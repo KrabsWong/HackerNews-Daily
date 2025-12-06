@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
-import Table from 'cli-table3';
 import { fetchTopStories, HNStory } from './api/hackerNews';
 import { translator } from './services/translator';
+import { fetchArticlesBatch } from './services/articleFetcher';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -12,6 +12,8 @@ interface ProcessedStory {
   titleEnglish: string;
   score: number;
   url: string;
+  time: string;
+  description: string;
 }
 
 /**
@@ -43,18 +45,30 @@ async function main(): Promise<void> {
     const titles = stories.map(s => s.title);
     const translatedTitles = await translator.translateBatch(titles);
     
+    // Fetch article descriptions
+    console.log('\nFetching article details...');
+    const urls = stories.map(s => s.url || `https://news.ycombinator.com/item?id=${s.id}`);
+    const articleMetadata = await fetchArticlesBatch(urls);
+    
+    // Translate descriptions
+    console.log('\nTranslating descriptions to Chinese...');
+    const descriptions = articleMetadata.map(meta => meta.description);
+    const translatedDescriptions = await translator.translateDescriptionsBatch(descriptions);
+    
     // Process stories with translations
     const processedStories: ProcessedStory[] = stories.map((story, index) => ({
       rank: index + 1,
       titleChinese: translatedTitles[index],
       titleEnglish: story.title,
       score: story.score,
-      url: story.url || `https://news.ycombinator.com/item?id=${story.id}`,
+      url: urls[index],
+      time: formatTimestamp(story.time),
+      description: translatedDescriptions[index],
     }));
     
     // Display results
     console.log('\nRendering results...\n');
-    displayTable(processedStories);
+    displayCards(processedStories);
     
     console.log(`\n✅ Successfully fetched and translated ${stories.length} stories\n`);
   } catch (error) {
@@ -64,30 +78,33 @@ async function main(): Promise<void> {
 }
 
 /**
- * Display stories in a formatted table
+ * Format Unix timestamp to local datetime string (YYYY-MM-DD HH:mm)
  */
-function displayTable(stories: ProcessedStory[]): void {
-  const table = new Table({
-    head: ['Rank', 'Title (Chinese)', 'Title (English)', 'Score', 'URL'],
-    colWidths: [6, 40, 40, 7, 50],
-    wordWrap: true,
-    style: {
-      head: ['cyan', 'bold'],
-      border: ['gray'],
-    },
-  });
+function formatTimestamp(unixTime: number): string {
+  const date = new Date(unixTime * 1000);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
+/**
+ * Display stories in card-based format
+ */
+function displayCards(stories: ProcessedStory[]): void {
+  const separator = '━'.repeat(60);
   
   for (const story of stories) {
-    table.push([
-      story.rank.toString(),
-      story.titleChinese,
-      story.titleEnglish,
-      story.score.toString(),
-      story.url,
-    ]);
+    console.log(`#${story.rank} 【${story.titleChinese}】`);
+    console.log(story.titleEnglish);
+    console.log(`发布时间：${story.time}`);
+    console.log(`链接：${story.url}`);
+    console.log(`描述：${story.description}`);
+    console.log(separator);
   }
-  
-  console.log(table.toString());
 }
 
 /**

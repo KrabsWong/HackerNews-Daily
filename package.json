@@ -8,12 +8,17 @@
     "build": "tsc",
     "start": "node dist/index.js"
   },
-  "keywords": ["hackernews", "cli", "translation", "chinese"],
+  "keywords": [
+    "hackernews",
+    "cli",
+    "translation",
+    "chinese"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
     "axios": "^1.6.2",
-    "cli-table3": "^0.6.3",
+    "cheerio": "^1.1.2",
     "dotenv": "^16.3.1"
   },
   "devDependencies": {

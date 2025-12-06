@@ -1,14 +1,16 @@
 # HackerNews Daily - Chinese Translation
 
-A CLI tool that fetches top HackerNews stories from the past 24 hours and translates titles to Chinese using DeepSeek AI.
+A CLI tool that fetches top HackerNews stories from the past 24 hours, translates titles and article summaries to Chinese using DeepSeek AI, and displays them in a clean card-based format.
 
 ## Features
 
 - 🔍 Fetches best stories from HackerNews API
-- 🌏 Translates titles to Chinese using DeepSeek LLM
-- 📊 Displays results in a formatted console table
+- 📄 Extracts article summaries from original URLs
+- 🌏 Translates titles and descriptions to Chinese using DeepSeek LLM
+- 📊 Displays results in a clean card-based format with timestamps
 - ⚙️ Configurable via environment variables
 - 🛡️ Graceful error handling with helpful messages
+- ⚡ Parallel article fetching for optimal performance
 
 ## Prerequisites
 
@@ -51,8 +53,9 @@ npm run fetch
 This will:
 1. Fetch the top stories from HackerNews
 2. Filter stories from the past 24 hours
-3. Translate each title to Chinese
-4. Display results in a formatted table
+3. Fetch article descriptions from original URLs
+4. Translate titles and descriptions to Chinese
+5. Display results in a card-based format with timestamps
 
 ## Configuration
 
@@ -78,14 +81,26 @@ Translated 5/28 titles...
 Translated 10/28 titles...
 ...
 
+Fetching article details...
+
+Translating descriptions to Chinese...
+Translated 5/28 descriptions...
+...
+
 Rendering results...
 
-┌──────┬────────────────────────────────┬────────────────────────────────┬───────┬──────────────────────────────┐
-│ Rank │ Title (Chinese)                │ Title (English)                │ Score │ URL                          │
-├──────┼────────────────────────────────┼────────────────────────────────┼───────┼──────────────────────────────┤
-│ 1    │ 翻译的中文标题                   │ Original English Title         │ 342   │ https://example.com/...      │
-│ 2    │ 另一个中文标题                   │ Another English Title          │ 256   │ https://example.com/...      │
-└──────┴────────────────────────────────┴────────────────────────────────┴───────┴──────────────────────────────┘
+#1 【人工智能的未来展望】
+The Future of Artificial Intelligence
+发布时间：2025-12-06 14:30
+链接：https://example.com/article
+描述：本文探讨了人工智能技术的最新发展和未来趋势...
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#2 【新型编程语言发布】
+New Programming Language Released
+发布时间：2025-12-06 12:15
+链接：https://example.com/article2
+描述：一个专注于性能和安全性的全新编程语言正式发布...
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ✅ Successfully fetched and translated 28 stories
 ```
@@ -117,10 +132,11 @@ Project structure:
 ```
 src/
 ├── api/
-│   └── hackerNews.ts    # HackerNews API client
+│   └── hackerNews.ts       # HackerNews API client
 ├── services/
-│   └── translator.ts    # DeepSeek translation service
-└── index.ts             # Main CLI entry point
+│   ├── translator.ts       # DeepSeek translation service
+│   └── articleFetcher.ts   # Article metadata fetching service
+└── index.ts                # Main CLI entry point
 ```
 
 ## Troubleshooting
@@ -136,6 +152,13 @@ This happens when:
 - DeepSeek API is temporarily unavailable
 - Rate limits are hit
 - The tool falls back gracefully to English titles
+
+### No descriptions shown ("暂无描述")
+This happens when:
+- The article URL blocks automated requests
+- The website doesn't have meta description tags
+- The fetch times out after 5 seconds
+- The tool continues gracefully without breaking
 
 ### No stories found
 Try increasing `HN_TIME_WINDOW_HOURS` in your `.env` file to look further back in time.

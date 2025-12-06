@@ -133,6 +133,80 @@ class TranslationService {
     
     return translations;
   }
+
+  /**
+   * Translate a description text to Chinese
+   * Returns "暂无描述" if description is null/empty
+   * Returns original text if translation fails
+   */
+  async translateDescription(description: string | null): Promise<string> {
+    // Handle null or empty descriptions
+    if (!description || description.trim() === '') {
+      return '暂无描述';
+    }
+
+    // Check if already in Chinese
+    if (/[\u4e00-\u9fa5]/.test(description)) {
+      return description;
+    }
+
+    try {
+      const request: DeepSeekRequest = {
+        model: 'deepseek-chat',
+        messages: [
+          {
+            role: 'user',
+            content: `Translate this article description to Chinese. Only output the translation, no explanations: ${description}`
+          }
+        ],
+        temperature: 0.3,
+      };
+
+      const response = await axios.post<DeepSeekResponse>(
+        `${DEEPSEEK_API_BASE}/chat/completions`,
+        request,
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: REQUEST_TIMEOUT,
+        }
+      );
+
+      const translation = response.data.choices[0]?.message?.content?.trim();
+      
+      if (!translation) {
+        console.warn(`Description translation returned empty, using fallback`);
+        return '暂无描述';
+      }
+
+      return translation;
+    } catch (error) {
+      console.warn(`Description translation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return description; // Fallback to original
+    }
+  }
+
+  /**
+   * Translate multiple descriptions sequentially
+   * Maintains order and handles errors gracefully
+   */
+  async translateDescriptionsBatch(descriptions: (string | null)[]): Promise<string[]> {
+    const translations: string[] = [];
+    
+    for (let i = 0; i < descriptions.length; i++) {
+      const translation = await this.translateDescription(descriptions[i]);
+      translations.push(translation);
+      
+      // Show progress
+      if ((i + 1) % 5 === 0 || i === descriptions.length - 1) {
+        console.log(`Translated ${i + 1}/${descriptions.length} descriptions...`);
+      }
+    }
+    
+    return translations;
+  }
 }
 
 // Export singleton instance
