@@ -2,9 +2,20 @@ import dotenv from 'dotenv';
 import { fetchTopStories, HNStory, fetchCommentsBatch } from './api/hackerNews';
 import { translator } from './services/translator';
 import { fetchArticlesBatch } from './services/articleFetcher';
+import { startWebServer, ProcessedStory as WebProcessedStory } from './server/app';
 
 // Load environment variables from .env file
 dotenv.config();
+
+/**
+ * Parse command-line arguments to check for --web flag
+ */
+function parseArgs(): { webMode: boolean } {
+  const args = process.argv.slice(2);
+  return {
+    webMode: args.includes('--web') || args.includes('-w')
+  };
+}
 
 // Story limit constants
 // Maximum safe limit to prevent performance issues and API rate limiting
@@ -83,7 +94,14 @@ function validateSummaryLength(requested: number): number {
  */
 async function main(): Promise<void> {
   try {
+    // Parse command-line arguments
+    const { webMode } = parseArgs();
+    
     console.log('\n🔍 HackerNews Daily - Chinese Translation\n');
+    
+    if (webMode) {
+      console.log('📺 Web mode enabled - will open in browser\n');
+    }
     
     // Validate configuration
     console.log('Validating configuration...');
@@ -150,11 +168,18 @@ async function main(): Promise<void> {
       commentSummary: commentSummaries[index],
     }));
     
-    // Display results
-    console.log('\nRendering results...\n');
-    displayCards(processedStories);
-    
-    console.log(`\n✅ Successfully fetched and translated ${stories.length} stories\n`);
+    // Display results based on mode
+    if (webMode) {
+      console.log('\nStarting web server...\n');
+      await startWebServer(processedStories);
+      // Keep process alive for web server
+      console.log('Press Ctrl+C to stop the server');
+    } else {
+      // CLI mode - display in terminal
+      console.log('\nRendering results...\n');
+      displayCards(processedStories);
+      console.log(`\n✅ Successfully fetched and translated ${stories.length} stories\n`);
+    }
   } catch (error) {
     handleError(error);
     process.exit(1);

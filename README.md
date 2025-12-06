@@ -10,6 +10,7 @@ A CLI tool that fetches top HackerNews stories from the past 24 hours, extracts 
 - 💬 Fetches top 10 comments and generates concise summaries (~100 characters)
 - 🌏 Translates titles and summaries to Chinese using DeepSeek LLM
 - 📊 Displays results in a clean card-based format with timestamps
+- 🌐 **Web UI Mode**: View stories in a browser with a clean Vue.js interface
 - ⚙️ Configurable via environment variables (story limit, time window, summary length)
 - 🛡️ Graceful error handling with fallback to meta descriptions
 - ⚡ Sequential processing to respect API rate limits
@@ -48,10 +49,31 @@ SUMMARY_MAX_LENGTH=300
 
 ## Usage
 
+### CLI Mode (Default)
+
 Run the CLI tool:
 ```bash
 npm run fetch
 ```
+
+### Web UI Mode
+
+View stories in your browser with a clean web interface:
+```bash
+npm run fetch:web
+```
+
+Or use the `--web` flag:
+```bash
+npm run fetch -- --web
+```
+
+When web mode is enabled:
+1. Stories are fetched and processed as usual
+2. A local web server starts on port 3000 (or next available port)
+3. Your default browser opens automatically
+4. Stories are displayed in a clean card-based layout
+5. Press `Ctrl+C` in the terminal to stop the server
 
 This will:
 1. Fetch the top stories from HackerNews
@@ -144,9 +166,24 @@ To build the TypeScript code:
 npm run build
 ```
 
+To build the Vue.js web frontend:
+```bash
+npm run build:web
+```
+
+To build everything (web frontend + TypeScript backend):
+```bash
+npm run build:all
+```
+
 This creates a `dist/` directory with compiled JavaScript. You can then run:
 ```bash
 npm start
+```
+
+Or with web mode:
+```bash
+npm start:web
 ```
 
 ## Error Handling
@@ -165,10 +202,22 @@ Project structure:
 src/
 ├── api/
 │   └── hackerNews.ts       # HackerNews API client
+├── server/
+│   └── app.ts              # Express web server for web mode
 ├── services/
 │   ├── translator.ts       # DeepSeek translation service
 │   └── articleFetcher.ts   # Article metadata fetching service
 └── index.ts                # Main CLI entry point
+
+web/                        # Vue.js frontend for web mode
+├── src/
+│   ├── App.vue             # Main app component
+│   ├── components/
+│   │   └── StoryCard.vue   # Story card component
+│   └── main.ts             # Vue app entry point
+├── index.html              # HTML template
+├── vite.config.ts          # Vite build configuration
+└── package.json            # Frontend dependencies
 ```
 
 ## Troubleshooting
@@ -215,6 +264,20 @@ This happens when:
 
 ### No stories found
 Try increasing `HN_TIME_WINDOW_HOURS` in your `.env` file to look further back in time.
+
+### Web mode issues
+
+**Browser doesn't open automatically:**
+- The URL is displayed in the terminal - copy and paste it into your browser
+- Try opening `http://localhost:3000` manually
+
+**Port already in use:**
+- The server automatically tries the next available port (3001, 3002, etc.)
+- Check the terminal output for the actual port being used
+
+**Web page shows "Loading stories...":**
+- Wait for the fetch process to complete
+- Check the terminal for progress and any errors
 
 ### Fewer stories than expected
 If you're receiving fewer stories than requested (e.g., 8 stories when `HN_STORY_LIMIT=30`), this is likely due to **time window filtering**:
