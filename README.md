@@ -163,6 +163,24 @@ This happens when:
 ### No stories found
 Try increasing `HN_TIME_WINDOW_HOURS` in your `.env` file to look further back in time.
 
+### Fewer stories than expected
+If you're receiving fewer stories than requested (e.g., 8 stories when `HN_STORY_LIMIT=30`), this is likely due to **time window filtering**:
+
+**Why this happens:**
+- The tool fetches stories from HackerNews, then filters them by the time window
+- With a 24-hour window, many top stories may be older than 24 hours
+- Only stories within your `HN_TIME_WINDOW_HOURS` are kept
+
+**Solutions:**
+- **Increase the time window**: Set `HN_TIME_WINDOW_HOURS=48` or `72` for more results
+- **The tool automatically compensates**: It fetches more stories than requested to account for filtering
+- **Expect some variation**: The final count may be slightly lower than requested due to filtering
+
+**Note about limits:**
+- Maximum supported limit: **30 stories** (for performance and API rate limiting)
+- Requesting more than 50 stories will show a warning and cap at 30
+- This ensures optimal performance and prevents API abuse
+
 ## API Documentation
 
 - **HackerNews API**: https://github.com/HackerNews/API

@@ -6,6 +6,12 @@ import { fetchArticlesBatch } from './services/articleFetcher';
 // Load environment variables from .env file
 dotenv.config();
 
+// Story limit constants
+// Maximum safe limit to prevent performance issues and API rate limiting
+const MAX_STORY_LIMIT = 30;
+// Threshold at which to warn users their limit will be capped
+const WARN_THRESHOLD = 50;
+
 interface ProcessedStory {
   rank: number;
   titleChinese: string;
@@ -14,6 +20,28 @@ interface ProcessedStory {
   url: string;
   time: string;
   description: string;
+}
+
+/**
+ * Validate and cap the story limit to prevent performance issues
+ * @param requested - The requested story limit from environment variable
+ * @returns The validated limit (capped at MAX_STORY_LIMIT if necessary)
+ */
+function validateStoryLimit(requested: number): number {
+  // Handle invalid inputs (NaN, negative, zero)
+  if (isNaN(requested) || requested <= 0) {
+    console.warn(`⚠️  Invalid story limit (${requested}). Using default of ${MAX_STORY_LIMIT} stories.`);
+    return MAX_STORY_LIMIT;
+  }
+  
+  // Check if requested limit exceeds warning threshold
+  if (requested >= WARN_THRESHOLD) {
+    console.warn(`⚠️  Requested story limit (${requested}) exceeds maximum supported limit. Using ${MAX_STORY_LIMIT} stories instead.`);
+    return MAX_STORY_LIMIT;
+  }
+  
+  // Accept limit if within safe range
+  return requested;
 }
 
 /**
@@ -28,8 +56,12 @@ async function main(): Promise<void> {
     translator.init();
     
     // Get configuration from environment
-    const storyLimit = parseInt(process.env.HN_STORY_LIMIT || '30', 10);
+    const requestedLimit = parseInt(process.env.HN_STORY_LIMIT || '30', 10);
+    const storyLimit = validateStoryLimit(requestedLimit);
     const timeWindowHours = parseInt(process.env.HN_TIME_WINDOW_HOURS || '24', 10);
+    
+    // Display fetch parameters
+    console.log(`Fetching up to ${storyLimit} stories from the past ${timeWindowHours} hours...`);
     
     // Fetch stories from HackerNews
     const stories = await fetchTopStories(storyLimit, timeWindowHours);
@@ -38,6 +70,12 @@ async function main(): Promise<void> {
       console.log('\n⚠️  No stories found in the specified time window.');
       console.log('Try increasing HN_TIME_WINDOW_HOURS or HN_STORY_LIMIT in your .env file.');
       return;
+    }
+    
+    // Check if result count is significantly lower than requested
+    if (stories.length < storyLimit * 0.5) {
+      console.log(`\n⚠️  Only ${stories.length} stories found (requested ${storyLimit}).`);
+      console.log(`Try increasing HN_TIME_WINDOW_HOURS in your .env file for more results.\n`);
     }
     
     // Translate titles

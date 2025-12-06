@@ -2,6 +2,7 @@ import axios, { AxiosError } from 'axios';
 
 const HN_API_BASE = 'https://hacker-news.firebaseio.com/v0';
 const REQUEST_TIMEOUT = 10000; // 10 seconds
+const MAX_FETCH_LIMIT = 100; // Absolute maximum to prevent performance issues
 
 export interface HNStory {
   id: number;
@@ -64,6 +65,33 @@ export function filterByTime(stories: HNStory[], hours: number): HNStory[] {
 }
 
 /**
+ * Calculate the number of stories to fetch from the API to compensate for time filtering
+ * Applies a multiplier based on the time window to ensure we get approximately the requested count
+ * @param requestedLimit - The number of stories the user wants after filtering
+ * @param timeWindowHours - The time window filter in hours
+ * @returns The buffered fetch count (capped at MAX_FETCH_LIMIT)
+ */
+export function calculateFetchBuffer(requestedLimit: number, timeWindowHours: number): number {
+  // Apply different multipliers based on time window strictness
+  // 24h or less: 2.5x buffer (stricter filtering)
+  // More than 24h: 1.5x buffer (less filtering needed)
+  const multiplier = timeWindowHours <= 24 ? 2.5 : 1.5;
+  
+  const bufferedCount = Math.ceil(requestedLimit * multiplier);
+  
+  // Cap at absolute maximum for safety
+  const cappedCount = Math.min(bufferedCount, MAX_FETCH_LIMIT);
+  
+  if (bufferedCount > MAX_FETCH_LIMIT) {
+    console.warn(`⚠️  Buffer calculation (${bufferedCount}) exceeds maximum fetch limit. Capping at ${MAX_FETCH_LIMIT}.`);
+  }
+  
+  console.log(`Fetching ${cappedCount} stories (${multiplier}x buffer for ${timeWindowHours}h window) to achieve ~${requestedLimit} after filtering...`);
+  
+  return cappedCount;
+}
+
+/**
  * Fetch top N stories from HackerNews within a time window
  */
 export async function fetchTopStories(limit: number, timeWindowHours: number): Promise<HNStory[]> {
@@ -72,8 +100,11 @@ export async function fetchTopStories(limit: number, timeWindowHours: number): P
   // Get all best story IDs
   const storyIds = await fetchBestStories();
   
+  // Calculate buffered fetch count to compensate for time filtering
+  const fetchCount = calculateFetchBuffer(limit, timeWindowHours);
+  
   // Limit the number of stories to fetch (take first N from best list)
-  const limitedIds = storyIds.slice(0, limit);
+  const limitedIds = storyIds.slice(0, fetchCount);
   
   // Fetch details for each story
   const storyPromises = limitedIds.map(id => fetchStoryDetails(id));
