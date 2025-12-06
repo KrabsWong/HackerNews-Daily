@@ -1,12 +1,13 @@
 # HackerNews Daily - Chinese Translation
 
-A CLI tool that fetches top HackerNews stories from the past 24 hours, extracts full article content, generates AI-powered summaries, translates everything to Chinese using DeepSeek AI, and displays them in a clean card-based format.
+A CLI tool that fetches top HackerNews stories from the past 24 hours, extracts full article content, generates AI-powered summaries, fetches and summarizes top comments, and translates everything to Chinese using DeepSeek AI, displaying them in a clean card-based format.
 
 ## Features
 
 - 🔍 Fetches best stories from HackerNews API
 - 📄 Extracts full article content using smart content extraction (Mozilla Readability)
 - 🤖 Generates AI-powered summaries (~300 characters) from full article text
+- 💬 Fetches top 10 comments and generates concise summaries (~100 characters)
 - 🌏 Translates titles and summaries to Chinese using DeepSeek LLM
 - 📊 Displays results in a clean card-based format with timestamps
 - ⚙️ Configurable via environment variables (story limit, time window, summary length)
@@ -56,11 +57,20 @@ This will:
 1. Fetch the top stories from HackerNews
 2. Filter stories from the past 24 hours
 3. Extract full article content from original URLs using smart content extraction
-4. Generate AI-powered summaries of the article content
-5. Translate titles and summaries to Chinese
-6. Display results in a card-based format with timestamps
+4. Fetch top 10 comments for each story
+5. Generate AI-powered summaries of the article content and comments
+6. Translate titles and summaries to Chinese
+7. Display results in a card-based format with timestamps
 
 **Note**: The tool uses Mozilla Readability algorithm to extract article content, automatically filtering out navigation, ads, and other non-content elements. If content extraction fails for any article, it gracefully falls back to translating the meta description.
+
+### Comment Summaries
+
+The tool fetches the top 10 comments for each story (ranked by HackerNews algorithm) and generates a concise ~100 character summary of key discussion points. Comment summaries:
+- Preserve technical terms and library names
+- Capture main viewpoints and community consensus
+- Mention controversial opinions when present
+- Only appear if a story has at least 3 comments
 
 ## Configuration
 
@@ -102,6 +112,12 @@ Generating AI-powered summaries...
 Processed 5/28 summaries...
 ...
 
+Fetching top comments for each story...
+
+Summarizing comments...
+Summarized 5/28 comment threads...
+...
+
 Rendering results...
 
 #1 【人工智能的未来展望】
@@ -109,6 +125,7 @@ The Future of Artificial Intelligence
 发布时间：2025-12-06 14:30
 链接：https://example.com/article
 描述：本文探讨了人工智能技术的最新发展和未来趋势...
+评论要点：社区讨论了 GPT-4 的性能提升，多数认为新的推理能力很实用，但有人担心成本问题
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #2 【新型编程语言发布】
 New Programming Language Released
@@ -178,12 +195,23 @@ This happens when:
 - The tool continues gracefully without breaking
 
 ### Performance & Timing
-The tool processes articles sequentially to respect API rate limits:
-- **Per article**: ~2-3 seconds (content extraction + AI summarization + translation)
-- **For 30 articles**: ~1.5-2 minutes total
+The tool processes articles and comments sequentially to respect API rate limits:
+- **Per article**: ~4-6 seconds (content + comments extraction + AI summarization + translation)
+- **For 30 articles**: ~2.5-3.5 minutes total
 - This is normal and expected behavior due to AI processing
 
+**Comment processing adds ~1.5-3s per story:**
+- Fetching 10 comments: ~0.5-1s
+- AI summarization: ~1-2s
+
 **Tip**: Start with `HN_STORY_LIMIT=5` for quick testing before processing larger batches.
+
+### No comment summary shown
+This happens when:
+- The story has fewer than 3 comments (not enough for meaningful summary)
+- Comment fetching fails (deleted comments, API issues)
+- Comment summarization fails
+- The tool continues gracefully, showing only article content
 
 ### No stories found
 Try increasing `HN_TIME_WINDOW_HOURS` in your `.env` file to look further back in time.

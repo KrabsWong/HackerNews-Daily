@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { fetchTopStories, HNStory } from './api/hackerNews';
+import { fetchTopStories, HNStory, fetchCommentsBatch } from './api/hackerNews';
 import { translator } from './services/translator';
 import { fetchArticlesBatch } from './services/articleFetcher';
 
@@ -25,6 +25,7 @@ interface ProcessedStory {
   url: string;
   time: string;
   description: string;
+  commentSummary: string | null; // AI summary of top comments
 }
 
 /**
@@ -129,6 +130,14 @@ async function main(): Promise<void> {
     const metaDescriptions = articleMetadata.map(meta => meta.description);
     const summaries = await translator.summarizeBatch(fullContents, metaDescriptions, summaryMaxLength);
     
+    // Fetch top comments for each story
+    console.log('\nFetching top comments for each story...');
+    const commentArrays = await fetchCommentsBatch(stories, 10);
+    
+    // Summarize comments
+    console.log('\nSummarizing comments...');
+    const commentSummaries = await translator.summarizeCommentsBatch(commentArrays);
+    
     // Process stories with translations
     const processedStories: ProcessedStory[] = stories.map((story, index) => ({
       rank: index + 1,
@@ -138,6 +147,7 @@ async function main(): Promise<void> {
       url: urls[index],
       time: formatTimestamp(story.time),
       description: summaries[index],
+      commentSummary: commentSummaries[index],
     }));
     
     // Display results
@@ -177,6 +187,12 @@ function displayCards(stories: ProcessedStory[]): void {
     console.log(`发布时间：${story.time}`);
     console.log(`链接：${story.url}`);
     console.log(`描述：${story.description}`);
+    
+    // Display comment summary if available
+    if (story.commentSummary) {
+      console.log(`评论要点：${story.commentSummary}`);
+    }
+    
     console.log(separator);
   }
 }

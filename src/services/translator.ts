@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios';
+import { HNComment, stripHTML } from '../api/hackerNews';
 
 const DEEPSEEK_API_BASE = 'https://api.deepseek.com/v1';
 const REQUEST_TIMEOUT = 30000; // 30 seconds for translation
@@ -252,6 +253,111 @@ ${content}`
       console.warn(`Summarization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return null; // Return null to trigger fallback
     }
+  }
+
+  /**
+   * Summarize HackerNews comments into a concise Chinese summary
+   * Returns null if comments are insufficient (<3) or summarization fails
+   * @param comments - Array of comment objects to summarize
+   * @returns Chinese summary string or null
+   */
+  async summarizeComments(comments: HNComment[]): Promise<string | null> {
+    if (!this.apiKey) {
+      throw new Error('Translation service not initialized');
+    }
+
+    // Need at least 3 comments for meaningful summary
+    if (!comments || comments.length < 3) {
+      return null;
+    }
+
+    try {
+      // Extract plain text from each comment
+      const commentTexts = comments.map(comment => stripHTML(comment.text)).filter(text => text.length > 0);
+      
+      if (commentTexts.length < 3) {
+        return null;
+      }
+
+      // Concatenate comments with separators
+      let combinedText = commentTexts.join('\n---\n');
+      
+      // Truncate if too long (prevent token limit issues)
+      if (combinedText.length > 5000) {
+        combinedText = combinedText.substring(0, 5000) + '...';
+      }
+
+      const request: DeepSeekRequest = {
+        model: 'deepseek-chat',
+        messages: [
+          {
+            role: 'user',
+            content: `总结以下 HackerNews 评论中的关键讨论要点。要求：
+- 总结长度约为 100 个字符
+- 保留重要的技术术语、库名称、工具名称（如 React、TypeScript、AWS 等）
+- 捕捉评论中的主要观点和共识
+- 如果有争议观点，简要提及
+- 使用清晰、简洁的中文表达
+
+评论内容：
+${combinedText}`
+          }
+        ],
+        temperature: 0.5,
+      };
+
+      const response = await axios.post<DeepSeekResponse>(
+        `${DEEPSEEK_API_BASE}/chat/completions`,
+        request,
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: REQUEST_TIMEOUT,
+        }
+      );
+
+      const summary = response.data.choices[0]?.message?.content?.trim();
+      
+      if (!summary) {
+        console.warn('Comment summarization returned empty');
+        return null;
+      }
+
+      return summary;
+    } catch (error) {
+      console.warn(`Comment summarization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return null;
+    }
+  }
+
+  /**
+   * Summarize comments for multiple stories sequentially
+   * @param commentArrays - Array of comment arrays (one per story)
+   * @returns Array of summary strings (or null if insufficient comments)
+   */
+  async summarizeCommentsBatch(commentArrays: HNComment[][]): Promise<(string | null)[]> {
+    const summaries: (string | null)[] = [];
+    
+    for (let i = 0; i < commentArrays.length; i++) {
+      const comments = commentArrays[i];
+      
+      // Skip if too few comments
+      if (comments.length < 3) {
+        summaries.push(null);
+      } else {
+        const summary = await this.summarizeComments(comments);
+        summaries.push(summary);
+      }
+      
+      // Show progress
+      if ((i + 1) % 5 === 0 || i === commentArrays.length - 1) {
+        console.log(`Summarized ${i + 1}/${commentArrays.length} comment threads...`);
+      }
+    }
+    
+    return summaries;
   }
 
   /**
