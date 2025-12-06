@@ -12,6 +12,11 @@ const MAX_STORY_LIMIT = 30;
 // Threshold at which to warn users their limit will be capped
 const WARN_THRESHOLD = 50;
 
+// Summary length constants
+const DEFAULT_SUMMARY_LENGTH = 300;
+const MIN_SUMMARY_LENGTH = 100;
+const MAX_SUMMARY_LENGTH = 500;
+
 interface ProcessedStory {
   rank: number;
   titleChinese: string;
@@ -45,6 +50,34 @@ function validateStoryLimit(requested: number): number {
 }
 
 /**
+ * Validate and cap the summary length to ensure quality summaries
+ * @param requested - The requested summary length from environment variable
+ * @returns The validated length (capped within MIN_SUMMARY_LENGTH and MAX_SUMMARY_LENGTH)
+ */
+function validateSummaryLength(requested: number): number {
+  // Handle invalid inputs (NaN, negative, zero)
+  if (isNaN(requested) || requested <= 0) {
+    console.warn(`⚠️  Invalid SUMMARY_MAX_LENGTH (${requested}). Using default of ${DEFAULT_SUMMARY_LENGTH} characters.`);
+    return DEFAULT_SUMMARY_LENGTH;
+  }
+  
+  // Check if too short
+  if (requested < MIN_SUMMARY_LENGTH) {
+    console.warn(`⚠️  SUMMARY_MAX_LENGTH too short (${requested}). Using minimum of ${MIN_SUMMARY_LENGTH} characters.`);
+    return MIN_SUMMARY_LENGTH;
+  }
+  
+  // Check if too long
+  if (requested > MAX_SUMMARY_LENGTH) {
+    console.warn(`⚠️  SUMMARY_MAX_LENGTH too large (${requested}). Capping at ${MAX_SUMMARY_LENGTH} characters.`);
+    return MAX_SUMMARY_LENGTH;
+  }
+  
+  // Accept length if within valid range
+  return requested;
+}
+
+/**
  * Main CLI function
  */
 async function main(): Promise<void> {
@@ -59,6 +92,8 @@ async function main(): Promise<void> {
     const requestedLimit = parseInt(process.env.HN_STORY_LIMIT || '30', 10);
     const storyLimit = validateStoryLimit(requestedLimit);
     const timeWindowHours = parseInt(process.env.HN_TIME_WINDOW_HOURS || '24', 10);
+    const requestedSummaryLength = parseInt(process.env.SUMMARY_MAX_LENGTH || '300', 10);
+    const summaryMaxLength = validateSummaryLength(requestedSummaryLength);
     
     // Display fetch parameters
     console.log(`Fetching up to ${storyLimit} stories from the past ${timeWindowHours} hours...`);
@@ -83,15 +118,16 @@ async function main(): Promise<void> {
     const titles = stories.map(s => s.title);
     const translatedTitles = await translator.translateBatch(titles);
     
-    // Fetch article descriptions
-    console.log('\nFetching article details...');
+    // Fetch article details (includes full content extraction)
+    console.log('\nFetching and extracting article content...');
     const urls = stories.map(s => s.url || `https://news.ycombinator.com/item?id=${s.id}`);
     const articleMetadata = await fetchArticlesBatch(urls);
     
-    // Translate descriptions
-    console.log('\nTranslating descriptions to Chinese...');
-    const descriptions = articleMetadata.map(meta => meta.description);
-    const translatedDescriptions = await translator.translateDescriptionsBatch(descriptions);
+    // Generate AI summaries or translate descriptions
+    console.log('\nGenerating AI-powered summaries...');
+    const fullContents = articleMetadata.map(meta => meta.fullContent);
+    const metaDescriptions = articleMetadata.map(meta => meta.description);
+    const summaries = await translator.summarizeBatch(fullContents, metaDescriptions, summaryMaxLength);
     
     // Process stories with translations
     const processedStories: ProcessedStory[] = stories.map((story, index) => ({
@@ -101,7 +137,7 @@ async function main(): Promise<void> {
       score: story.score,
       url: urls[index],
       time: formatTimestamp(story.time),
-      description: translatedDescriptions[index],
+      description: summaries[index],
     }));
     
     // Display results

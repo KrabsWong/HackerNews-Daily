@@ -1,16 +1,17 @@
 # HackerNews Daily - Chinese Translation
 
-A CLI tool that fetches top HackerNews stories from the past 24 hours, translates titles and article summaries to Chinese using DeepSeek AI, and displays them in a clean card-based format.
+A CLI tool that fetches top HackerNews stories from the past 24 hours, extracts full article content, generates AI-powered summaries, translates everything to Chinese using DeepSeek AI, and displays them in a clean card-based format.
 
 ## Features
 
 - 🔍 Fetches best stories from HackerNews API
-- 📄 Extracts article summaries from original URLs
-- 🌏 Translates titles and descriptions to Chinese using DeepSeek LLM
+- 📄 Extracts full article content using smart content extraction (Mozilla Readability)
+- 🤖 Generates AI-powered summaries (~300 characters) from full article text
+- 🌏 Translates titles and summaries to Chinese using DeepSeek LLM
 - 📊 Displays results in a clean card-based format with timestamps
-- ⚙️ Configurable via environment variables
-- 🛡️ Graceful error handling with helpful messages
-- ⚡ Parallel article fetching for optimal performance
+- ⚙️ Configurable via environment variables (story limit, time window, summary length)
+- 🛡️ Graceful error handling with fallback to meta descriptions
+- ⚡ Sequential processing to respect API rate limits
 
 ## Prerequisites
 
@@ -41,6 +42,7 @@ Your `.env` file should look like:
 DEEPSEEK_API_KEY=your_api_key_here
 HN_STORY_LIMIT=30
 HN_TIME_WINDOW_HOURS=24
+SUMMARY_MAX_LENGTH=300
 ```
 
 ## Usage
@@ -53,9 +55,12 @@ npm run fetch
 This will:
 1. Fetch the top stories from HackerNews
 2. Filter stories from the past 24 hours
-3. Fetch article descriptions from original URLs
-4. Translate titles and descriptions to Chinese
-5. Display results in a card-based format with timestamps
+3. Extract full article content from original URLs using smart content extraction
+4. Generate AI-powered summaries of the article content
+5. Translate titles and summaries to Chinese
+6. Display results in a card-based format with timestamps
+
+**Note**: The tool uses Mozilla Readability algorithm to extract article content, automatically filtering out navigation, ads, and other non-content elements. If content extraction fails for any article, it gracefully falls back to translating the meta description.
 
 ## Configuration
 
@@ -64,8 +69,18 @@ Configure the tool by editing `.env`:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DEEPSEEK_API_KEY` | Your DeepSeek API key (required) | - |
-| `HN_STORY_LIMIT` | Maximum number of stories to fetch | 30 |
+| `HN_STORY_LIMIT` | Maximum number of stories to fetch (capped at 30) | 30 |
 | `HN_TIME_WINDOW_HOURS` | Only show stories from past N hours | 24 |
+| `SUMMARY_MAX_LENGTH` | Target length for AI-generated summaries (100-500 chars) | 300 |
+
+### Summary Generation
+
+The tool generates AI-powered summaries in two steps:
+
+1. **Content Extraction**: Uses Mozilla Readability to extract the main article text from HTML, automatically removing ads, navigation, and other clutter
+2. **AI Summarization**: Sends the extracted content to DeepSeek API to generate a concise Chinese summary of approximately `SUMMARY_MAX_LENGTH` characters
+
+**Fallback Behavior**: If content extraction or summarization fails, the tool falls back to translating the meta description (if available) or displays "暂无描述".
 
 ## Example Output
 
@@ -81,10 +96,10 @@ Translated 5/28 titles...
 Translated 10/28 titles...
 ...
 
-Fetching article details...
+Fetching and extracting article content...
 
-Translating descriptions to Chinese...
-Translated 5/28 descriptions...
+Generating AI-powered summaries...
+Processed 5/28 summaries...
 ...
 
 Rendering results...
@@ -155,10 +170,20 @@ This happens when:
 
 ### No descriptions shown ("暂无描述")
 This happens when:
+- Content extraction fails (JavaScript-heavy sites, paywalls, PDFs)
 - The article URL blocks automated requests
 - The website doesn't have meta description tags
 - The fetch times out after 5 seconds
+- AI summarization fails (falls back to meta description translation)
 - The tool continues gracefully without breaking
+
+### Performance & Timing
+The tool processes articles sequentially to respect API rate limits:
+- **Per article**: ~2-3 seconds (content extraction + AI summarization + translation)
+- **For 30 articles**: ~1.5-2 minutes total
+- This is normal and expected behavior due to AI processing
+
+**Tip**: Start with `HN_STORY_LIMIT=5` for quick testing before processing larger batches.
 
 ### No stories found
 Try increasing `HN_TIME_WINDOW_HOURS` in your `.env` file to look further back in time.

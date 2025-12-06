@@ -189,6 +189,72 @@ class TranslationService {
   }
 
   /**
+   * Generate an AI-powered summary of article content in Chinese
+   * Returns null if summarization fails (triggers fallback to meta description)
+   */
+  async summarizeContent(content: string, maxLength: number, retry = true): Promise<string | null> {
+    if (!this.apiKey) {
+      throw new Error('Translation service not initialized');
+    }
+
+    // Handle empty content
+    if (!content || content.trim() === '') {
+      return null;
+    }
+
+    try {
+      const request: DeepSeekRequest = {
+        model: 'deepseek-chat',
+        messages: [
+          {
+            role: 'user',
+            content: `请用中文总结以下文章内容。要求：
+- 总结长度约为 ${maxLength} 个字符
+- 抓住文章的核心要点和关键见解
+- 使用清晰、简洁的中文表达
+- 专注于读者需要了解的内容
+
+文章内容：
+${content}`
+          }
+        ],
+        temperature: 0.5,
+      };
+
+      const response = await axios.post<DeepSeekResponse>(
+        `${DEEPSEEK_API_BASE}/chat/completions`,
+        request,
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: REQUEST_TIMEOUT,
+        }
+      );
+
+      const summary = response.data.choices[0]?.message?.content?.trim();
+      
+      if (!summary) {
+        console.warn(`Summarization returned empty`);
+        return null;
+      }
+
+      return summary;
+    } catch (error) {
+      // Retry once on rate limit or temporary errors
+      if (retry && error instanceof AxiosError && error.response?.status === 429) {
+        console.warn('Rate limit hit during summarization, retrying after delay...');
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        return this.summarizeContent(content, maxLength, false);
+      }
+
+      console.warn(`Summarization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return null; // Return null to trigger fallback
+    }
+  }
+
+  /**
    * Translate multiple descriptions sequentially
    * Maintains order and handles errors gracefully
    */
@@ -206,6 +272,48 @@ class TranslationService {
     }
     
     return translations;
+  }
+
+  /**
+   * Summarize multiple article contents sequentially using AI
+   * Falls back to meta description translation for failed summarizations
+   * @param contents - Array of full article content strings
+   * @param fallbackDescriptions - Array of meta descriptions to use if summarization fails
+   * @param maxLength - Target summary length in characters
+   */
+  async summarizeBatch(
+    contents: (string | null)[],
+    fallbackDescriptions: (string | null)[],
+    maxLength: number
+  ): Promise<string[]> {
+    const summaries: string[] = [];
+    
+    for (let i = 0; i < contents.length; i++) {
+      let summary: string;
+      
+      // Try to summarize full content if available
+      if (contents[i]) {
+        const aiSummary = await this.summarizeContent(contents[i]!, maxLength);
+        if (aiSummary) {
+          summary = aiSummary;
+        } else {
+          // Fallback to translating meta description
+          summary = await this.translateDescription(fallbackDescriptions[i]);
+        }
+      } else {
+        // No full content available, use meta description
+        summary = await this.translateDescription(fallbackDescriptions[i]);
+      }
+      
+      summaries.push(summary);
+      
+      // Show progress
+      if ((i + 1) % 5 === 0 || i === summaries.length - 1) {
+        console.log(`Processed ${i + 1}/${contents.length} summaries...`);
+      }
+    }
+    
+    return summaries;
   }
 }
 
