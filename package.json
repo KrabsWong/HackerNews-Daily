@@ -1,0 +1,24 @@
+{
+  "name": "hacknews-daily",
+  "version": "1.0.0",
+  "description": "Fetch and translate HackerNews top stories to Chinese",
+  "main": "dist/index.js",
+  "scripts": {
+    "fetch": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "keywords": ["hackernews", "cli", "translation", "chinese"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.2",
+    "cli-table3": "^0.6.3",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
