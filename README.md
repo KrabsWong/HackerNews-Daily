@@ -11,7 +11,8 @@ A CLI tool that fetches top HackerNews stories from the past 24 hours, extracts 
 - 🌏 Translates titles and summaries to Chinese using DeepSeek LLM
 - 📊 Displays results in a clean card-based format with timestamps
 - 🌐 **Web UI Mode**: View stories in a browser with a clean Vue.js interface
-- ⚙️ Configurable via environment variables (story limit, time window, summary length)
+- 📦 **Local Caching**: Saves fetched data locally to avoid redundant API calls
+- ⚙️ Configurable via environment variables (story limit, time window, summary length, cache TTL)
 - 🛡️ Graceful error handling with fallback to meta descriptions
 - ⚡ Sequential processing to respect API rate limits
 
@@ -45,6 +46,8 @@ DEEPSEEK_API_KEY=your_api_key_here
 HN_STORY_LIMIT=30
 HN_TIME_WINDOW_HOURS=24
 SUMMARY_MAX_LENGTH=300
+CACHE_TTL_MINUTES=30
+CACHE_ENABLED=true
 ```
 
 ## Usage
@@ -66,6 +69,18 @@ npm run fetch:web
 Or use the `--web` flag:
 ```bash
 npm run fetch -- --web
+```
+
+### Force Refresh (Bypass Cache)
+
+To bypass the cache and fetch fresh data:
+```bash
+npm run fetch -- --no-cache
+```
+
+Or use the `--refresh` flag:
+```bash
+npm run fetch -- --refresh
 ```
 
 When web mode is enabled:
@@ -104,6 +119,8 @@ Configure the tool by editing `.env`:
 | `HN_STORY_LIMIT` | Maximum number of stories to fetch (capped at 30) | 30 |
 | `HN_TIME_WINDOW_HOURS` | Only show stories from past N hours | 24 |
 | `SUMMARY_MAX_LENGTH` | Target length for AI-generated summaries (100-500 chars) | 300 |
+| `CACHE_TTL_MINUTES` | Cache validity duration in minutes | 30 |
+| `CACHE_ENABLED` | Enable/disable local caching ("true" or "false") | true |
 
 ### Summary Generation
 
@@ -113,6 +130,23 @@ The tool generates AI-powered summaries in two steps:
 2. **AI Summarization**: Sends the extracted content to DeepSeek API to generate a concise Chinese summary of approximately `SUMMARY_MAX_LENGTH` characters
 
 **Fallback Behavior**: If content extraction or summarization fails, the tool falls back to translating the meta description (if available) or displays "暂无描述".
+
+### Caching
+
+The tool implements local file-based caching to avoid redundant API calls:
+
+- **Cache Location**: `.cache/stories.json` (automatically gitignored)
+- **Cache Hit**: If valid cache exists, data is returned instantly without any API calls
+- **Cache Miss**: Fresh data is fetched and saved to cache for future use
+- **Cache Invalidation**: Cache is invalidated when:
+  - TTL expires (default: 30 minutes)
+  - Configuration changes (story limit, time window, or summary length)
+  - `--no-cache` or `--refresh` flag is used
+
+**Benefits**:
+- Instant results on subsequent runs within TTL
+- Reduced API costs (no DeepSeek API calls when using cache)
+- Lower risk of hitting rate limits
 
 ## Example Output
 
@@ -202,9 +236,12 @@ Project structure:
 src/
 ├── api/
 │   └── hackerNews.ts       # HackerNews API client
+├── config/
+│   └── constants.ts        # Centralized configuration constants
 ├── server/
 │   └── app.ts              # Express web server for web mode
 ├── services/
+│   ├── cache.ts            # Local file-based cache service
 │   ├── translator.ts       # DeepSeek translation service
 │   └── articleFetcher.ts   # Article metadata fetching service
 └── index.ts                # Main CLI entry point
@@ -278,6 +315,22 @@ Try increasing `HN_TIME_WINDOW_HOURS` in your `.env` file to look further back i
 **Web page shows "Loading stories...":**
 - Wait for the fetch process to complete
 - Check the terminal for progress and any errors
+
+### Cache issues
+
+**Cache not working:**
+- Ensure `CACHE_ENABLED` is not set to "false" in your `.env` file
+- Check that the `.cache/` directory is writable
+- The `--no-cache` flag bypasses cache entirely
+
+**Stale data showing:**
+- Use `--no-cache` or `--refresh` flag to force a fresh fetch
+- Reduce `CACHE_TTL_MINUTES` in your `.env` file
+- Delete `.cache/stories.json` manually to clear cache
+
+**Cache cleared unexpectedly:**
+- Cache is invalidated when configuration changes
+- Changing `HN_STORY_LIMIT`, `HN_TIME_WINDOW_HOURS`, or `SUMMARY_MAX_LENGTH` will trigger a fresh fetch
 
 ### Fewer stories than expected
 If you're receiving fewer stories than requested (e.g., 8 stories when `HN_STORY_LIMIT=30`), this is likely due to **time window filtering**:

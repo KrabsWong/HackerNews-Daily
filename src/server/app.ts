@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { createServer, Server } from 'http';
 import open from 'open';
+import { SERVER_CONFIG } from '../config/constants';
 
 export interface ProcessedStory {
   rank: number;
@@ -74,8 +75,8 @@ export async function startWebServer(stories: ProcessedStory[]): Promise<void> {
   });
   
   try {
-    // Find available port starting from 3000
-    const port = await findAvailablePort(3000);
+    // Find available port starting from default
+    const port = await findAvailablePort(SERVER_CONFIG.DEFAULT_PORT);
     
     // Start server
     server = app.listen(port, () => {
@@ -99,11 +100,11 @@ export async function startWebServer(stories: ProcessedStory[]): Promise<void> {
           process.exit(0);
         });
         
-        // Force close after 5 seconds
+        // Force close after timeout
         setTimeout(() => {
           console.log('⚠️  Forcing server shutdown');
           process.exit(1);
-        }, 5000);
+        }, SERVER_CONFIG.SHUTDOWN_TIMEOUT);
       } else {
         process.exit(0);
       }

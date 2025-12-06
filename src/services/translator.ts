@@ -1,9 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { HNComment, stripHTML } from '../api/hackerNews';
-
-const DEEPSEEK_API_BASE = 'https://api.deepseek.com/v1';
-const REQUEST_TIMEOUT = 30000; // 30 seconds for translation
-const RETRY_DELAY = 1000; // 1 second
+import { DEEPSEEK_API, CONTENT_CONFIG } from '../config/constants';
 
 interface DeepSeekMessage {
   role: 'user' | 'system' | 'assistant';
@@ -83,14 +80,14 @@ class TranslationService {
       };
 
       const response = await axios.post<DeepSeekResponse>(
-        `${DEEPSEEK_API_BASE}/chat/completions`,
+        `${DEEPSEEK_API.BASE_URL}/chat/completions`,
         request,
         {
           headers: {
             'Authorization': `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
-          timeout: REQUEST_TIMEOUT,
+          timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
         }
       );
 
@@ -106,7 +103,7 @@ class TranslationService {
       // Retry once on rate limit or temporary errors
       if (retry && error instanceof AxiosError && error.response?.status === 429) {
         console.warn('Rate limit hit, retrying after delay...');
-        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        await new Promise(resolve => setTimeout(resolve, DEEPSEEK_API.RETRY_DELAY));
         return this.translateTitle(title, false);
       }
 
@@ -164,14 +161,14 @@ class TranslationService {
       };
 
       const response = await axios.post<DeepSeekResponse>(
-        `${DEEPSEEK_API_BASE}/chat/completions`,
+        `${DEEPSEEK_API.BASE_URL}/chat/completions`,
         request,
         {
           headers: {
             'Authorization': `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
-          timeout: REQUEST_TIMEOUT,
+          timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
         }
       );
 
@@ -223,14 +220,14 @@ ${content}`
       };
 
       const response = await axios.post<DeepSeekResponse>(
-        `${DEEPSEEK_API_BASE}/chat/completions`,
+        `${DEEPSEEK_API.BASE_URL}/chat/completions`,
         request,
         {
           headers: {
             'Authorization': `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
-          timeout: REQUEST_TIMEOUT,
+          timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
         }
       );
 
@@ -246,7 +243,7 @@ ${content}`
       // Retry once on rate limit or temporary errors
       if (retry && error instanceof AxiosError && error.response?.status === 429) {
         console.warn('Rate limit hit during summarization, retrying after delay...');
-        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        await new Promise(resolve => setTimeout(resolve, DEEPSEEK_API.RETRY_DELAY));
         return this.summarizeContent(content, maxLength, false);
       }
 
@@ -267,7 +264,7 @@ ${content}`
     }
 
     // Need at least 3 comments for meaningful summary
-    if (!comments || comments.length < 3) {
+    if (!comments || comments.length < CONTENT_CONFIG.MIN_COMMENTS_FOR_SUMMARY) {
       return null;
     }
 
@@ -275,7 +272,7 @@ ${content}`
       // Extract plain text from each comment
       const commentTexts = comments.map(comment => stripHTML(comment.text)).filter(text => text.length > 0);
       
-      if (commentTexts.length < 3) {
+      if (commentTexts.length < CONTENT_CONFIG.MIN_COMMENTS_FOR_SUMMARY) {
         return null;
       }
 
@@ -283,8 +280,8 @@ ${content}`
       let combinedText = commentTexts.join('\n---\n');
       
       // Truncate if too long (prevent token limit issues)
-      if (combinedText.length > 5000) {
-        combinedText = combinedText.substring(0, 5000) + '...';
+      if (combinedText.length > CONTENT_CONFIG.MAX_COMMENTS_LENGTH) {
+        combinedText = combinedText.substring(0, CONTENT_CONFIG.MAX_COMMENTS_LENGTH) + '...';
       }
 
       const request: DeepSeekRequest = {
@@ -307,14 +304,14 @@ ${combinedText}`
       };
 
       const response = await axios.post<DeepSeekResponse>(
-        `${DEEPSEEK_API_BASE}/chat/completions`,
+        `${DEEPSEEK_API.BASE_URL}/chat/completions`,
         request,
         {
           headers: {
             'Authorization': `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
-          timeout: REQUEST_TIMEOUT,
+          timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
         }
       );
 
@@ -344,7 +341,7 @@ ${combinedText}`
       const comments = commentArrays[i];
       
       // Skip if too few comments
-      if (comments.length < 3) {
+      if (comments.length < CONTENT_CONFIG.MIN_COMMENTS_FOR_SUMMARY) {
         summaries.push(null);
       } else {
         const summary = await this.summarizeComments(comments);

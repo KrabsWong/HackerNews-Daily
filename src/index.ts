@@ -3,30 +3,22 @@ import { fetchTopStories, HNStory, fetchCommentsBatch } from './api/hackerNews';
 import { translator } from './services/translator';
 import { fetchArticlesBatch } from './services/articleFetcher';
 import { startWebServer, ProcessedStory as WebProcessedStory } from './server/app';
+import { STORY_LIMITS, SUMMARY_CONFIG, ENV_DEFAULTS } from './config/constants';
+import { checkCache, writeCache, isCacheEnabled, CachedStory } from './services/cache';
 
 // Load environment variables from .env file
 dotenv.config();
 
 /**
- * Parse command-line arguments to check for --web flag
+ * Parse command-line arguments
  */
-function parseArgs(): { webMode: boolean } {
+function parseArgs(): { webMode: boolean; noCache: boolean } {
   const args = process.argv.slice(2);
   return {
-    webMode: args.includes('--web') || args.includes('-w')
+    webMode: args.includes('--web') || args.includes('-w'),
+    noCache: args.includes('--no-cache') || args.includes('--refresh')
   };
 }
-
-// Story limit constants
-// Maximum safe limit to prevent performance issues and API rate limiting
-const MAX_STORY_LIMIT = 30;
-// Threshold at which to warn users their limit will be capped
-const WARN_THRESHOLD = 50;
-
-// Summary length constants
-const DEFAULT_SUMMARY_LENGTH = 300;
-const MIN_SUMMARY_LENGTH = 100;
-const MAX_SUMMARY_LENGTH = 500;
 
 interface ProcessedStory {
   rank: number;
@@ -47,14 +39,14 @@ interface ProcessedStory {
 function validateStoryLimit(requested: number): number {
   // Handle invalid inputs (NaN, negative, zero)
   if (isNaN(requested) || requested <= 0) {
-    console.warn(`⚠️  Invalid story limit (${requested}). Using default of ${MAX_STORY_LIMIT} stories.`);
-    return MAX_STORY_LIMIT;
+    console.warn(`⚠️  Invalid story limit (${requested}). Using default of ${STORY_LIMITS.MAX_STORY_LIMIT} stories.`);
+    return STORY_LIMITS.MAX_STORY_LIMIT;
   }
   
   // Check if requested limit exceeds warning threshold
-  if (requested >= WARN_THRESHOLD) {
-    console.warn(`⚠️  Requested story limit (${requested}) exceeds maximum supported limit. Using ${MAX_STORY_LIMIT} stories instead.`);
-    return MAX_STORY_LIMIT;
+  if (requested >= STORY_LIMITS.WARN_THRESHOLD) {
+    console.warn(`⚠️  Requested story limit (${requested}) exceeds maximum supported limit. Using ${STORY_LIMITS.MAX_STORY_LIMIT} stories instead.`);
+    return STORY_LIMITS.MAX_STORY_LIMIT;
   }
   
   // Accept limit if within safe range
@@ -69,20 +61,20 @@ function validateStoryLimit(requested: number): number {
 function validateSummaryLength(requested: number): number {
   // Handle invalid inputs (NaN, negative, zero)
   if (isNaN(requested) || requested <= 0) {
-    console.warn(`⚠️  Invalid SUMMARY_MAX_LENGTH (${requested}). Using default of ${DEFAULT_SUMMARY_LENGTH} characters.`);
-    return DEFAULT_SUMMARY_LENGTH;
+    console.warn(`⚠️  Invalid SUMMARY_MAX_LENGTH (${requested}). Using default of ${SUMMARY_CONFIG.DEFAULT_LENGTH} characters.`);
+    return SUMMARY_CONFIG.DEFAULT_LENGTH;
   }
   
   // Check if too short
-  if (requested < MIN_SUMMARY_LENGTH) {
-    console.warn(`⚠️  SUMMARY_MAX_LENGTH too short (${requested}). Using minimum of ${MIN_SUMMARY_LENGTH} characters.`);
-    return MIN_SUMMARY_LENGTH;
+  if (requested < SUMMARY_CONFIG.MIN_LENGTH) {
+    console.warn(`⚠️  SUMMARY_MAX_LENGTH too short (${requested}). Using minimum of ${SUMMARY_CONFIG.MIN_LENGTH} characters.`);
+    return SUMMARY_CONFIG.MIN_LENGTH;
   }
   
   // Check if too long
-  if (requested > MAX_SUMMARY_LENGTH) {
-    console.warn(`⚠️  SUMMARY_MAX_LENGTH too large (${requested}). Capping at ${MAX_SUMMARY_LENGTH} characters.`);
-    return MAX_SUMMARY_LENGTH;
+  if (requested > SUMMARY_CONFIG.MAX_LENGTH) {
+    console.warn(`⚠️  SUMMARY_MAX_LENGTH too large (${requested}). Capping at ${SUMMARY_CONFIG.MAX_LENGTH} characters.`);
+    return SUMMARY_CONFIG.MAX_LENGTH;
   }
   
   // Accept length if within valid range
@@ -95,7 +87,7 @@ function validateSummaryLength(requested: number): number {
 async function main(): Promise<void> {
   try {
     // Parse command-line arguments
-    const { webMode } = parseArgs();
+    const { webMode, noCache } = parseArgs();
     
     console.log('\n🔍 HackerNews Daily - Chinese Translation\n');
     
@@ -103,70 +95,51 @@ async function main(): Promise<void> {
       console.log('📺 Web mode enabled - will open in browser\n');
     }
     
-    // Validate configuration
-    console.log('Validating configuration...');
-    translator.init();
-    
     // Get configuration from environment
-    const requestedLimit = parseInt(process.env.HN_STORY_LIMIT || '30', 10);
+    const requestedLimit = parseInt(process.env.HN_STORY_LIMIT || String(ENV_DEFAULTS.HN_STORY_LIMIT), 10);
     const storyLimit = validateStoryLimit(requestedLimit);
-    const timeWindowHours = parseInt(process.env.HN_TIME_WINDOW_HOURS || '24', 10);
-    const requestedSummaryLength = parseInt(process.env.SUMMARY_MAX_LENGTH || '300', 10);
+    const timeWindowHours = parseInt(process.env.HN_TIME_WINDOW_HOURS || String(ENV_DEFAULTS.HN_TIME_WINDOW_HOURS), 10);
+    const requestedSummaryLength = parseInt(process.env.SUMMARY_MAX_LENGTH || String(ENV_DEFAULTS.SUMMARY_MAX_LENGTH), 10);
     const summaryMaxLength = validateSummaryLength(requestedSummaryLength);
     
-    // Display fetch parameters
-    console.log(`Fetching up to ${storyLimit} stories from the past ${timeWindowHours} hours...`);
+    // Cache configuration
+    const cacheConfig = {
+      storyLimit,
+      timeWindowHours,
+      summaryMaxLength,
+    };
     
-    // Fetch stories from HackerNews
-    const stories = await fetchTopStories(storyLimit, timeWindowHours);
+    // Check cache first (unless --no-cache flag is set)
+    let processedStories: ProcessedStory[];
     
-    if (stories.length === 0) {
-      console.log('\n⚠️  No stories found in the specified time window.');
-      console.log('Try increasing HN_TIME_WINDOW_HOURS or HN_STORY_LIMIT in your .env file.');
-      return;
+    if (!noCache && isCacheEnabled()) {
+      const cacheResult = checkCache(cacheConfig);
+      
+      if (cacheResult.hit && cacheResult.stories) {
+        // Use cached data
+        processedStories = cacheResult.stories;
+      } else {
+        // Cache miss - fetch fresh data
+        if (cacheResult.reason) {
+          console.log(`📭 ${cacheResult.reason}`);
+        }
+        processedStories = await fetchFreshData(storyLimit, timeWindowHours, summaryMaxLength);
+        
+        // Save to cache
+        writeCache(processedStories, cacheConfig);
+      }
+    } else {
+      // Cache disabled or --no-cache flag
+      if (noCache) {
+        console.log('🔄 Cache bypassed (--no-cache flag)\n');
+      }
+      processedStories = await fetchFreshData(storyLimit, timeWindowHours, summaryMaxLength);
+      
+      // Save to cache (if enabled)
+      if (isCacheEnabled()) {
+        writeCache(processedStories, cacheConfig);
+      }
     }
-    
-    // Check if result count is significantly lower than requested
-    if (stories.length < storyLimit * 0.5) {
-      console.log(`\n⚠️  Only ${stories.length} stories found (requested ${storyLimit}).`);
-      console.log(`Try increasing HN_TIME_WINDOW_HOURS in your .env file for more results.\n`);
-    }
-    
-    // Translate titles
-    console.log('\nTranslating titles to Chinese...');
-    const titles = stories.map(s => s.title);
-    const translatedTitles = await translator.translateBatch(titles);
-    
-    // Fetch article details (includes full content extraction)
-    console.log('\nFetching and extracting article content...');
-    const urls = stories.map(s => s.url || `https://news.ycombinator.com/item?id=${s.id}`);
-    const articleMetadata = await fetchArticlesBatch(urls);
-    
-    // Generate AI summaries or translate descriptions
-    console.log('\nGenerating AI-powered summaries...');
-    const fullContents = articleMetadata.map(meta => meta.fullContent);
-    const metaDescriptions = articleMetadata.map(meta => meta.description);
-    const summaries = await translator.summarizeBatch(fullContents, metaDescriptions, summaryMaxLength);
-    
-    // Fetch top comments for each story
-    console.log('\nFetching top comments for each story...');
-    const commentArrays = await fetchCommentsBatch(stories, 10);
-    
-    // Summarize comments
-    console.log('\nSummarizing comments...');
-    const commentSummaries = await translator.summarizeCommentsBatch(commentArrays);
-    
-    // Process stories with translations
-    const processedStories: ProcessedStory[] = stories.map((story, index) => ({
-      rank: index + 1,
-      titleChinese: translatedTitles[index],
-      titleEnglish: story.title,
-      score: story.score,
-      url: urls[index],
-      time: formatTimestamp(story.time),
-      description: summaries[index],
-      commentSummary: commentSummaries[index],
-    }));
     
     // Display results based on mode
     if (webMode) {
@@ -178,12 +151,81 @@ async function main(): Promise<void> {
       // CLI mode - display in terminal
       console.log('\nRendering results...\n');
       displayCards(processedStories);
-      console.log(`\n✅ Successfully fetched and translated ${stories.length} stories\n`);
+      console.log(`\n✅ Successfully displayed ${processedStories.length} stories\n`);
     }
   } catch (error) {
     handleError(error);
     process.exit(1);
   }
+}
+
+/**
+ * Fetch fresh data from APIs (HackerNews + DeepSeek)
+ */
+async function fetchFreshData(
+  storyLimit: number,
+  timeWindowHours: number,
+  summaryMaxLength: number
+): Promise<ProcessedStory[]> {
+  // Validate configuration
+  console.log('Validating configuration...');
+  translator.init();
+  
+  // Display fetch parameters
+  console.log(`Fetching up to ${storyLimit} stories from the past ${timeWindowHours} hours...`);
+  
+  // Fetch stories from HackerNews
+  const stories = await fetchTopStories(storyLimit, timeWindowHours);
+  
+  if (stories.length === 0) {
+    console.log('\n⚠️  No stories found in the specified time window.');
+    console.log('Try increasing HN_TIME_WINDOW_HOURS or HN_STORY_LIMIT in your .env file.');
+    return [];
+  }
+  
+  // Check if result count is significantly lower than requested
+  if (stories.length < storyLimit * 0.5) {
+    console.log(`\n⚠️  Only ${stories.length} stories found (requested ${storyLimit}).`);
+    console.log(`Try increasing HN_TIME_WINDOW_HOURS in your .env file for more results.\n`);
+  }
+  
+  // Translate titles
+  console.log('\nTranslating titles to Chinese...');
+  const titles = stories.map(s => s.title);
+  const translatedTitles = await translator.translateBatch(titles);
+  
+  // Fetch article details (includes full content extraction)
+  console.log('\nFetching and extracting article content...');
+  const urls = stories.map(s => s.url || `https://news.ycombinator.com/item?id=${s.id}`);
+  const articleMetadata = await fetchArticlesBatch(urls);
+  
+  // Generate AI summaries or translate descriptions
+  console.log('\nGenerating AI-powered summaries...');
+  const fullContents = articleMetadata.map(meta => meta.fullContent);
+  const metaDescriptions = articleMetadata.map(meta => meta.description);
+  const summaries = await translator.summarizeBatch(fullContents, metaDescriptions, summaryMaxLength);
+  
+  // Fetch top comments for each story
+  console.log('\nFetching top comments for each story...');
+  const commentArrays = await fetchCommentsBatch(stories, 10);
+  
+  // Summarize comments
+  console.log('\nSummarizing comments...');
+  const commentSummaries = await translator.summarizeCommentsBatch(commentArrays);
+  
+  // Process stories with translations
+  const processedStories: ProcessedStory[] = stories.map((story, index) => ({
+    rank: index + 1,
+    titleChinese: translatedTitles[index],
+    titleEnglish: story.title,
+    score: story.score,
+    url: urls[index],
+    time: formatTimestamp(story.time),
+    description: summaries[index],
+    commentSummary: commentSummaries[index],
+  }));
+  
+  return processedStories;
 }
 
 /**

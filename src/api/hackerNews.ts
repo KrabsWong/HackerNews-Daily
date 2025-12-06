@@ -1,9 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import * as cheerio from 'cheerio';
-
-const HN_API_BASE = 'https://hacker-news.firebaseio.com/v0';
-const REQUEST_TIMEOUT = 10000; // 10 seconds
-const MAX_FETCH_LIMIT = 100; // Absolute maximum to prevent performance issues
+import { HN_API, STORY_LIMITS } from '../config/constants';
 
 export interface HNStory {
   id: number;
@@ -57,8 +54,8 @@ export function stripHTML(html: string): string {
  */
 export async function fetchBestStories(): Promise<number[]> {
   try {
-    const response = await axios.get<number[]>(`${HN_API_BASE}/beststories.json`, {
-      timeout: REQUEST_TIMEOUT,
+    const response = await axios.get<number[]>(`${HN_API.BASE_URL}/beststories.json`, {
+      timeout: HN_API.REQUEST_TIMEOUT,
     });
     return response.data;
   } catch (error) {
@@ -75,8 +72,8 @@ export async function fetchBestStories(): Promise<number[]> {
  */
 export async function fetchStoryDetails(id: number): Promise<HNStory | null> {
   try {
-    const response = await axios.get<HNStory>(`${HN_API_BASE}/item/${id}.json`, {
-      timeout: REQUEST_TIMEOUT,
+    const response = await axios.get<HNStory>(`${HN_API.BASE_URL}/item/${id}.json`, {
+      timeout: HN_API.REQUEST_TIMEOUT,
     });
     
     const story = response.data;
@@ -100,8 +97,8 @@ export async function fetchStoryDetails(id: number): Promise<HNStory | null> {
  */
 async function fetchCommentDetails(id: number): Promise<HNComment | null> {
   try {
-    const response = await axios.get<HNComment>(`${HN_API_BASE}/item/${id}.json`, {
-      timeout: REQUEST_TIMEOUT,
+    const response = await axios.get<HNComment>(`${HN_API.BASE_URL}/item/${id}.json`, {
+      timeout: HN_API.REQUEST_TIMEOUT,
     });
     
     const comment = response.data;
@@ -186,10 +183,10 @@ export function calculateFetchBuffer(requestedLimit: number, timeWindowHours: nu
   const bufferedCount = Math.ceil(requestedLimit * multiplier);
   
   // Cap at absolute maximum for safety
-  const cappedCount = Math.min(bufferedCount, MAX_FETCH_LIMIT);
+  const cappedCount = Math.min(bufferedCount, STORY_LIMITS.MAX_FETCH_LIMIT);
   
-  if (bufferedCount > MAX_FETCH_LIMIT) {
-    console.warn(`⚠️  Buffer calculation (${bufferedCount}) exceeds maximum fetch limit. Capping at ${MAX_FETCH_LIMIT}.`);
+  if (bufferedCount > STORY_LIMITS.MAX_FETCH_LIMIT) {
+    console.warn(`⚠️  Buffer calculation (${bufferedCount}) exceeds maximum fetch limit. Capping at ${STORY_LIMITS.MAX_FETCH_LIMIT}.`);
   }
   
   console.log(`Fetching ${cappedCount} stories (${multiplier}x buffer for ${timeWindowHours}h window) to achieve ~${requestedLimit} after filtering...`);

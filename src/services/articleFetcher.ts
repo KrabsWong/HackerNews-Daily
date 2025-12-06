@@ -2,10 +2,7 @@ import axios, { AxiosError } from 'axios';
 import * as cheerio from 'cheerio';
 import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
-
-const FETCH_TIMEOUT = 5000; // 5 seconds
-const USER_AGENT = 'Mozilla/5.0 (compatible; HackerNewsDaily/1.0)';
-const MAX_CONTENT_LENGTH = 4000; // Maximum characters before truncation for AI summarization
+import { ARTICLE_FETCHER, CONTENT_CONFIG } from '../config/constants';
 
 export interface ArticleMetadata {
   url: string;
@@ -58,8 +55,8 @@ function extractArticleContent(html: string, url: string): string | null {
       .replace(/\n+/g, '\n'); // Replace multiple newlines with single newline
     
     // Truncate if too long
-    if (content.length > MAX_CONTENT_LENGTH) {
-      content = truncateContent(content, MAX_CONTENT_LENGTH);
+    if (content.length > CONTENT_CONFIG.MAX_CONTENT_LENGTH) {
+      content = truncateContent(content, CONTENT_CONFIG.MAX_CONTENT_LENGTH);
     }
     
     return content;
@@ -77,9 +74,9 @@ function extractArticleContent(html: string, url: string): string | null {
 export async function fetchArticleMetadata(url: string): Promise<ArticleMetadata> {
   try {
     const response = await axios.get(url, {
-      timeout: FETCH_TIMEOUT,
+      timeout: ARTICLE_FETCHER.REQUEST_TIMEOUT,
       headers: {
-        'User-Agent': USER_AGENT,
+        'User-Agent': ARTICLE_FETCHER.USER_AGENT,
       },
       maxRedirects: 3,
     });
@@ -102,8 +99,8 @@ export async function fetchArticleMetadata(url: string): Promise<ArticleMetadata
     // Trim and limit description length to 200 characters
     if (description) {
       description = description.trim();
-      if (description.length > 200) {
-        description = description.substring(0, 197) + '...';
+      if (description.length > CONTENT_CONFIG.MAX_DESCRIPTION_LENGTH) {
+        description = description.substring(0, CONTENT_CONFIG.MAX_DESCRIPTION_LENGTH - 3) + '...';
       }
     }
 

@@ -8,6 +8,9 @@ web/dist/
 # Environment variables
 .env
 
+# Cache
+.cache/
+
 # Logs
 *.log
 npm-debug.log*
