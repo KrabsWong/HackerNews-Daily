@@ -1,0 +1,81 @@
+name: Daily HackerNews Export
+
+on:
+  # Run daily at 01:00 UTC (after yesterday has fully passed)
+  schedule:
+    - cron: '0 1 * * *'
+  
+  # Allow manual triggering for testing
+  workflow_dispatch:
+
+# Prevent concurrent runs to avoid conflicts
+concurrency:
+  group: daily-export
+  cancel-in-progress: false
+
+jobs:
+  export-and-push:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout main repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run daily export
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: npm run fetch -- --export-daily
+      
+      - name: Checkout TLDR-HackNews24 repository
+        uses: actions/checkout@v4
+        with:
+          repository: KrabsWong/TLDR-HackNews24
+          token: ${{ secrets.TLDR_REPO_TOKEN }}
+          path: tldr-repo
+      
+      - name: Copy markdown file to TLDR repository
+        run: |
+          # Get yesterday's date in YYYY-MM-DD format
+          YESTERDAY=$(date -u -d "yesterday" '+%Y-%m-%d' 2>/dev/null || date -u -v-1d '+%Y-%m-%d')
+          FILENAME="hackernews-${YESTERDAY}.md"
+          
+          # Copy the generated file
+          if [ -f "TLDR-HackNews24/${FILENAME}" ]; then
+            cp "TLDR-HackNews24/${FILENAME}" "tldr-repo/${FILENAME}"
+            echo "✅ Copied ${FILENAME} to TLDR repository"
+          else
+            echo "❌ Error: ${FILENAME} not found in TLDR-HackNews24/"
+            exit 1
+          fi
+      
+      - name: Commit and push to TLDR repository
+        run: |
+          cd tldr-repo
+          
+          # Get yesterday's date for commit message
+          YESTERDAY=$(date -u -d "yesterday" '+%Y-%m-%d' 2>/dev/null || date -u -v-1d '+%Y-%m-%d')
+          
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Add, commit, and push
+          git add .
+          
+          # Only commit if there are changes
+          if git diff --staged --quiet; then
+            echo "ℹ️ No changes to commit"
+          else
+            git commit -m "Add HackerNews daily export for ${YESTERDAY}"
+            git push
+            echo "✅ Successfully pushed to TLDR-HackNews24 repository"
+          fi

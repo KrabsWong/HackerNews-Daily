@@ -401,6 +401,111 @@ If you're receiving fewer stories than requested (e.g., 8 stories when `HN_STORY
 - Requesting more than 50 stories will show a warning and cap at 30
 - This ensures optimal performance and prevents API abuse
 
+## GitHub Actions Automation
+
+This project includes a GitHub Actions workflow that automatically exports daily HackerNews articles and pushes them to the [TLDR-HackNews24](https://github.com/KrabsWong/TLDR-HackNews24) archive repository.
+
+### How It Works
+
+The workflow (`.github/workflows/daily-export.yml`) runs automatically:
+- **Schedule**: Daily at 01:00 UTC (after the previous day has fully passed)
+- **Process**:
+  1. Checks out this repository
+  2. Installs dependencies
+  3. Runs `npm run fetch -- --export-daily` to generate yesterday's markdown file
+  4. Checks out the TLDR-HackNews24 repository
+  5. Copies the generated file to TLDR-HackNews24
+  6. Commits and pushes the changes
+
+### Setup Instructions
+
+To enable automated daily exports, configure the following GitHub repository secrets:
+
+1. **Navigate to Repository Settings**
+   - Go to your repository on GitHub
+   - Click `Settings` > `Secrets and variables` > `Actions`
+
+2. **Add Required Secrets**
+   
+   **`DEEPSEEK_API_KEY`** (Required)
+   - Your DeepSeek API key for translation and summarization
+   - Get one from https://platform.deepseek.com/
+   - Click `New repository secret`
+   - Name: `DEEPSEEK_API_KEY`
+   - Value: Your API key
+
+   **`TLDR_REPO_TOKEN`** (Required)
+   - GitHub Personal Access Token (PAT) with `repo` scope
+   - Used to push files to the TLDR-HackNews24 repository
+   - Create a PAT:
+     1. Go to GitHub Settings > Developer settings > Personal access tokens > Tokens (classic)
+     2. Click `Generate new token (classic)`
+     3. Give it a descriptive name (e.g., "HackNews Daily Export Bot")
+     4. Select scope: `repo` (Full control of private repositories)
+     5. Click `Generate token` and copy the token
+   - Add to repository secrets:
+     - Name: `TLDR_REPO_TOKEN`
+     - Value: Your PAT
+
+3. **Verify Setup**
+   - The workflow will automatically run at 01:00 UTC daily
+   - For immediate testing, manually trigger the workflow:
+     1. Go to `Actions` tab in your repository
+     2. Click `Daily HackerNews Export` workflow
+     3. Click `Run workflow` > `Run workflow`
+   - Check the workflow run logs for any errors
+   - Verify the file appears in [TLDR-HackNews24](https://github.com/KrabsWong/TLDR-HackNews24)
+
+### Manual Triggering
+
+You can manually trigger the workflow at any time:
+1. Go to the `Actions` tab in your GitHub repository
+2. Select the `Daily HackerNews Export` workflow
+3. Click `Run workflow` button
+4. Confirm by clicking `Run workflow`
+
+This is useful for:
+- Testing after initial setup
+- Regenerating a specific day's export
+- Debugging workflow issues
+
+### Workflow Monitoring
+
+Monitor workflow executions:
+- **Actions Tab**: View all workflow runs, their status, and logs
+- **Email Notifications**: GitHub sends notifications for failed workflows (configure in GitHub notification settings)
+- **Status Badge**: You can add a workflow status badge to your README (optional)
+
+### Troubleshooting
+
+**Workflow fails with "DEEPSEEK_API_KEY is required"**
+- Ensure `DEEPSEEK_API_KEY` secret is configured in repository settings
+- Check that the secret name is spelled correctly (case-sensitive)
+
+**Workflow fails when pushing to TLDR-HackNews24**
+- Verify `TLDR_REPO_TOKEN` has `repo` scope permissions
+- Ensure the token hasn't expired
+- Check that the TLDR-HackNews24 repository exists and is accessible
+
+**No file generated**
+- Check workflow logs for errors during the export step
+- Verify there were stories from yesterday (HackerNews might be quiet on some days)
+- Ensure API rate limits haven't been exceeded
+
+**Workflow doesn't run on schedule**
+- GitHub Actions may delay scheduled workflows by up to 15 minutes during high load
+- Verify the workflow file is on the default branch (usually `main` or `master`)
+- Check that GitHub Actions is enabled for your repository
+
+### Disabling Automation
+
+To temporarily disable automated exports:
+1. Go to `Actions` tab
+2. Select `Daily HackerNews Export` workflow
+3. Click the `...` menu > `Disable workflow`
+
+To re-enable, follow the same steps and click `Enable workflow`.
+
 ## API Documentation
 
 - **HackerNews API**: https://github.com/HackerNews/API
