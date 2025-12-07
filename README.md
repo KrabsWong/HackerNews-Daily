@@ -18,7 +18,7 @@ A CLI tool that fetches top HackerNews stories from the past 24 hours, extracts 
 
 ## Prerequisites
 
-- Node.js (≥18.x recommended)
+- Node.js (≥20.x recommended)
 - DeepSeek API key (get one from [https://platform.deepseek.com/](https://platform.deepseek.com/))
 
 ## Installation
