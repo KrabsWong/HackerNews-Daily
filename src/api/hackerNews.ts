@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import * as cheerio from 'cheerio';
-import { HN_API, STORY_LIMITS } from '../config/constants';
+import { HN_API, ALGOLIA_HN_API, STORY_LIMITS } from '../config/constants';
 
 export interface HNStory {
   id: number;
@@ -11,6 +11,37 @@ export interface HNStory {
   type: string;
   by?: string;
   kids?: number[]; // Top-level comment IDs
+}
+
+/**
+ * Algolia HN API story response structure
+ */
+export interface AlgoliaStory {
+  story_id: number;
+  objectID: string;
+  title: string;
+  url?: string;
+  points: number;
+  created_at_i: number;
+  author: string;
+  num_comments: number | null;
+  story_text?: string;
+  _tags: string[];
+}
+
+/**
+ * Algolia search response structure
+ */
+export interface AlgoliaSearchResponse {
+  hits: AlgoliaStory[];
+  nbHits: number;
+  page: number;
+  nbPages: number;
+  hitsPerPage: number;
+  exhaustiveNbHits: boolean;
+  query: string;
+  params: string;
+  processingTimeMS: number;
 }
 
 /**
@@ -50,9 +81,194 @@ export function stripHTML(html: string): string {
 }
 
 /**
- * Fetch the list of best story IDs from HackerNews
+ * Map Algolia story response to HNStory interface
  */
-export async function fetchBestStories(): Promise<number[]> {
+export function mapAlgoliaStoryToHNStory(algoliaStory: AlgoliaStory): HNStory {
+  return {
+    id: algoliaStory.story_id,
+    title: algoliaStory.title,
+    url: algoliaStory.url,
+    score: algoliaStory.points,
+    time: algoliaStory.created_at_i,
+    type: 'story',
+    by: algoliaStory.author,
+    // kids field not provided by Algolia search endpoint
+    // will be fetched separately if needed for comments
+  };
+}
+
+/**
+ * Fetch stories from Algolia HN Search API with date range filtering
+ * @param limit - Maximum number of stories to fetch
+ * @param startTime - Unix timestamp for start of date range (inclusive)
+ * @param endTime - Optional Unix timestamp for end of date range (inclusive)
+ * @returns Array of HNStory objects sorted by date (most recent first)
+ */
+export async function fetchStoriesFromAlgolia(
+  limit: number,
+  startTime: number,
+  endTime?: number
+): Promise<HNStory[]> {
+  try {
+    // Build numeric filters for date range
+    const filters: string[] = [`created_at_i>${startTime}`];
+    if (endTime) {
+      filters.push(`created_at_i<${endTime}`);
+    }
+    
+    // Cap hits per page at API maximum
+    const hitsPerPage = Math.min(limit, ALGOLIA_HN_API.MAX_HITS_PER_PAGE);
+    
+    // Build query parameters
+    const params = new URLSearchParams({
+      tags: 'story',
+      numericFilters: filters.join(','),
+      hitsPerPage: hitsPerPage.toString(),
+    });
+    
+    const url = `${ALGOLIA_HN_API.BASE_URL}/search_by_date?${params}`;
+    
+    const response = await axios.get<AlgoliaSearchResponse>(url, {
+      timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT,
+    });
+    
+    const { hits, nbPages, page } = response.data;
+    let allHits = hits;
+    
+    // Handle pagination if we need more results and there are more pages
+    if (allHits.length < limit && nbPages > 1) {
+      const remainingNeeded = limit - allHits.length;
+      const additionalPages = Math.min(
+        Math.ceil(remainingNeeded / hitsPerPage),
+        nbPages - 1
+      );
+      
+      // Fetch additional pages
+      const pagePromises: Promise<AlgoliaSearchResponse>[] = [];
+      for (let i = 1; i <= additionalPages; i++) {
+        const pageParams = new URLSearchParams({
+          tags: 'story',
+          numericFilters: filters.join(','),
+          hitsPerPage: hitsPerPage.toString(),
+          page: i.toString(),
+        });
+        
+        pagePromises.push(
+          axios.get<AlgoliaSearchResponse>(
+            `${ALGOLIA_HN_API.BASE_URL}/search_by_date?${pageParams}`,
+            { timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT }
+          ).then(res => res.data)
+        );
+      }
+      
+      const additionalResults = await Promise.all(pagePromises);
+      additionalResults.forEach(result => {
+        allHits = allHits.concat(result.hits);
+      });
+    }
+    
+    // Limit to requested count and map to HNStory format
+    const limitedHits = allHits.slice(0, limit);
+    return limitedHits.map(mapAlgoliaStoryToHNStory);
+    
+  } catch (error) {
+    if (error instanceof AxiosError) {
+      if (error.response?.status === 429) {
+        throw new Error('Algolia API rate limit exceeded, please try again later');
+      }
+      throw new Error(`Failed to fetch stories from Algolia HN API: ${error.message}`);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fetch ALL stories from a specific date range, then sort by score and return top N
+ * This is useful for getting the "best" stories from a complete day
+ * @param limit - Maximum number of top stories to return (default 30)
+ * @param startTime - Unix timestamp for start of date range
+ * @param endTime - Unix timestamp for end of date range
+ * @returns Array of HNStory objects sorted by score (highest first)
+ */
+export async function fetchTopStoriesByScore(
+  limit: number,
+  startTime: number,
+  endTime: number
+): Promise<HNStory[]> {
+  try {
+    const filters = [`created_at_i>${startTime}`, `created_at_i<${endTime}`];
+    const hitsPerPage = ALGOLIA_HN_API.MAX_HITS_PER_PAGE; // Use max for efficiency
+    
+    // First request to get total page count
+    const params = new URLSearchParams({
+      tags: 'story',
+      numericFilters: filters.join(','),
+      hitsPerPage: hitsPerPage.toString(),
+    });
+    
+    const url = `${ALGOLIA_HN_API.BASE_URL}/search_by_date?${params}`;
+    const response = await axios.get<AlgoliaSearchResponse>(url, {
+      timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT,
+    });
+    
+    const { hits, nbPages, nbHits } = response.data;
+    let allHits = [...hits];
+    
+    console.log(`Found ${nbHits} total stories in date range, fetching all pages...`);
+    
+    // Fetch remaining pages if there are more
+    if (nbPages > 1) {
+      // Limit to reasonable number of pages (e.g., 10 pages = 1000 stories max)
+      const maxPages = Math.min(nbPages, 10);
+      const pagePromises: Promise<AlgoliaSearchResponse>[] = [];
+      
+      for (let i = 1; i < maxPages; i++) {
+        const pageParams = new URLSearchParams({
+          tags: 'story',
+          numericFilters: filters.join(','),
+          hitsPerPage: hitsPerPage.toString(),
+          page: i.toString(),
+        });
+        
+        pagePromises.push(
+          axios.get<AlgoliaSearchResponse>(
+            `${ALGOLIA_HN_API.BASE_URL}/search_by_date?${pageParams}`,
+            { timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT }
+          ).then(res => res.data)
+        );
+      }
+      
+      const additionalResults = await Promise.all(pagePromises);
+      additionalResults.forEach(result => {
+        allHits = allHits.concat(result.hits);
+      });
+    }
+    
+    console.log(`Fetched ${allHits.length} stories, sorting by score...`);
+    
+    // Sort by points (score) descending
+    allHits.sort((a, b) => b.points - a.points);
+    
+    // Take top N and map to HNStory format
+    const topHits = allHits.slice(0, limit);
+    return topHits.map(mapAlgoliaStoryToHNStory);
+    
+  } catch (error) {
+    if (error instanceof AxiosError) {
+      if (error.response?.status === 429) {
+        throw new Error('Algolia API rate limit exceeded, please try again later');
+      }
+      throw new Error(`Failed to fetch stories from Algolia HN API: ${error.message}`);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fetch the list of best story IDs from HackerNews Firebase API
+ * These are stories curated by HN's "best" algorithm (https://news.ycombinator.com/best)
+ */
+export async function fetchBestStoryIds(): Promise<number[]> {
   try {
     const response = await axios.get<number[]>(`${HN_API.BASE_URL}/beststories.json`, {
       timeout: HN_API.REQUEST_TIMEOUT,
@@ -60,7 +276,81 @@ export async function fetchBestStories(): Promise<number[]> {
     return response.data;
   } catch (error) {
     if (error instanceof AxiosError) {
-      throw new Error(`Failed to fetch HackerNews stories: ${error.message}`);
+      throw new Error(`Failed to fetch best story IDs: ${error.message}`);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fetch best stories from HN's "best" list, filtered by date range and sorted by score
+ * This combines Firebase's beststories ranking with Algolia's detailed data
+ * @param limit - Maximum number of top stories to return
+ * @param startTime - Unix timestamp for start of date range
+ * @param endTime - Unix timestamp for end of date range
+ * @returns Array of HNStory objects from the "best" list, filtered by date, sorted by score
+ */
+export async function fetchBestStoriesByDateAndScore(
+  limit: number,
+  startTime: number,
+  endTime: number
+): Promise<HNStory[]> {
+  try {
+    // Step 1: Get best story IDs from Firebase (HN's curated "best" list)
+    console.log('Fetching best story IDs from HackerNews...');
+    const bestIds = await fetchBestStoryIds();
+    console.log(`Found ${bestIds.length} stories in HN best list`);
+    
+    // Step 2: Fetch story details from Algolia (more efficient than Firebase for bulk)
+    // We'll fetch in batches using Algolia's search with story IDs
+    const batchSize = 100;
+    const allStories: AlgoliaStory[] = [];
+    
+    // Process in batches
+    for (let i = 0; i < bestIds.length; i += batchSize) {
+      const batchIds = bestIds.slice(i, i + batchSize);
+      
+      // Use Algolia search with story tags to get details
+      const tagFilters = batchIds.map(id => `story_${id}`).join(',');
+      const params = new URLSearchParams({
+        tags: `story,(${tagFilters})`,
+        hitsPerPage: batchSize.toString(),
+      });
+      
+      try {
+        const response = await axios.get<AlgoliaSearchResponse>(
+          `${ALGOLIA_HN_API.BASE_URL}/search?${params}`,
+          { timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT }
+        );
+        allStories.push(...response.data.hits);
+      } catch (err) {
+        // If batch fetch fails, continue with next batch
+        console.warn(`Failed to fetch batch ${i / batchSize + 1}, skipping...`);
+      }
+    }
+    
+    console.log(`Fetched details for ${allStories.length} best stories`);
+    
+    // Step 3: Filter by date range
+    const filteredStories = allStories.filter(
+      story => story.created_at_i > startTime && story.created_at_i < endTime
+    );
+    
+    console.log(`${filteredStories.length} stories match the date range`);
+    
+    // Step 4: Sort by score (points) descending
+    filteredStories.sort((a, b) => b.points - a.points);
+    
+    // Step 5: Take top N and map to HNStory format
+    const topStories = filteredStories.slice(0, limit);
+    return topStories.map(mapAlgoliaStoryToHNStory);
+    
+  } catch (error) {
+    if (error instanceof AxiosError) {
+      if (error.response?.status === 429) {
+        throw new Error('API rate limit exceeded, please try again later');
+      }
+      throw new Error(`Failed to fetch best stories: ${error.message}`);
     }
     throw error;
   }
@@ -69,6 +359,7 @@ export async function fetchBestStories(): Promise<number[]> {
 /**
  * Fetch details for a single story by ID
  * Returns null if the story cannot be fetched or is invalid
+ * Used for fetching comment IDs from stories
  */
 export async function fetchStoryDetails(id: number): Promise<HNStory | null> {
   try {
@@ -160,64 +451,21 @@ export async function fetchCommentsBatch(stories: HNStory[], limit: number = 10)
 }
 
 /**
- * Filter stories to only include those within the specified time window
- */
-export function filterByTime(stories: HNStory[], hours: number): HNStory[] {
-  const cutoffTime = Date.now() / 1000 - (hours * 3600);
-  return stories.filter(story => story.time >= cutoffTime);
-}
-
-/**
- * Calculate the number of stories to fetch from the API to compensate for time filtering
- * Applies a multiplier based on the time window to ensure we get approximately the requested count
- * @param requestedLimit - The number of stories the user wants after filtering
- * @param timeWindowHours - The time window filter in hours
- * @returns The buffered fetch count (capped at MAX_FETCH_LIMIT)
- */
-export function calculateFetchBuffer(requestedLimit: number, timeWindowHours: number): number {
-  // Apply different multipliers based on time window strictness
-  // 24h or less: 2.5x buffer (stricter filtering)
-  // More than 24h: 1.5x buffer (less filtering needed)
-  const multiplier = timeWindowHours <= 24 ? 2.5 : 1.5;
-  
-  const bufferedCount = Math.ceil(requestedLimit * multiplier);
-  
-  // Cap at absolute maximum for safety
-  const cappedCount = Math.min(bufferedCount, STORY_LIMITS.MAX_FETCH_LIMIT);
-  
-  if (bufferedCount > STORY_LIMITS.MAX_FETCH_LIMIT) {
-    console.warn(`⚠️  Buffer calculation (${bufferedCount}) exceeds maximum fetch limit. Capping at ${STORY_LIMITS.MAX_FETCH_LIMIT}.`);
-  }
-  
-  console.log(`Fetching ${cappedCount} stories (${multiplier}x buffer for ${timeWindowHours}h window) to achieve ~${requestedLimit} after filtering...`);
-  
-  return cappedCount;
-}
-
-/**
  * Fetch top N stories from HackerNews within a time window
+ * Only includes stories from HN's "best" list (https://news.ycombinator.com/best)
+ * Stories are filtered by date range and sorted by score
  */
 export async function fetchTopStories(limit: number, timeWindowHours: number): Promise<HNStory[]> {
-  console.log('Fetching HackerNews stories...');
+  console.log('Fetching HackerNews best stories...');
   
-  // Get all best story IDs
-  const storyIds = await fetchBestStories();
+  // Calculate time range for date filter
+  const endTime = Math.floor(Date.now() / 1000);
+  const startTime = endTime - (timeWindowHours * 3600);
   
-  // Calculate buffered fetch count to compensate for time filtering
-  const fetchCount = calculateFetchBuffer(limit, timeWindowHours);
+  // Fetch best stories filtered by date and sorted by score
+  const stories = await fetchBestStoriesByDateAndScore(limit, startTime, endTime);
   
-  // Limit the number of stories to fetch (take first N from best list)
-  const limitedIds = storyIds.slice(0, fetchCount);
+  console.log(`Found ${stories.length} best stories (by score) from the past ${timeWindowHours} hours`);
   
-  // Fetch details for each story
-  const storyPromises = limitedIds.map(id => fetchStoryDetails(id));
-  const stories = await Promise.all(storyPromises);
-  
-  // Filter out null values (failed fetches) and apply time filter
-  const validStories = stories.filter((story): story is HNStory => story !== null);
-  const recentStories = filterByTime(validStories, timeWindowHours);
-  
-  console.log(`Found ${recentStories.length} stories from the past ${timeWindowHours} hours`);
-  
-  return recentStories;
+  return stories;
 }

@@ -30,6 +30,20 @@ export const DEEPSEEK_API = {
 } as const;
 
 /**
+ * Algolia HackerNews Search API configuration
+ */
+export const ALGOLIA_HN_API = {
+  /** Base URL for Algolia HN Search API */
+  BASE_URL: 'https://hn.algolia.com/api/v1',
+  /** Request timeout in milliseconds (10 seconds) */
+  REQUEST_TIMEOUT: 10000,
+  /** Default number of results per page */
+  DEFAULT_HITS_PER_PAGE: 30,
+  /** Maximum hits per page allowed by API */
+  MAX_HITS_PER_PAGE: 100,
+} as const;
+
+/**
  * Article fetcher configuration
  */
 export const ARTICLE_FETCHER = {

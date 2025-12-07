@@ -4,7 +4,7 @@ A CLI tool that fetches top HackerNews stories from the past 24 hours, extracts 
 
 ## Features
 
-- 🔍 Fetches best stories from HackerNews API
+- 🔍 Fetches stories from HackerNews via Algolia Search API (efficient date-based filtering)
 - 📄 Extracts full article content using smart content extraction (Mozilla Readability)
 - 🤖 Generates AI-powered summaries (~300 characters) from full article text
 - 💬 Fetches top 10 comments and generates concise summaries (~100 characters)
@@ -14,7 +14,7 @@ A CLI tool that fetches top HackerNews stories from the past 24 hours, extracts 
 - 📦 **Local Caching**: Saves fetched data locally to avoid redundant API calls
 - ⚙️ Configurable via environment variables (story limit, time window, summary length, cache TTL)
 - 🛡️ Graceful error handling with fallback to meta descriptions
-- ⚡ Sequential processing to respect API rate limits
+- ⚡ Efficient API usage with single-request story fetching
 
 ## Prerequisites
 
@@ -290,8 +290,11 @@ web/                        # Vue.js frontend for web mode
 ### "DEEPSEEK_API_KEY environment variable is required"
 Make sure you've created a `.env` file with your API key.
 
-### "Failed to fetch HackerNews stories"
-Check your internet connection and verify that https://hacker-news.firebaseio.com is accessible.
+### "Failed to fetch stories from Algolia HN API"
+Check your internet connection and verify that https://hn.algolia.com is accessible.
+
+### "Algolia API rate limit exceeded"
+Wait a few minutes before trying again, or reduce `HN_STORY_LIMIT` in your `.env` file.
 
 ### Translation shows original English
 This happens when:
@@ -384,22 +387,24 @@ Try increasing `HN_TIME_WINDOW_HOURS` in your `.env` file to look further back i
 - The tool only exports stories from the previous calendar day (00:00-23:59)
 
 ### Fewer stories than expected
-If you're receiving fewer stories than requested (e.g., 8 stories when `HN_STORY_LIMIT=30`), this is likely due to **time window filtering**:
+If you're receiving fewer stories than requested (e.g., 8 stories when `HN_STORY_LIMIT=30`), this may happen because:
 
 **Why this happens:**
-- The tool fetches stories from HackerNews, then filters them by the time window
-- With a 24-hour window, many top stories may be older than 24 hours
-- Only stories within your `HN_TIME_WINDOW_HOURS` are kept
+- The Algolia API returns stories sorted by date within your time window
+- There may be fewer stories posted within your `HN_TIME_WINDOW_HOURS` than requested
 
 **Solutions:**
 - **Increase the time window**: Set `HN_TIME_WINDOW_HOURS=48` or `72` for more results
-- **The tool automatically compensates**: It fetches more stories than requested to account for filtering
-- **Expect some variation**: The final count may be slightly lower than requested due to filtering
+- **Expect some variation**: The final count depends on HackerNews activity during your time window
 
 **Note about limits:**
 - Maximum supported limit: **30 stories** (for performance and API rate limiting)
 - Requesting more than 50 stories will show a warning and cap at 30
 - This ensures optimal performance and prevents API abuse
+
+**Note about sorting:**
+- Stories are now sorted by date (most recent first) via Algolia API
+- This differs from the previous "best" algorithm ranking
 
 ## GitHub Actions Automation
 
@@ -508,7 +513,8 @@ To re-enable, follow the same steps and click `Enable workflow`.
 
 ## API Documentation
 
-- **HackerNews API**: https://github.com/HackerNews/API
+- **Algolia HN Search API**: https://hn.algolia.com/api (used for fetching stories by date)
+- **HackerNews Firebase API**: https://github.com/HackerNews/API (used for fetching comments)
 - **DeepSeek API**: https://platform.deepseek.com/api-docs/
 
 ## License

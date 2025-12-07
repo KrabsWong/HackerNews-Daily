@@ -333,7 +333,7 @@ function displayCards(stories: ProcessedStory[]): void {
   for (const story of stories) {
     console.log(`#${story.rank} 【${story.titleChinese}】`);
     console.log(story.titleEnglish);
-    console.log(`发布时间：${story.time}`);
+    console.log(`发布时间：${story.time}  |  评分：${story.score}`);
     console.log(`链接：${story.url}`);
     console.log(`描述：${story.description}`);
     
@@ -361,11 +361,16 @@ function handleError(error: unknown): void {
       console.error('1. Copy .env.example to .env: cp .env.example .env');
       console.error('2. Get your API key from https://platform.deepseek.com/');
       console.error('3. Add your key to .env: DEEPSEEK_API_KEY=your_key_here\n');
-    } else if (error.message.includes('Failed to fetch HackerNews')) {
+    } else if (error.message.includes('Failed to fetch') && error.message.includes('Algolia')) {
       console.error('\n💡 Troubleshooting:');
       console.error('- Check your internet connection');
-      console.error('- Verify that https://hacker-news.firebaseio.com is accessible');
+      console.error('- Verify that https://hn.algolia.com is accessible');
       console.error('- Try again in a few moments\n');
+    } else if (error.message.includes('rate limit')) {
+      console.error('\n💡 API Rate Limit:');
+      console.error('- Algolia API rate limit exceeded');
+      console.error('- Wait a few minutes before trying again');
+      console.error('- Consider reducing HN_STORY_LIMIT in your .env file\n');
     } else if (error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED')) {
       console.error('\n💡 Network error: Please check your internet connection\n');
     } else if (error.message.includes('Permission denied') || error.message.includes('EACCES')) {
