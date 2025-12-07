@@ -236,6 +236,34 @@ Minimal `design.md` skeleton:
 
 ## Spec File Format
 
+### Critical: Final Spec Structure (openspec/specs/)
+
+**Every spec file in `openspec/specs/<capability>/spec.md` MUST have this structure:**
+
+```markdown
+# <capability-name> Specification
+
+## Purpose
+<Brief description of this capability's purpose, 1-2 sentences>
+
+## Requirements
+
+### Requirement: <Requirement Name>
+The system SHALL <requirement description>.
+
+#### Scenario: <Scenario Name>
+**Given** <precondition>  
+**When** <action>  
+**Then** <expected result>
+```
+
+**CRITICAL**: The `## Purpose` section is REQUIRED. Without it, openspec will report `requirements 0` even if requirements exist in the file.
+
+**Common mistakes to avoid:**
+- ❌ Missing `## Purpose` section → openspec cannot parse requirements
+- ❌ Using "Specification Delta" in title → should be just "Specification"
+- ❌ Starting directly with `## Requirements` without Purpose
+
 ### Critical: Scenario Formatting
 
 **CORRECT** (use #### headers):
@@ -297,6 +325,17 @@ Example for RENAMED:
 **"Requirement must have at least one scenario"**
 - Check scenarios use `#### Scenario:` format (4 hashtags)
 - Don't use bullet points or bold for scenario headers
+
+**Spec shows "requirements 0" but file has requirements**
+- **Most common cause**: Missing `## Purpose` section
+- Fix: Add `## Purpose` section with 1-2 sentence description before `## Requirements`
+- Also check: Title should be `# name Specification` (not "Specification Delta")
+
+**Archive creates specs that openspec can't parse**
+- Archive only copies delta files; ensure when rebuilding specs from archive:
+  1. Replace `## ADDED Requirements` with `## Requirements`
+  2. Remove "Delta" from title
+  3. **Add `## Purpose` section** (archives don't include this)
 
 **Silent scenario parsing failures**
 - Exact format required: `#### Scenario: Name`

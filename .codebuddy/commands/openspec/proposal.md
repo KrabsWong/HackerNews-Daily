@@ -21,6 +21,12 @@ tags: [openspec, change]
 6. Draft `tasks.md` as an ordered list of small, verifiable work items that deliver user-visible progress, include validation (tests, tooling), and highlight dependencies or parallelizable work.
 7. Validate with `openspec validate <id> --strict` and resolve every issue before sharing the proposal.
 
+**Spec Format Reminders**
+- Delta specs use: `# <capability> Specification Delta` with `## ADDED|MODIFIED|REMOVED Requirements`
+- Final specs (in `openspec/specs/`) MUST have `## Purpose` section before `## Requirements` - without it, openspec reports 0 requirements
+- Requirements MUST use SHALL/MUST (uppercase) in description
+- Scenarios MUST use `#### Scenario:` (4 hashtags, not bullets or bold)
+
 **Reference**
 - Use `openspec show <id> --json --deltas-only` or `openspec show <spec> --type spec` to inspect details when validation fails.
 - Search existing requirements with `rg -n "Requirement:|Scenario:" openspec/specs` before writing new ones.
