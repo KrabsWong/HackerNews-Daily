@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { CACHE_CONFIG, ENV_DEFAULTS } from '../config/constants';
+import { CACHE_CONFIG, ENV_DEFAULTS, CONTENT_FILTER } from '../config/constants';
 
 /**
  * Configuration used to generate cache
@@ -10,6 +10,8 @@ interface CacheConfig {
   storyLimit: number;
   timeWindowHours: number;
   summaryMaxLength: number;
+  contentFilterEnabled: boolean;
+  contentFilterSensitivity: string;
 }
 
 /**

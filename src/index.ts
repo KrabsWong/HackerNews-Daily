@@ -1,10 +1,15 @@
 import dotenv from 'dotenv';
+
+// Load environment variables FIRST before importing anything that uses them
+dotenv.config();
+
 import { fetchTopStories, HNStory, fetchCommentsBatch } from './api/hackerNews';
 import { translator } from './services/translator';
 import { fetchArticlesBatch } from './services/articleFetcher';
 import { startWebServer, ProcessedStory as WebProcessedStory } from './server/app';
-import { STORY_LIMITS, SUMMARY_CONFIG, ENV_DEFAULTS } from './config/constants';
+import { STORY_LIMITS, SUMMARY_CONFIG, ENV_DEFAULTS, CONTENT_FILTER } from './config/constants';
 import { checkCache, writeCache, isCacheEnabled, CachedStory } from './services/cache';
+import { AIContentFilter } from './services/contentFilter';
 import {
   generateMarkdownContent,
   ensureDirectoryExists,
@@ -12,9 +17,6 @@ import {
   formatDateForDisplay,
   writeMarkdownFile
 } from './services/markdownExporter';
-
-// Load environment variables from .env file
-dotenv.config();
 
 /**
  * Parse command-line arguments
@@ -153,6 +155,8 @@ async function main(): Promise<void> {
       storyLimit,
       timeWindowHours,
       summaryMaxLength,
+      contentFilterEnabled: CONTENT_FILTER.ENABLED,
+      contentFilterSensitivity: CONTENT_FILTER.SENSITIVITY,
     };
     
     // Check cache first (unless --no-cache flag is set)
@@ -252,6 +256,9 @@ async function fetchFreshData(
   console.log('Validating configuration...');
   translator.init();
   
+  // Initialize content filter
+  const contentFilter = new AIContentFilter(translator);
+  
   // Display fetch parameters
   console.log(`Fetching up to ${storyLimit} stories from the past ${timeWindowHours} hours...`);
   
@@ -270,14 +277,29 @@ async function fetchFreshData(
     console.log(`Try increasing HN_TIME_WINDOW_HOURS in your .env file for more results.\n`);
   }
   
+  // Apply content filter (if enabled)
+  let filteredStories = stories;
+  if (contentFilter.isEnabled()) {
+    console.log('\nApplying AI content filter...');
+    filteredStories = await contentFilter.filterStories(stories);
+    
+    const filteredCount = stories.length - filteredStories.length;
+    if (filteredCount > 0) {
+      console.log(`Filtered ${filteredCount} stories based on content policy`);
+    }
+  }
+  
+  // Use filtered stories for all downstream processing
+  const storiesToProcess = filteredStories;
+  
   // Translate titles
   console.log('\nTranslating titles to Chinese...');
-  const titles = stories.map(s => s.title);
+  const titles = storiesToProcess.map(s => s.title);
   const translatedTitles = await translator.translateBatch(titles);
   
   // Fetch article details (includes full content extraction)
   console.log('\nFetching and extracting article content...');
-  const urls = stories.map(s => s.url || `https://news.ycombinator.com/item?id=${s.id}`);
+  const urls = storiesToProcess.map(s => s.url || `https://news.ycombinator.com/item?id=${s.id}`);
   const articleMetadata = await fetchArticlesBatch(urls);
   
   // Generate AI summaries or translate descriptions
@@ -288,14 +310,14 @@ async function fetchFreshData(
   
   // Fetch top comments for each story
   console.log('\nFetching top comments for each story...');
-  const commentArrays = await fetchCommentsBatch(stories, 10);
+  const commentArrays = await fetchCommentsBatch(storiesToProcess, 10);
   
   // Summarize comments
   console.log('\nSummarizing comments...');
   const commentSummaries = await translator.summarizeCommentsBatch(commentArrays);
   
   // Process stories with translations
-  const processedStories: ProcessedStory[] = stories.map((story, index) => ({
+  const processedStories: ProcessedStory[] = storiesToProcess.map((story, index) => ({
     rank: index + 1,
     titleChinese: translatedTitles[index],
     titleEnglish: story.title,

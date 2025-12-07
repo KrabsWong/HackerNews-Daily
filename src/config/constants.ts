@@ -136,6 +136,37 @@ export const SERVER_CONFIG = {
 } as const;
 
 // =============================================================================
+// Content Filter Configuration
+// =============================================================================
+
+/**
+ * Sensitivity level for content filtering
+ */
+export type SensitivityLevel = 'low' | 'medium' | 'high';
+
+/**
+ * Content filter settings for AI-based sensitive content filtering
+ * Uses getters to read environment variables at runtime (after dotenv.config())
+ */
+export const CONTENT_FILTER = {
+  /** Enable/disable content filtering (default: false for backward compatibility) */
+  get ENABLED(): boolean {
+    return process.env.ENABLE_CONTENT_FILTER === 'true';
+  },
+  
+  /** Sensitivity level for content classification (low, medium, high) */
+  get SENSITIVITY(): SensitivityLevel {
+    return (process.env.CONTENT_FILTER_SENSITIVITY || 'medium') as SensitivityLevel;
+  },
+  
+  /** Timeout for AI classification requests in milliseconds (15 seconds) */
+  TIMEOUT: 15000,
+  
+  /** Fallback behavior on error - if true, allow stories through when filter fails (fail-open) */
+  FALLBACK_ON_ERROR: true,
+};
+
+// =============================================================================
 // Default Environment Values
 // =============================================================================
 

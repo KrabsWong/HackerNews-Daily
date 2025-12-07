@@ -9,6 +9,7 @@ A CLI tool that fetches top HackerNews stories from the past 24 hours, extracts 
 - 🤖 Generates AI-powered summaries (~300 characters) from full article text
 - 💬 Fetches top 10 comments and generates concise summaries (~100 characters)
 - 🌏 Translates titles and summaries to Chinese using DeepSeek LLM
+- 🛡️ **AI Content Filter**: Optional filtering of sensitive content (political/controversial topics)
 - 📊 Displays results in a clean card-based format with timestamps
 - 🌐 **Web UI Mode**: View stories in a browser with a clean Vue.js interface
 - 📦 **Local Caching**: Saves fetched data locally to avoid redundant API calls
@@ -48,6 +49,8 @@ HN_TIME_WINDOW_HOURS=24
 SUMMARY_MAX_LENGTH=300
 CACHE_TTL_MINUTES=30
 CACHE_ENABLED=true
+ENABLE_CONTENT_FILTER=false
+CONTENT_FILTER_SENSITIVITY=medium
 ```
 
 ## Usage
@@ -143,6 +146,8 @@ Configure the tool by editing `.env`:
 | `SUMMARY_MAX_LENGTH` | Target length for AI-generated summaries (100-500 chars) | 300 |
 | `CACHE_TTL_MINUTES` | Cache validity duration in minutes | 30 |
 | `CACHE_ENABLED` | Enable/disable local caching ("true" or "false") | true |
+| `ENABLE_CONTENT_FILTER` | Enable AI-based content filtering ("true" or "false") | false |
+| `CONTENT_FILTER_SENSITIVITY` | Filter sensitivity level: "low", "medium", or "high" | medium |
 
 ### Summary Generation
 
@@ -169,6 +174,49 @@ The tool implements local file-based caching to avoid redundant API calls:
 - Instant results on subsequent runs within TTL
 - Reduced API costs (no DeepSeek API calls when using cache)
 - Lower risk of hitting rate limits
+
+### Content Filtering
+
+The tool includes an optional AI-based content filter to remove stories containing sensitive or controversial topics. This is useful for content moderation in certain regions or contexts.
+
+**How it works**:
+- When enabled, story titles are classified by DeepSeek AI before translation
+- Stories classified as "SENSITIVE" are filtered out
+- Only "SAFE" stories proceed to translation and display
+- Adds 2-5 seconds to fetch time (batch classification)
+
+**Configuration**:
+
+Enable the filter in your `.env` file:
+```bash
+ENABLE_CONTENT_FILTER=true
+CONTENT_FILTER_SENSITIVITY=medium
+```
+
+**Sensitivity Levels**:
+
+- **`low`**: Only filters explicitly illegal content or explicit adult/violent material
+  - Most permissive, minimal filtering
+  
+- **`medium`** (recommended default): Filters political controversies, explicit content, and illegal activities
+  - Balanced approach for general content moderation
+  
+- **`high`**: Broadly filters any potentially sensitive topics
+  - Most restrictive, includes borderline topics
+
+**Behavior**:
+- Filtered stories are silently removed from results
+- Console shows: `Filtered X stories based on content policy`
+- Final story count may be less than `HN_STORY_LIMIT`
+- If AI classification fails, stories are allowed through (fail-open)
+- Warning shown if more than 50% of stories are filtered
+
+**Performance**:
+- Classification adds ~2-5 seconds per fetch
+- Minimal API cost (~$0.001-0.002 per batch)
+- Saves translation costs for filtered stories
+
+**Note**: Filter is **disabled by default** for backward compatibility.
 
 ## Example Output
 

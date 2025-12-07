@@ -2,9 +2,7 @@
 
 ## Purpose
 Specification for Spec: Story Fetching via Hybrid Firebase + Algolia API functionality.
-
 ## Requirements
-
 ### Requirement: System SHALL fetch stories from HN's "best" list
 
 The system SHALL fetch stories only from HackerNews's curated "best" list (https://news.ycombinator.com/best).
@@ -26,21 +24,34 @@ The system SHALL fetch stories only from HackerNews's curated "best" list (https
 
 ### Requirement: System SHALL filter stories by date range
 
-The system SHALL filter stories to only include those within the specified time window.
+The system SHALL filter stories to only include those within the specified time window, and then apply content filtering before translation.
 
-#### Scenario: Filter stories from last 24 hours
+#### Scenario: Filter stories from last 24 hours with content filter
 
 **Given** stories fetched from the best list  
 **And** a time window of 24 hours  
-**When** applying date filter  
-**Then** the system SHALL keep only stories where `created_at_i > (now - 24h)`  
-**And** discard stories outside the time window
+**And** content filtering is enabled  
+**When** applying date and content filters  
+**Then** the system SHALL first keep only stories where `created_at_i > (now - 24h)`  
+**And** then apply AI content filtering to remove sensitive stories  
+**And** proceed with only SAFE stories for translation
 
-#### Scenario: Filter specific date range for daily export
+#### Scenario: Filter specific date range for daily export with content filter
 
 **Given** a request to export stories from a specific date  
+**And** content filtering is enabled  
 **When** filtering by date boundaries (start: 00:00:00, end: 23:59:59)  
-**Then** the system SHALL keep only stories where `created_at_i` is within that range
+**Then** the system SHALL keep only stories where `created_at_i` is within that range  
+**And** then apply AI content filtering  
+**And** export only SAFE stories
+
+#### Scenario: Bypass content filter when disabled
+
+**Given** stories filtered by date range  
+**And** content filtering is disabled  
+**When** processing stories  
+**Then** the system SHALL skip content filtering entirely  
+**And** proceed directly to translation with all date-filtered stories
 
 ### Requirement: System SHALL sort stories by score
 
@@ -116,6 +127,46 @@ The system SHALL provide appropriate error messages for API failures.
 **Given** Firebase API is unreachable  
 **When** fetching best story IDs  
 **Then** the system SHALL throw appropriate error with message
+
+### Requirement: System SHALL integrate content filtering service
+
+The system SHALL create and use a content filter instance during story processing.
+
+#### Scenario: Initialize content filter
+
+**Given** the main application starts  
+**When** preparing to fetch stories  
+**Then** the system SHALL create a content filter instance  
+**And** pass the translator instance to it  
+**And** use it during the fetch pipeline
+
+#### Scenario: Apply content filter after date filtering
+
+**Given** stories filtered by date and sorted by score  
+**And** content filtering is enabled  
+**When** processing stories  
+**Then** the system SHALL call `contentFilter.filterStories()`  
+**And** receive only SAFE stories  
+**And** pass only these stories to translation service
+
+### Requirement: System SHALL report filtering statistics
+
+The system SHALL provide visibility into content filtering operations.
+
+#### Scenario: Display filtering statistics
+
+**Given** content filtering is enabled  
+**And** some stories were filtered  
+**When** displaying console output  
+**Then** the system SHALL show a message like "Filtered X stories based on content policy"  
+**And** show the final count of stories to be processed
+
+#### Scenario: No message when filter disabled
+
+**Given** content filtering is disabled  
+**When** processing stories  
+**Then** the system SHALL NOT display content filtering messages  
+**And** proceed with normal logging
 
 ## Dependencies
 
