@@ -11,6 +11,9 @@ web/dist/
 # Cache
 .cache/
 
+# Exported markdown files
+TLDR-HackNews24/
+
 # Logs
 *.log
 npm-debug.log*

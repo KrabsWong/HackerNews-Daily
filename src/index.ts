@@ -5,6 +5,13 @@ import { fetchArticlesBatch } from './services/articleFetcher';
 import { startWebServer, ProcessedStory as WebProcessedStory } from './server/app';
 import { STORY_LIMITS, SUMMARY_CONFIG, ENV_DEFAULTS } from './config/constants';
 import { checkCache, writeCache, isCacheEnabled, CachedStory } from './services/cache';
+import {
+  generateMarkdownContent,
+  ensureDirectoryExists,
+  generateFilename,
+  formatDateForDisplay,
+  writeMarkdownFile
+} from './services/markdownExporter';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -12,12 +19,46 @@ dotenv.config();
 /**
  * Parse command-line arguments
  */
-function parseArgs(): { webMode: boolean; noCache: boolean } {
+function parseArgs(): { webMode: boolean; noCache: boolean; exportDailyMode: boolean } {
   const args = process.argv.slice(2);
   return {
     webMode: args.includes('--web') || args.includes('-w'),
-    noCache: args.includes('--no-cache') || args.includes('--refresh')
+    noCache: args.includes('--no-cache') || args.includes('--refresh'),
+    exportDailyMode: args.includes('--export-daily')
   };
+}
+
+/**
+ * Get the date boundaries for the previous calendar day (yesterday)
+ * Returns start (00:00:00) and end (23:59:59) timestamps in Unix seconds
+ */
+function getPreviousDayBoundaries(): { start: number; end: number; date: Date } {
+  const now = new Date();
+  
+  // Create date for yesterday
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  // Set to start of day (00:00:00)
+  const startOfDay = new Date(yesterday);
+  startOfDay.setHours(0, 0, 0, 0);
+  
+  // Set to end of day (23:59:59.999)
+  const endOfDay = new Date(yesterday);
+  endOfDay.setHours(23, 59, 59, 999);
+  
+  return {
+    start: Math.floor(startOfDay.getTime() / 1000), // Unix timestamp in seconds
+    end: Math.floor(endOfDay.getTime() / 1000),     // Unix timestamp in seconds
+    date: yesterday
+  };
+}
+
+/**
+ * Filter stories by date range (Unix timestamps)
+ */
+function filterStoriesByDateRange(stories: ProcessedStory[], startTime: number, endTime: number): ProcessedStory[] {
+  return stories.filter(story => story.timestamp >= startTime && story.timestamp <= endTime);
 }
 
 interface ProcessedStory {
@@ -27,6 +68,7 @@ interface ProcessedStory {
   score: number;
   url: string;
   time: string;
+  timestamp: number; // Unix timestamp for filtering and sorting
   description: string;
   commentSummary: string | null; // AI summary of top comments
 }
@@ -87,12 +129,16 @@ function validateSummaryLength(requested: number): number {
 async function main(): Promise<void> {
   try {
     // Parse command-line arguments
-    const { webMode, noCache } = parseArgs();
+    const { webMode, noCache, exportDailyMode } = parseArgs();
     
     console.log('\n🔍 HackerNews Daily - Chinese Translation\n');
     
     if (webMode) {
       console.log('📺 Web mode enabled - will open in browser\n');
+    }
+    
+    if (exportDailyMode) {
+      console.log('📄 Export mode enabled - exporting yesterday\'s articles\n');
     }
     
     // Get configuration from environment
@@ -142,7 +188,42 @@ async function main(): Promise<void> {
     }
     
     // Display results based on mode
-    if (webMode) {
+    if (exportDailyMode) {
+      // Export mode - filter by previous calendar day and export to markdown
+      const { start, end, date } = getPreviousDayBoundaries();
+      const filteredStories = filterStoriesByDateRange(processedStories, start, end);
+      
+      if (filteredStories.length === 0) {
+        const dateStr = formatDateForDisplay(date);
+        console.log(`\n⚠️  No stories found for ${dateStr}\n`);
+        return;
+      }
+      
+      // Sort by timestamp descending (newest first)
+      const sortedStories = [...filteredStories].sort((a, b) => b.timestamp - a.timestamp);
+      
+      // Re-rank after filtering and sorting
+      const rerankedStories = sortedStories.map((story, index) => ({
+        ...story,
+        rank: index + 1
+      }));
+      
+      // Generate markdown content
+      const markdownContent = generateMarkdownContent(rerankedStories, date);
+      
+      // Ensure directory exists
+      const exportDir = 'TLDR-HackNews24';
+      await ensureDirectoryExists(exportDir);
+      
+      // Generate filename
+      const filename = generateFilename(date);
+      
+      // Write to file
+      await writeMarkdownFile(markdownContent, filename, exportDir);
+      
+      const filePath = `${exportDir}/${filename}`;
+      console.log(`\n✅ Successfully exported ${rerankedStories.length} stories to ${filePath}\n`);
+    } else if (webMode) {
       console.log('\nStarting web server...\n');
       await startWebServer(processedStories);
       // Keep process alive for web server
@@ -221,6 +302,7 @@ async function fetchFreshData(
     score: story.score,
     url: urls[index],
     time: formatTimestamp(story.time),
+    timestamp: story.time, // Add Unix timestamp for filtering and sorting
     description: summaries[index],
     commentSummary: commentSummaries[index],
   }));
@@ -286,6 +368,20 @@ function handleError(error: unknown): void {
       console.error('- Try again in a few moments\n');
     } else if (error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED')) {
       console.error('\n💡 Network error: Please check your internet connection\n');
+    } else if (error.message.includes('Permission denied') || error.message.includes('EACCES')) {
+      console.error('\n💡 Export error troubleshooting:');
+      console.error('- Check directory write permissions');
+      console.error('- Ensure TLDR-HackNews24/ directory is not write-protected');
+      console.error('- Try running with appropriate permissions\n');
+    } else if (error.message.includes('No space left') || error.message.includes('ENOSPC')) {
+      console.error('\n💡 Disk space error:');
+      console.error('- Free up disk space');
+      console.error('- Check available storage on your device\n');
+    } else if (error.message.includes('Failed to create directory') || error.message.includes('Failed to write file')) {
+      console.error('\n💡 File system error:');
+      console.error('- Verify you have write permissions');
+      console.error('- Check that the path is valid');
+      console.error('- Ensure sufficient disk space is available\n');
     }
   } else {
     console.error('An unexpected error occurred');

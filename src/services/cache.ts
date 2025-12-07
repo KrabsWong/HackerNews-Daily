@@ -22,6 +22,7 @@ export interface CachedStory {
   score: number;
   url: string;
   time: string;
+  timestamp: number; // Unix timestamp for filtering and sorting
   description: string;
   commentSummary: string | null;
 }

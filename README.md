@@ -71,6 +71,28 @@ Or use the `--web` flag:
 npm run fetch -- --web
 ```
 
+### Daily Export Mode
+
+Export articles from the previous calendar day (yesterday) to a markdown file:
+```bash
+npm run fetch -- --export-daily
+```
+
+This will:
+- Query articles from yesterday (previous calendar day 00:00-23:59)
+- Sort articles by creation time (newest first)
+- Generate a markdown file at `TLDR-HackNews24/hackernews-YYYY-MM-DD.md`
+- Display success message with file path
+
+You can combine with `--no-cache` to force fresh data:
+```bash
+npm run fetch -- --export-daily --no-cache
+```
+
+**Output Format**: The exported markdown file uses the same format as CLI mode, with article cards containing Chinese title, English title, timestamp, URL, description, and comment summary.
+
+**Filename**: Files are named `hackernews-YYYY-MM-DD.md` where the date represents the previous calendar day.
+
 ### Force Refresh (Bypass Cache)
 
 To bypass the cache and fetch fresh data:
@@ -243,8 +265,14 @@ src/
 ├── services/
 │   ├── cache.ts            # Local file-based cache service
 │   ├── translator.ts       # DeepSeek translation service
-│   └── articleFetcher.ts   # Article metadata fetching service
+│   ├── articleFetcher.ts   # Article metadata fetching service
+│   └── markdownExporter.ts # Markdown export service for daily exports
 └── index.ts                # Main CLI entry point
+
+TLDR-HackNews24/            # Daily export directory (auto-created)
+├── hackernews-2025-12-06.md
+├── hackernews-2025-12-05.md
+└── ...
 
 web/                        # Vue.js frontend for web mode
 ├── src/
@@ -331,6 +359,29 @@ Try increasing `HN_TIME_WINDOW_HOURS` in your `.env` file to look further back i
 **Cache cleared unexpectedly:**
 - Cache is invalidated when configuration changes
 - Changing `HN_STORY_LIMIT`, `HN_TIME_WINDOW_HOURS`, or `SUMMARY_MAX_LENGTH` will trigger a fresh fetch
+
+### Daily export issues
+
+**No markdown file created:**
+- Check that `TLDR-HackNews24/` directory exists and is writable
+- Ensure there are articles from yesterday (previous calendar day 00:00-23:59)
+- Run with `--no-cache` to fetch fresh data
+- Check terminal output for "⚠️ No stories found for YYYY-MM-DD" message
+
+**Permission denied error:**
+- Ensure you have write permissions in the project directory
+- Try creating `TLDR-HackNews24/` directory manually: `mkdir TLDR-HackNews24`
+- Check directory ownership and permissions
+
+**File overwrite warning:**
+- This is normal behavior when exporting the same date multiple times
+- The tool overwrites the existing file with fresh data
+- Previous export data will be replaced
+
+**No stories from yesterday:**
+- HackerNews may not have had active stories during yesterday's date range
+- Try increasing `HN_STORY_LIMIT` to fetch more stories
+- The tool only exports stories from the previous calendar day (00:00-23:59)
 
 ### Fewer stories than expected
 If you're receiving fewer stories than requested (e.g., 8 stories when `HN_STORY_LIMIT=30`), this is likely due to **time window filtering**:
