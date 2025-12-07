@@ -35,29 +35,32 @@ jobs:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: npm run fetch -- --export-daily
       
-      - name: Checkout TLDR-HackNews24 repository
+      - name: Checkout tldr-hacknews-24 repository
         uses: actions/checkout@v4
         with:
-          repository: KrabsWong/TLDR-HackNews24
+          repository: KrabsWong/tldr-hacknews-24
           token: ${{ secrets.TLDR_REPO_TOKEN }}
           path: tldr-repo
       
-      - name: Copy markdown file to TLDR repository
+      - name: Copy markdown file to Jekyll _posts directory
         run: |
           # Get yesterday's date in YYYY-MM-DD format
           YESTERDAY=$(date -u -d "yesterday" '+%Y-%m-%d' 2>/dev/null || date -u -v-1d '+%Y-%m-%d')
-          FILENAME="hackernews-${YESTERDAY}.md"
+          FILENAME="${YESTERDAY}-daily.md"
           
-          # Copy the generated file
-          if [ -f "TLDR-HackNews24/${FILENAME}" ]; then
-            cp "TLDR-HackNews24/${FILENAME}" "tldr-repo/${FILENAME}"
-            echo "✅ Copied ${FILENAME} to TLDR repository"
+          # Ensure _posts directory exists
+          mkdir -p tldr-repo/_posts
+          
+          # Copy the generated file to _posts directory
+          if [ -f "hacknews-export/${FILENAME}" ]; then
+            cp "hacknews-export/${FILENAME}" "tldr-repo/_posts/${FILENAME}"
+            echo "✅ Copied ${FILENAME} to tldr-hacknews-24/_posts/"
           else
-            echo "❌ Error: ${FILENAME} not found in TLDR-HackNews24/"
+            echo "❌ Error: ${FILENAME} not found in hacknews-export/"
             exit 1
           fi
       
-      - name: Commit and push to TLDR repository
+      - name: Commit and push to tldr-hacknews-24 repository
         run: |
           cd tldr-repo
           
@@ -77,5 +80,5 @@ jobs:
           else
             git commit -m "Add HackerNews daily export for ${YESTERDAY}"
             git push
-            echo "✅ Successfully pushed to TLDR-HackNews24 repository"
+            echo "✅ Successfully pushed to tldr-hacknews-24 repository"
           fi

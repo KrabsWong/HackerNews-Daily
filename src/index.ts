@@ -212,7 +212,7 @@ async function main(): Promise<void> {
       const markdownContent = generateMarkdownContent(rerankedStories, date);
       
       // Ensure directory exists
-      const exportDir = 'TLDR-HackNews24';
+      const exportDir = 'hacknews-export';
       await ensureDirectoryExists(exportDir);
       
       // Generate filename
@@ -376,7 +376,7 @@ function handleError(error: unknown): void {
     } else if (error.message.includes('Permission denied') || error.message.includes('EACCES')) {
       console.error('\n💡 Export error troubleshooting:');
       console.error('- Check directory write permissions');
-      console.error('- Ensure TLDR-HackNews24/ directory is not write-protected');
+      console.error('- Ensure hacknews-export/ directory is not write-protected');
       console.error('- Try running with appropriate permissions\n');
     } else if (error.message.includes('No space left') || error.message.includes('ENOSPC')) {
       console.error('\n💡 Disk space error:');

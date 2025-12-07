@@ -14,17 +14,31 @@ interface ProcessedStory {
 }
 
 /**
+ * Generate Jekyll front matter with layout, title, and date
+ * @param date - Date object for the export
+ * @returns Jekyll-compatible YAML front matter block
+ */
+export function generateJekyllFrontMatter(date: Date): string {
+  const dateStr = formatDateForDisplay(date);
+  let frontMatter = '---\n';
+  frontMatter += 'layout: post\n';
+  frontMatter += `title: HackerNews Daily - ${dateStr}\n`;
+  frontMatter += `date: ${dateStr}\n`;
+  frontMatter += '---\n\n';
+  return frontMatter;
+}
+
+/**
  * Generate markdown content from processed stories with optimized hierarchy
  * Uses clear markdown structure for better readability and rendering
  * @param stories - Array of processed stories to convert to markdown
  * @param date - Date object for the export (used for the title)
  */
 export function generateMarkdownContent(stories: ProcessedStory[], date: Date): string {
-  const dateStr = formatDateForDisplay(date);
   let content = '';
   
-  // Add top-level heading with date
-  content += `# HackerNews Daily - ${dateStr}\n\n`;
+  // Add Jekyll front matter at the top
+  content += generateJekyllFrontMatter(date);
   
   for (const story of stories) {
     // Article heading (H2) with rank and Chinese title
@@ -73,14 +87,14 @@ export async function ensureDirectoryExists(directory: string): Promise<void> {
 /**
  * Generate filename from date
  * @param date - Date object for the export
- * @returns Filename in format hackernews-YYYY-MM-DD.md
+ * @returns Filename in Jekyll format YYYY-MM-DD-daily.md
  */
 export function generateFilename(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   
-  return `hackernews-${year}-${month}-${day}.md`;
+  return `${year}-${month}-${day}-daily.md`;
 }
 
 /**

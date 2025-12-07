@@ -1,28 +1,9 @@
-# github-actions-workflow Specification
+# GitHub Actions Workflow Specification Delta
 
-## Purpose
-Specification for github-actions-workflow functionality.
-## Requirements
-### Requirement: Environment Setup
-The workflow SHALL set up Node.js version 20 or higher environment and install all project dependencies to ensure compatibility with jsdom 27+ and its undici dependency.
+## Overview
+This change updates the GitHub Actions workflow to push exported markdown files to a Jekyll blog repository, specifically targeting the `_posts` directory with Jekyll-standard filename format.
 
-#### Scenario: Node.js 20+ environment configuration
-- **WHEN** the workflow starts execution
-- **THEN** Node.js version 20 or higher is installed and available
-- **AND** npm package manager is ready for use
-- **AND** the `File` global object is available for undici library usage
-
-#### Scenario: Dependency installation from package.json
-- **WHEN** npm install command executes in the workflow
-- **THEN** all required dependencies from package.json are installed successfully
-- **AND** jsdom 27.2.0 and its undici dependency load without errors
-- **AND** build completes without ReferenceError exceptions
-
-#### Scenario: Compatibility with jsdom and undici
-- **WHEN** the workflow executes code that uses jsdom for HTML parsing
-- **THEN** undici library can access required Node.js global objects (File, Blob, etc.)
-- **AND** no "ReferenceError: File is not defined" errors occur
-- **AND** article content extraction completes successfully
+## ADDED Requirements
 
 ### Requirement: Jekyll Blog Repository Integration
 The workflow SHALL push exported markdown files to a Jekyll blog repository at `KrabsWong/tldr-hacknews-24` in the `_posts/` directory.
@@ -50,4 +31,3 @@ The workflow SHALL push exported markdown files to a Jekyll blog repository at `
 - **WHEN** the workflow attempts to push to the target repository
 - **THEN** it MUST have write access via the configured token
 - **AND** handle authentication errors gracefully with clear error messages
-
