@@ -1,8 +1,10 @@
-# story-fetching Specification
+# Spec: Story Fetching via Hybrid Firebase + Algolia API Specification
 
 ## Purpose
-TBD - created by archiving change migrate-to-algolia-api. Update Purpose after archive.
+Specification for Spec: Story Fetching via Hybrid Firebase + Algolia API functionality.
+
 ## Requirements
+
 ### Requirement: System SHALL fetch stories from HN's "best" list
 
 The system SHALL fetch stories only from HackerNews's curated "best" list (https://news.ycombinator.com/best).
@@ -115,3 +117,7 @@ The system SHALL provide appropriate error messages for API failures.
 **When** fetching best story IDs  
 **Then** the system SHALL throw appropriate error with message
 
+## Dependencies
+
+- [comment-fetching]: Comment fetching remains via Firebase API
+- No changes required to article content scraping logic

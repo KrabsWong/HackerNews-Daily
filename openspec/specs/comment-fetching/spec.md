@@ -1,8 +1,10 @@
-# comment-fetching Specification
+# Spec: Comment Fetching Strategy Specification
 
 ## Purpose
-TBD - created by archiving change migrate-to-algolia-api. Update Purpose after archive.
+Specification for Spec: Comment Fetching Strategy functionality.
+
 ## Requirements
+
 ### Requirement: System SHALL fetch comment details for stories
 
 The system SHALL fetch top comments for each story using Firebase API.
@@ -36,3 +38,14 @@ The system SHALL support fetching story metadata from Algolia while efficiently 
 **And** make N Firebase requests for N comment IDs  
 **And** maintain existing concurrency and error handling
 
+## Dependencies
+
+- [story-fetching]: Stories are fetched via hybrid Firebase + Algolia approach
+- Existing `HNComment` interface remains unchanged
+- Existing comment parsing and HTML stripping logic unchanged
+
+## Out of Scope
+
+- Migrating comment fetching to Algolia items API
+- Changes to comment ranking or filtering logic
+- Changes to comment summarization logic
