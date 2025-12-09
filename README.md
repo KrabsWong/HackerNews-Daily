@@ -524,22 +524,29 @@ The workflow (`.github/workflows/daily-export.yml`) runs automatically:
 
 ### Setup Instructions
 
-To enable automated daily exports, configure the following GitHub repository secrets:
+To enable automated daily exports, configure the following GitHub repository settings:
 
 1. **Navigate to Repository Settings**
    - Go to your repository on GitHub
    - Click `Settings` > `Secrets and variables` > `Actions`
 
-2. **Add Required Secrets**
+2. **Add Required Secrets** (Settings → Secrets and variables → Actions → Secrets)
    
-   **`DEEPSEEK_API_KEY`** (Required)
+   | Secret Name | Description | Required |
+   |-------------|-------------|----------|
+   | `DEEPSEEK_API_KEY` | DeepSeek API key for translation/summarization | Yes |
+   | `CRAWLER_API_URL` | Crawler service URL for content extraction | Yes |
+   | `TLDR_REPO_TOKEN` | GitHub PAT with `repo` scope for pushing to archive repo | Yes |
+
+   **`DEEPSEEK_API_KEY`**
    - Your DeepSeek API key for translation and summarization
    - Get one from https://platform.deepseek.com/
-   - Click `New repository secret`
-   - Name: `DEEPSEEK_API_KEY`
-   - Value: Your API key
 
-   **`TLDR_REPO_TOKEN`** (Required)
+   **`CRAWLER_API_URL`**
+   - URL of your crawler API service for content extraction
+   - Example: `https://tiny-crawl-production.up.railway.app`
+
+   **`TLDR_REPO_TOKEN`**
    - GitHub Personal Access Token (PAT) with `repo` scope
    - Used to push files to the TLDR-HackNews24 repository
    - Create a PAT:
@@ -548,11 +555,22 @@ To enable automated daily exports, configure the following GitHub repository sec
      3. Give it a descriptive name (e.g., "HackNews Daily Export Bot")
      4. Select scope: `repo` (Full control of private repositories)
      5. Click `Generate token` and copy the token
-   - Add to repository secrets:
-     - Name: `TLDR_REPO_TOKEN`
-     - Value: Your PAT
 
-3. **Verify Setup**
+3. **Optional: Add Configuration Variables** (Settings → Secrets and variables → Actions → Variables)
+   
+   These are optional and have sensible defaults:
+
+   | Variable Name | Description | Default |
+   |---------------|-------------|---------|
+   | `HN_STORY_LIMIT` | Number of stories to fetch | 30 |
+   | `HN_TIME_WINDOW_HOURS` | Time window in hours | 24 |
+   | `SUMMARY_MAX_LENGTH` | Max summary length in characters | 300 |
+   | `CACHE_ENABLED` | Enable caching (not recommended for CI) | false |
+   | `CACHE_TTL_MINUTES` | Cache TTL in minutes | 30 |
+   | `ENABLE_CONTENT_FILTER` | Enable AI content filter | false |
+   | `CONTENT_FILTER_SENSITIVITY` | Filter sensitivity (low/medium/high) | medium |
+
+4. **Verify Setup**
    - The workflow will automatically run at 01:00 UTC daily
    - For immediate testing, manually trigger the workflow:
      1. Go to `Actions` tab in your repository

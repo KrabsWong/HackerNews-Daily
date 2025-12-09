@@ -32,7 +32,29 @@ jobs:
       
       - name: Run daily export
         env:
+          # ===========================================
+          # Required Secrets (must be configured in GitHub repository settings)
+          # ===========================================
+          # DeepSeek API key for AI translation and summarization
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          # Crawler API URL for content extraction (required)
+          CRAWLER_API_URL: ${{ secrets.CRAWLER_API_URL }}
+          
+          # ===========================================
+          # Optional Configuration (via GitHub Variables or defaults)
+          # ===========================================
+          # Story fetching configuration
+          HN_STORY_LIMIT: ${{ vars.HN_STORY_LIMIT || '30' }}
+          HN_TIME_WINDOW_HOURS: ${{ vars.HN_TIME_WINDOW_HOURS || '24' }}
+          SUMMARY_MAX_LENGTH: ${{ vars.SUMMARY_MAX_LENGTH || '300' }}
+          
+          # Cache configuration (disabled by default in CI)
+          CACHE_ENABLED: ${{ vars.CACHE_ENABLED || 'false' }}
+          CACHE_TTL_MINUTES: ${{ vars.CACHE_TTL_MINUTES || '30' }}
+          
+          # Content filter configuration
+          ENABLE_CONTENT_FILTER: ${{ vars.ENABLE_CONTENT_FILTER || 'false' }}
+          CONTENT_FILTER_SENSITIVITY: ${{ vars.CONTENT_FILTER_SENSITIVITY || 'medium' }}
         run: npm run fetch -- --export-daily
       
       - name: Checkout tldr-hacknews-24 repository
