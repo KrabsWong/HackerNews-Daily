@@ -1,21 +1,23 @@
 # HackerNews Daily - Chinese Translation
 
-A CLI tool that fetches top HackerNews stories from the past 24 hours, extracts full article content, generates AI-powered summaries, fetches and summarizes top comments, and translates everything to Chinese using DeepSeek AI, displaying them in a clean card-based format.
+A CLI tool that fetches top-rated stories from HackerNews's curated "best" list, extracts full article content, generates AI-powered summaries, fetches and summarizes top comments, and translates everything to Chinese using DeepSeek AI. Supports multiple output formats: CLI display, Web UI, and daily Markdown exports with optional AI-based content filtering.
 
 ## Features
 
-- 🔍 Fetches stories from HackerNews via Algolia Search API (efficient date-based filtering)
-- 📄 Extracts full article content using smart content extraction (Mozilla Readability)
-- 🤖 Generates AI-powered summaries (~300 characters) from full article text
-- 💬 Fetches top 10 comments and generates concise summaries (~100 characters)
-- 🌏 Translates titles and summaries to Chinese using DeepSeek LLM
-- 🛡️ **AI Content Filter**: Optional filtering of sensitive content (political/controversial topics)
-- 📊 Displays results in a clean card-based format with timestamps
-- 🌐 **Web UI Mode**: View stories in a browser with a clean Vue.js interface
-- 📦 **Local Caching**: Saves fetched data locally to avoid redundant API calls
-- ⚙️ Configurable via environment variables (story limit, time window, summary length, cache TTL)
-- 🛡️ Graceful error handling with fallback to meta descriptions
-- ⚡ Efficient API usage with single-request story fetching
+- 🎯 Fetches stories from HackerNews's curated "best" list via hybrid Firebase + Algolia API strategy
+- 📄 Extracts full article content using Mozilla Readability (smart content extraction)
+- 🤖 Generates AI-powered summaries (configurable 100-500 characters, default 300) from full article text
+- 💬 Fetches top 10 comments and generates concise AI summaries (~100 characters, requires 3+ comments)
+- 🌏 Translates titles, article summaries, and comment summaries to Chinese using DeepSeek LLM
+- 🛡️ **AI Content Filter**: Optional filtering of sensitive content with three sensitivity levels (low/medium/high, disabled by default)
+- 📊 **CLI Mode**: Clean card-based display with timestamps and scores
+- 🌐 **Web UI Mode**: Vue.js interface with auto-opening browser (port 3000+)
+- 📝 **Daily Export Mode**: Export previous day's articles to Jekyll-compatible Markdown files
+- 📦 **Local Caching**: TTL-based file caching (default 30 minutes) to avoid redundant API calls
+- ⚙️ Configurable via environment variables (story limit, time window, summary length, cache TTL, filter settings)
+- 🛡️ Graceful error handling with multi-level fallbacks (content → meta description → original text)
+- ⚡ Efficient API usage: ~3 API calls for 30 stories (vs 31+ previously)
+- 🤖 **GitHub Actions**: Automated daily exports to separate Jekyll blog repository
 
 ## Prerequisites
 
@@ -85,7 +87,7 @@ npm run fetch -- --export-daily
 This will:
 - Query articles from yesterday (previous calendar day 00:00-23:59)
 - Sort articles by creation time (newest first)
-- Generate a markdown file at `TLDR-HackNews24/hackernews-YYYY-MM-DD.md`
+- Generate a markdown file at `hacknews-export/YYYY-MM-DD-daily.md`
 - Display success message with file path
 
 You can combine with `--no-cache` to force fresh data:
@@ -93,9 +95,14 @@ You can combine with `--no-cache` to force fresh data:
 npm run fetch -- --export-daily --no-cache
 ```
 
-**Output Format**: The exported markdown file uses the same format as CLI mode, with article cards containing Chinese title, English title, timestamp, URL, description, and comment summary.
+**Output Format**: The exported markdown file includes Jekyll-compatible YAML front matter (layout, title, date) and uses clear hierarchical structure:
+- Date as H1 heading
+- Each article as H2 section with rank number
+- Metadata with clear labels (timestamp, clickable URL link)
+- Description and comment summary in separate paragraphs
+- Horizontal rules between articles for visual separation
 
-**Filename**: Files are named `hackernews-YYYY-MM-DD.md` where the date represents the previous calendar day.
+**Filename**: Files are named `YYYY-MM-DD-daily.md` where the date represents the previous calendar day. The `-daily` suffix distinguishes daily export posts for Jekyll.
 
 ### Force Refresh (Bypass Cache)
 
@@ -367,9 +374,9 @@ src/
 │   └── markdownExporter.ts # Markdown export service for daily exports
 └── index.ts                # Main CLI entry point
 
-TLDR-HackNews24/            # Daily export directory (auto-created)
-├── hackernews-2025-12-06.md
-├── hackernews-2025-12-05.md
+hacknews-export/            # Daily export directory (auto-created)
+├── 2025-12-06-daily.md
+├── 2025-12-05-daily.md
 └── ...
 
 web/                        # Vue.js frontend for web mode
@@ -466,14 +473,14 @@ Try increasing `HN_TIME_WINDOW_HOURS` in your `.env` file to look further back i
 ### Daily export issues
 
 **No markdown file created:**
-- Check that `TLDR-HackNews24/` directory exists and is writable
+- Check that `hacknews-export/` directory exists and is writable
 - Ensure there are articles from yesterday (previous calendar day 00:00-23:59)
 - Run with `--no-cache` to fetch fresh data
 - Check terminal output for "⚠️ No stories found for YYYY-MM-DD" message
 
 **Permission denied error:**
 - Ensure you have write permissions in the project directory
-- Try creating `TLDR-HackNews24/` directory manually: `mkdir TLDR-HackNews24`
+- Try creating `hacknews-export/` directory manually: `mkdir hacknews-export`
 - Check directory ownership and permissions
 
 **File overwrite warning:**
@@ -482,7 +489,8 @@ Try increasing `HN_TIME_WINDOW_HOURS` in your `.env` file to look further back i
 - Previous export data will be replaced
 
 **No stories from yesterday:**
-- HackerNews may not have had active stories during yesterday's date range
+- HackerNews may not have had active stories from the "best" list during yesterday's date range
+- The tool fetches from HN's curated "best" list (not all stories), so the available count depends on HN's algorithm
 - Try increasing `HN_STORY_LIMIT` to fetch more stories
 - The tool only exports stories from the previous calendar day (00:00-23:59)
 
@@ -490,12 +498,16 @@ Try increasing `HN_TIME_WINDOW_HOURS` in your `.env` file to look further back i
 If you're receiving fewer stories than requested (e.g., 8 stories when `HN_STORY_LIMIT=30`), this may happen because:
 
 **Why this happens:**
-- The Algolia API returns stories sorted by date within your time window
-- There may be fewer stories posted within your `HN_TIME_WINDOW_HOURS` than requested
+- The tool fetches stories from HackerNews's curated "best" list (https://news.ycombinator.com/best)
+- Only stories that appear in this curated list AND match your time window are included
+- The "best" list contains ~200 stories, but they may not all be within your time window
+- Content filtering (if enabled) may remove additional stories
 
 **Solutions:**
 - **Increase the time window**: Set `HN_TIME_WINDOW_HOURS=48` or `72` for more results
-- **Expect some variation**: The final count depends on HackerNews activity during your time window
+- **Disable content filter**: Set `ENABLE_CONTENT_FILTER=false` if enabled
+- **Lower filter sensitivity**: Set `CONTENT_FILTER_SENSITIVITY=low` instead of medium/high
+- **Expect some variation**: The final count depends on HN's "best" algorithm and your filters
 
 **Note about limits:**
 - Maximum supported limit: **30 stories** (for performance and API rate limiting)
@@ -503,12 +515,13 @@ If you're receiving fewer stories than requested (e.g., 8 stories when `HN_STORY
 - This ensures optimal performance and prevents API abuse
 
 **Note about sorting:**
-- Stories are now sorted by date (most recent first) via Algolia API
-- This differs from the previous "best" algorithm ranking
+- Stories are fetched from HN's "best" list (quality-curated)
+- Then sorted by score (points) in descending order
+- You get the top-rated stories from the "best" list within your time window
 
 ## GitHub Actions Automation
 
-This project includes a GitHub Actions workflow that automatically exports daily HackerNews articles and pushes them to the [TLDR-HackNews24](https://github.com/KrabsWong/TLDR-HackNews24) archive repository.
+This project includes a GitHub Actions workflow that automatically exports daily HackerNews articles and pushes them to the [tldr-hacknews-24](https://github.com/KrabsWong/tldr-hacknews-24) Jekyll blog repository.
 
 ### How It Works
 
@@ -518,9 +531,9 @@ The workflow (`.github/workflows/daily-export.yml`) runs automatically:
   1. Checks out this repository
   2. Installs dependencies
   3. Runs `npm run fetch -- --export-daily` to generate yesterday's markdown file
-  4. Checks out the TLDR-HackNews24 repository
-  5. Copies the generated file to TLDR-HackNews24
-  6. Commits and pushes the changes
+  4. Checks out the tldr-hacknews-24 Jekyll blog repository
+  5. Copies the generated file from `hacknews-export/` to `tldr-repo/_posts/` directory
+  6. Commits and pushes the changes with GitHub Actions bot account
 
 ### Setup Instructions
 
@@ -548,7 +561,7 @@ To enable automated daily exports, configure the following GitHub repository set
 
    **`TLDR_REPO_TOKEN`**
    - GitHub Personal Access Token (PAT) with `repo` scope
-   - Used to push files to the TLDR-HackNews24 repository
+   - Used to push files to the tldr-hacknews-24 repository
    - Create a PAT:
      1. Go to GitHub Settings > Developer settings > Personal access tokens > Tokens (classic)
      2. Click `Generate new token (classic)`
@@ -577,7 +590,7 @@ To enable automated daily exports, configure the following GitHub repository set
      2. Click `Daily HackerNews Export` workflow
      3. Click `Run workflow` > `Run workflow`
    - Check the workflow run logs for any errors
-   - Verify the file appears in [TLDR-HackNews24](https://github.com/KrabsWong/TLDR-HackNews24)
+   - Verify the file appears in [tldr-hacknews-24 _posts directory](https://github.com/KrabsWong/tldr-hacknews-24)
 
 ### Manual Triggering
 
@@ -605,10 +618,10 @@ Monitor workflow executions:
 - Ensure `DEEPSEEK_API_KEY` secret is configured in repository settings
 - Check that the secret name is spelled correctly (case-sensitive)
 
-**Workflow fails when pushing to TLDR-HackNews24**
+**Workflow fails when pushing to tldr-hacknews-24**
 - Verify `TLDR_REPO_TOKEN` has `repo` scope permissions
 - Ensure the token hasn't expired
-- Check that the TLDR-HackNews24 repository exists and is accessible
+- Check that the tldr-hacknews-24 repository exists and is accessible
 
 **No file generated**
 - Check workflow logs for errors during the export step
