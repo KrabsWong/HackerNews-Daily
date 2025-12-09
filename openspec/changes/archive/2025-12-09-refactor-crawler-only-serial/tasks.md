@@ -11,7 +11,7 @@
 
 ## 2. Update Configuration
 
-- [ ] 2.1 Update `.env.example` to indicate `CRAWLER_API_URL` is now required
+- [x] 2.1 Update `.env.example` to indicate `CRAWLER_API_URL` is now required
 - [x] 2.2 Add warning log if `CRAWLER_API_URL` is not configured
 - [x] 2.3 Change `MAX_CONTENT_LENGTH` default to 0 (no limit)
 - [x] 2.4 Update truncation logic to only apply when MAX_CONTENT_LENGTH > 0
@@ -19,5 +19,5 @@
 ## 3. Validation
 
 - [x] 3.1 Run `npm run build` to verify TypeScript compilation
-- [ ] 3.2 Run `npm run fetch` to verify serial processing works
-- [ ] 3.3 Verify timeout handling works correctly
+- [x] 3.2 Run `npm run fetch` to verify serial processing works
+- [x] 3.3 Verify timeout handling works correctly

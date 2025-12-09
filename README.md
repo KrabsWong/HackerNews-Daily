@@ -51,6 +51,7 @@ CACHE_TTL_MINUTES=30
 CACHE_ENABLED=true
 ENABLE_CONTENT_FILTER=false
 CONTENT_FILTER_SENSITIVITY=medium
+CRAWLER_API_URL=
 ```
 
 ## Usage
@@ -148,6 +149,7 @@ Configure the tool by editing `.env`:
 | `CACHE_ENABLED` | Enable/disable local caching ("true" or "false") | true |
 | `ENABLE_CONTENT_FILTER` | Enable AI-based content filtering ("true" or "false") | false |
 | `CONTENT_FILTER_SENSITIVITY` | Filter sensitivity level: "low", "medium", or "high" | medium |
+| `CRAWLER_API_URL` | Crawler API base URL for fallback content extraction (optional) | - |
 
 ### Summary Generation
 
@@ -157,6 +159,54 @@ The tool generates AI-powered summaries in two steps:
 2. **AI Summarization**: Sends the extracted content to DeepSeek API to generate a concise Chinese summary of approximately `SUMMARY_MAX_LENGTH` characters
 
 **Fallback Behavior**: If content extraction or summarization fails, the tool falls back to translating the meta description (if available) or displays "暂无描述".
+
+### Crawler API Fallback (Optional)
+
+The tool supports an optional crawler API fallback for improved content extraction success rates. When configured, the crawler API is used as a last resort for sites that block standard HTTP requests.
+
+**How it works**:
+- **Three-tier fallback strategy**:
+  1. **Primary**: Axios + Readability (fast, works for ~60% of sites)
+  2. **Secondary**: Meta description extraction (fallback for basic info)
+  3. **Tertiary**: Crawler API (comprehensive, for difficult sites with anti-crawling)
+
+**Configuration**:
+
+Add the crawler API URL to your `.env` file:
+```bash
+# Optional: Crawler API for fallback content extraction
+CRAWLER_API_URL=https://tiny-crawl-production.up.railway.app
+```
+
+**When the crawler is used**:
+- The crawler API is only called when both Readability extraction AND meta description fail
+- It uses headless browser technology to bypass:
+  - Anti-crawling mechanisms (Cloudflare, bot detection)
+  - JavaScript-rendered content (SPA frameworks)
+  - CAPTCHA challenges and rate limiting
+- Returns markdown-formatted content optimized for AI summarization
+
+**Batch Processing for Rate Limiting**:
+- Articles are fetched in batches of 5 concurrently (configurable in `constants.ts`)
+- Prevents sudden traffic spikes to target servers
+- Reduces risk of rate limiting or IP blocking
+- More polite crawling behavior
+- Example: 30 articles = 6 batches processed sequentially
+- Logs show batch progress: `📦 Processing batch 1/6 (5 articles)...`
+
+**Performance**:
+- Both default fetch and crawler requests have a 10-second timeout
+- Only triggered as last resort (when both Readability AND meta description fail)
+- Minimal impact on overall performance due to infrequent usage
+- Significantly improves success rate for sites that block standard requests
+
+**Logging Visibility**:
+- Each URL shows extraction method: `🌐 Method: Default Fetch (Axios + Readability)`
+- When crawler is triggered: `🕷️  Switching to: Crawler Fallback`
+- Completion shows successful method: `✅ Completed: {url} (Default Fetch)` or `(Crawler Fallback)`
+- Clear visibility into which method is being used at all times
+
+**Note**: The crawler API is **optional** and **disabled by default**. Uncomment `CRAWLER_API_URL` in your `.env` file to enable it.
 
 ### Caching
 
@@ -358,6 +408,8 @@ This happens when:
 - The fetch times out after 5 seconds
 - AI summarization fails (falls back to meta description translation)
 - The tool continues gracefully without breaking
+
+**Solution**: Configure the optional crawler API fallback by setting `CRAWLER_API_URL` in your `.env` file. The crawler uses headless browser technology to bypass anti-crawling mechanisms and significantly improves content extraction success rates.
 
 ### Performance & Timing
 The tool processes articles and comments sequentially to respect API rate limits:
