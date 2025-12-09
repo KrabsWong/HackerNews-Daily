@@ -3,7 +3,7 @@ name: Daily HackerNews Export
 on:
   # Run daily at 01:00 UTC (after yesterday has fully passed)
   schedule:
-    - cron: '0 1 * * *'
+    - cron: '16 0 * * *'
   
   # Allow manual triggering for testing
   workflow_dispatch:
