@@ -47,10 +47,47 @@ export const ALGOLIA_HN_API = {
  * Article fetcher configuration
  */
 export const ARTICLE_FETCHER = {
-  /** Request timeout in milliseconds (5 seconds) */
-  REQUEST_TIMEOUT: 5000,
+  /** Request timeout in milliseconds (10 seconds - balanced for both speed and reliability) */
+  REQUEST_TIMEOUT: 10000,
   /** User agent string for HTTP requests */
   USER_AGENT: 'Mozilla/5.0 (compatible; HackerNewsDaily/1.0)',
+  /** 
+   * Batch size for concurrent article fetching
+   * Limits the number of articles fetched in parallel to avoid:
+   * - Server rate limiting or connection issues
+   * - Excessive memory usage from parallel JSDOM parsing
+   * - Sudden traffic spikes to target servers
+   * Recommended: 3-5 for balanced performance and politeness
+   */
+  BATCH_SIZE: 5,
+} as const;
+
+/**
+ * Crawler API configuration for fallback content extraction
+ * Used when standard HTTP requests fail due to anti-crawling mechanisms
+ */
+export const CRAWLER_API = {
+  /** 
+   * Base URL for crawler API service (from CRAWLER_API_URL environment variable)
+   * Returns undefined if not configured - crawler fallback will be disabled
+   */
+  get BASE_URL(): string | undefined {
+    return process.env.CRAWLER_API_URL || undefined;
+  },
+  
+  /**
+   * Check if crawler API is enabled (i.e., BASE_URL is configured)
+   */
+  get ENABLED(): boolean {
+    return !!this.BASE_URL;
+  },
+  
+  /** 
+   * Request timeout in milliseconds (10 seconds)
+   * If the crawler can't complete within 10s, it's not worth waiting longer.
+   * This applies to both the headless browser rendering and content extraction.
+   */
+  REQUEST_TIMEOUT: 10000,
 } as const;
 
 // =============================================================================
@@ -95,8 +132,12 @@ export const SUMMARY_CONFIG = {
  * Article content extraction settings
  */
 export const CONTENT_CONFIG = {
-  /** Maximum characters before truncation for AI summarization */
-  MAX_CONTENT_LENGTH: 4000,
+  /** 
+   * Maximum characters before truncation for AI summarization
+   * Set to 0 or undefined to disable truncation (no limit)
+   * Default: 0 (no limit)
+   */
+  MAX_CONTENT_LENGTH: 0,
   /** Maximum length for meta descriptions */
   MAX_DESCRIPTION_LENGTH: 200,
   /** Maximum length for combined comments before truncation */

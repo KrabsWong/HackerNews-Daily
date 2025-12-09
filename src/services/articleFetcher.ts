@@ -1,13 +1,10 @@
 import axios, { AxiosError } from 'axios';
-import * as cheerio from 'cheerio';
-import { Readability } from '@mozilla/readability';
-import { JSDOM } from 'jsdom';
-import { ARTICLE_FETCHER, CONTENT_CONFIG } from '../config/constants';
+import { CONTENT_CONFIG, CRAWLER_API } from '../config/constants';
 
 export interface ArticleMetadata {
   url: string;
-  description: string | null; // Meta description from HTML tags
-  fullContent: string | null; // Extracted article body content for AI summarization
+  description: string | null;
+  fullContent: string | null;
 }
 
 /**
@@ -19,7 +16,6 @@ function truncateContent(content: string, maxLength: number): string {
     return content;
   }
   
-  // Find last space before maxLength to avoid cutting mid-word
   const truncated = content.substring(0, maxLength);
   const lastSpace = truncated.lastIndexOf(' ');
   
@@ -31,120 +27,116 @@ function truncateContent(content: string, maxLength: number): string {
 }
 
 /**
- * Extract main article content from HTML using Readability algorithm
- * Returns null if extraction fails
+ * Fetch article content using Crawler API
+ * The crawler API uses headless browser technology to extract content
+ * Returns markdown content or null if crawler fails
  */
-function extractArticleContent(html: string, url: string): string | null {
-  try {
-    // Parse HTML with JSDOM (required by Readability)
-    const dom = new JSDOM(html, { url });
-    const document = dom.window.document;
-    
-    // Apply Readability algorithm to extract main content
-    const reader = new Readability(document);
-    const article = reader.parse();
-    
-    if (!article || !article.textContent) {
-      return null;
-    }
-    
-    // Clean up the text content
-    let content = article.textContent
-      .trim()
-      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-      .replace(/\n+/g, '\n'); // Replace multiple newlines with single newline
-    
-    // Truncate if too long
-    if (content.length > CONTENT_CONFIG.MAX_CONTENT_LENGTH) {
-      content = truncateContent(content, CONTENT_CONFIG.MAX_CONTENT_LENGTH);
-    }
-    
-    return content;
-  } catch (error) {
-    // Log error but don't throw - graceful degradation to meta description
-    console.warn(`Content extraction failed for ${url}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    return null;
+async function fetchWithCrawlerAPI(url: string): Promise<{ content: string | null; description: string | null }> {
+  if (!CRAWLER_API.ENABLED) {
+    return { content: null, description: null };
   }
-}
 
-/**
- * Fetch article metadata (description) from a given URL
- * Returns null for description if fetch fails or no description found
- */
-export async function fetchArticleMetadata(url: string): Promise<ArticleMetadata> {
   try {
-    const response = await axios.get(url, {
-      timeout: ARTICLE_FETCHER.REQUEST_TIMEOUT,
-      headers: {
-        'User-Agent': ARTICLE_FETCHER.USER_AGENT,
-      },
-      maxRedirects: 3,
-    });
+    const response = await axios.post(
+      `${CRAWLER_API.BASE_URL}/crawl`,
+      { url },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout: CRAWLER_API.REQUEST_TIMEOUT,
+      }
+    );
 
-    const html = response.data;
-    
-    // Extract full article content using Readability
-    const fullContent = extractArticleContent(html, url);
-    
-    // Also extract meta description as fallback
-    const $ = cheerio.load(html);
-
-    // Try various meta description tags
-    let description = 
-      $('meta[name="description"]').attr('content') ||
-      $('meta[property="og:description"]').attr('content') ||
-      $('meta[name="twitter:description"]').attr('content') ||
-      null;
-
-    // Trim and limit description length to 200 characters
-    if (description) {
-      description = description.trim();
-      if (description.length > CONTENT_CONFIG.MAX_DESCRIPTION_LENGTH) {
-        description = description.substring(0, CONTENT_CONFIG.MAX_DESCRIPTION_LENGTH - 3) + '...';
+    if (response.status === 200 && response.data) {
+      const { success, markdown, error } = response.data;
+      
+      if (success && markdown && markdown.trim().length > 0) {
+        let content = markdown.trim();
+        
+        // Extract first paragraph as description (before truncation)
+        const firstParagraph = content.split('\n\n')[0]?.trim() || null;
+        let description: string | null = null;
+        if (firstParagraph && firstParagraph.length > 0) {
+          description = firstParagraph.length > CONTENT_CONFIG.MAX_DESCRIPTION_LENGTH
+            ? firstParagraph.substring(0, CONTENT_CONFIG.MAX_DESCRIPTION_LENGTH - 3) + '...'
+            : firstParagraph;
+        }
+        
+        // Truncate content only if MAX_CONTENT_LENGTH is set (> 0)
+        if (CONTENT_CONFIG.MAX_CONTENT_LENGTH > 0 && content.length > CONTENT_CONFIG.MAX_CONTENT_LENGTH) {
+          content = truncateContent(content, CONTENT_CONFIG.MAX_CONTENT_LENGTH);
+        }
+        
+        return { content, description };
+      } else {
+        console.warn(`  ⚠️  Crawler failed: ${error || 'No content'}`);
+        return { content: null, description: null };
       }
     }
 
-    return {
-      url,
-      description,
-      fullContent,
-    };
+    console.warn(`  ⚠️  Unexpected status ${response.status}`);
+    return { content: null, description: null };
   } catch (error) {
-    // Log warning but don't throw - graceful degradation
     if (error instanceof AxiosError) {
-      console.warn(`Failed to fetch article ${url}: ${error.message}`);
+      if (error.code === 'ECONNABORTED') {
+        console.warn(`  ⏱️  Timeout`);
+      } else {
+        console.warn(`  ⚠️  Error: ${error.message}`);
+      }
     } else {
-      console.warn(`Failed to fetch article ${url}: Unknown error`);
+      console.warn(`  ⚠️  Unknown error`);
     }
-
-    return {
-      url,
-      description: null,
-      fullContent: null,
-    };
+    return { content: null, description: null };
   }
 }
 
 /**
- * Fetch metadata for multiple articles in parallel
- * Uses Promise.allSettled to ensure failures don't block other fetches
+ * Fetch article metadata using Crawler API
+ * Returns content and description extracted by the crawler service
+ */
+export async function fetchArticleMetadata(url: string): Promise<ArticleMetadata> {
+  const { content, description } = await fetchWithCrawlerAPI(url);
+
+  return {
+    url,
+    description,
+    fullContent: content,
+  };
+}
+
+/**
+ * Fetch metadata for multiple articles SERIALLY (one at a time)
+ * Serial processing avoids overwhelming the crawler service
  */
 export async function fetchArticlesBatch(urls: string[]): Promise<ArticleMetadata[]> {
-  const fetchPromises = urls.map(url => fetchArticleMetadata(url));
-  const results = await Promise.allSettled(fetchPromises);
+  if (!CRAWLER_API.ENABLED) {
+    console.warn('\n⚠️  CRAWLER_API_URL not configured. Set it in .env file.\n');
+    return urls.map(url => ({ url, description: null, fullContent: null }));
+  }
 
-  return results.map((result, index) => {
-    if (result.status === 'fulfilled') {
-      return result.value;
+  const results: ArticleMetadata[] = [];
+  const total = urls.length;
+  
+  console.log(`\n📦 Processing ${total} articles serially...\n`);
+  
+  for (let i = 0; i < total; i++) {
+    const url = urls[i];
+    const progress = `[${i + 1}/${total}]`;
+    
+    console.log(`${progress} ${url}`);
+    
+    const result = await fetchArticleMetadata(url);
+    results.push(result);
+    
+    if (result.fullContent) {
+      console.log(`${progress} ✅ ${result.fullContent.length} chars\n`);
     } else {
-      // This shouldn't happen since fetchArticleMetadata catches errors,
-      // but handle it just in case
-      console.warn(`Unexpected error fetching ${urls[index]}`);
-      return {
-        url: urls[index],
-        description: null,
-        fullContent: null,
-      };
+      console.log(`${progress} ⚠️  No content\n`);
     }
-  });
+  }
+  
+  console.log(`\n✅ Completed ${total} articles\n`);
+  
+  return results;
 }
