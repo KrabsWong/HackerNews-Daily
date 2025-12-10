@@ -85,10 +85,16 @@ npm run fetch -- --export-daily
 ```
 
 This will:
-- Query articles from yesterday (previous calendar day 00:00-23:59)
+- Query articles from yesterday (previous calendar day 00:00-23:59 **in Beijing timezone UTC+8**)
 - Sort articles by creation time (newest first)
 - Generate a markdown file at `hacknews-export/YYYY-MM-DD-daily.md`
 - Display success message with file path
+
+**Note on Timezone**: All date/time operations use **Beijing timezone (UTC+8)** for Chinese users. This includes:
+- Article timestamp displays (shown in Beijing time)
+- Markdown filename generation (uses Beijing date)
+- Previous day boundary calculations (00:00-23:59 Beijing time)
+- Jekyll front matter dates (Beijing date)
 
 You can combine with `--no-cache` to force fresh data:
 ```bash
@@ -305,14 +311,14 @@ Rendering results...
 
 #1 【人工智能的未来展望】
 The Future of Artificial Intelligence
-发布时间：2025-12-06 14:30
+发布时间：2025-12-06 14:30  (Beijing time)
 链接：https://example.com/article
 描述：本文探讨了人工智能技术的最新发展和未来趋势...
 评论要点：社区讨论了 GPT-4 的性能提升，多数认为新的推理能力很实用，但有人担心成本问题
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #2 【新型编程语言发布】
 New Programming Language Released
-发布时间：2025-12-06 12:15
+发布时间：2025-12-06 12:15  (Beijing time)
 链接：https://example.com/article2
 描述：一个专注于性能和安全性的全新编程语言正式发布...
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -526,11 +532,12 @@ This project includes a GitHub Actions workflow that automatically exports daily
 ### How It Works
 
 The workflow (`.github/workflows/daily-export.yml`) runs automatically:
-- **Schedule**: Daily at 01:00 UTC (after the previous day has fully passed)
+- **Schedule**: Daily at 16:20 UTC, which is 00:20 Beijing time (UTC+8) the next day
+- **Timezone Note**: While GitHub Actions cron runs on UTC time, the system internally uses **Beijing timezone** for all date calculations, ensuring correct date boundaries and filenames for Chinese users
 - **Process**:
   1. Checks out this repository
   2. Installs dependencies
-  3. Runs `npm run fetch -- --export-daily` to generate yesterday's markdown file
+  3. Runs `npm run fetch -- --export-daily` to generate yesterday's markdown file (using Beijing timezone)
   4. Checks out the tldr-hacknews-24 Jekyll blog repository
   5. Copies the generated file from `hacknews-export/` to `tldr-repo/_posts/` directory
   6. Commits and pushes the changes with GitHub Actions bot account

@@ -19,6 +19,49 @@ import {
 } from './services/markdownExporter';
 
 /**
+ * Beijing timezone offset in hours (UTC+8)
+ */
+const BEIJING_TIMEZONE_OFFSET = 8;
+
+/**
+ * Convert a Date object to Beijing timezone
+ * @param date - Date object in any timezone
+ * @returns New Date object adjusted to Beijing time
+ */
+function toBeijingTime(date: Date): Date {
+  // Get UTC time in milliseconds
+  const utcTime = date.getTime() + (date.getTimezoneOffset() * 60000);
+  // Add Beijing offset (UTC+8)
+  return new Date(utcTime + (3600000 * BEIJING_TIMEZONE_OFFSET));
+}
+
+/**
+ * Get current time in Beijing timezone
+ * @returns Date object representing current Beijing time
+ */
+function getBeijingNow(): Date {
+  return toBeijingTime(new Date());
+}
+
+/**
+ * Convert Unix timestamp to Beijing time string
+ * @param unixTime - Unix timestamp in seconds
+ * @returns Formatted string in Beijing time (YYYY-MM-DD HH:mm)
+ */
+function formatTimestampBeijing(unixTime: number): string {
+  const date = new Date(unixTime * 1000);
+  const beijingDate = toBeijingTime(date);
+  
+  const year = beijingDate.getFullYear();
+  const month = String(beijingDate.getMonth() + 1).padStart(2, '0');
+  const day = String(beijingDate.getDate()).padStart(2, '0');
+  const hours = String(beijingDate.getHours()).padStart(2, '0');
+  const minutes = String(beijingDate.getMinutes()).padStart(2, '0');
+  
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
+/**
  * Parse command-line arguments
  */
 function parseArgs(): { webMode: boolean; noCache: boolean; exportDailyMode: boolean } {
@@ -31,28 +74,35 @@ function parseArgs(): { webMode: boolean; noCache: boolean; exportDailyMode: boo
 }
 
 /**
- * Get the date boundaries for the previous calendar day (yesterday)
+ * Get the date boundaries for the previous calendar day (yesterday) in Beijing timezone
  * Returns start (00:00:00) and end (23:59:59) timestamps in Unix seconds
+ * All calculations are done in Beijing time (UTC+8)
  */
 function getPreviousDayBoundaries(): { start: number; end: number; date: Date } {
-  const now = new Date();
+  // Get current Beijing time
+  const nowBeijing = getBeijingNow();
   
-  // Create date for yesterday
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
+  // Create date for yesterday in Beijing timezone
+  const yesterdayBeijing = new Date(nowBeijing);
+  yesterdayBeijing.setDate(yesterdayBeijing.getDate() - 1);
   
-  // Set to start of day (00:00:00)
-  const startOfDay = new Date(yesterday);
+  // Set to start of day (00:00:00) in Beijing time
+  const startOfDay = new Date(yesterdayBeijing);
   startOfDay.setHours(0, 0, 0, 0);
   
-  // Set to end of day (23:59:59.999)
-  const endOfDay = new Date(yesterday);
+  // Set to end of day (23:59:59.999) in Beijing time
+  const endOfDay = new Date(yesterdayBeijing);
   endOfDay.setHours(23, 59, 59, 999);
   
+  // Convert Beijing time back to UTC for Unix timestamps
+  // Subtract 8 hours to get UTC time
+  const startUTC = startOfDay.getTime() - (BEIJING_TIMEZONE_OFFSET * 3600000);
+  const endUTC = endOfDay.getTime() - (BEIJING_TIMEZONE_OFFSET * 3600000);
+  
   return {
-    start: Math.floor(startOfDay.getTime() / 1000), // Unix timestamp in seconds
-    end: Math.floor(endOfDay.getTime() / 1000),     // Unix timestamp in seconds
-    date: yesterday
+    start: Math.floor(startUTC / 1000), // Unix timestamp in seconds (UTC)
+    end: Math.floor(endUTC / 1000),     // Unix timestamp in seconds (UTC)
+    date: yesterdayBeijing // Beijing date for display
   };
 }
 
@@ -333,17 +383,12 @@ async function fetchFreshData(
 }
 
 /**
- * Format Unix timestamp to local datetime string (YYYY-MM-DD HH:mm)
+ * Format Unix timestamp to Beijing time string (YYYY-MM-DD HH:mm)
+ * @param unixTime - Unix timestamp in seconds
+ * @returns Formatted string in Beijing timezone
  */
 function formatTimestamp(unixTime: number): string {
-  const date = new Date(unixTime * 1000);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
+  return formatTimestampBeijing(unixTime);
 }
 
 /**

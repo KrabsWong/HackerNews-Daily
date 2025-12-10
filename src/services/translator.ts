@@ -73,7 +73,22 @@ class TranslationService {
         messages: [
           {
             role: 'user',
-            content: `Translate this HackerNews title to Chinese. Only output the translation, no explanations: ${title}`
+            content: `Translate this HackerNews title to Chinese, following these rules:
+
+1. PRESERVE technical terms in their original English form or use standard Chinese abbreviations:
+   - Programming languages: TypeScript, Python, Rust, Go, JavaScript, C++, Java, etc.
+   - Cloud services: AWS, Azure, GCP, Firebase, Vercel, etc.
+   - Technical acronyms: API, HTTP, HTTPS, GPU, CPU, AI, ML, LLM, NLP, etc.
+   - Products/Projects: GitHub, GitLab, OpenAI, TensorFlow, React, Vue, Docker, etc.
+   - For well-known protocols/standards: Use abbreviations like "MCP协议" for "Model Context Protocol"
+
+2. Only translate natural language portions (verbs, adjectives, common nouns)
+
+3. Maintain readability for technical Chinese audiences
+
+Title to translate: ${title}
+
+Output only the translated title, no explanations.`
           }
         ],
         temperature: 0.3,

@@ -18,16 +18,27 @@ The system SHALL provide a `--export-daily` command-line option to export articl
 - **AND** exports yesterday's articles to markdown file
 
 ### Requirement: Previous Calendar Day Filtering
-The system SHALL filter articles to only include those created during the previous calendar day (00:00:00 to 23:59:59 in local time).
+The system SHALL filter articles to only include those created during the previous calendar day (00:00:00 to 23:59:59 in Beijing timezone UTC+8).
 
-#### Scenario: Query on December 7
-- **WHEN** current date is December 7, 2025
-- **THEN** the system queries articles from December 6, 2025 00:00:00 to December 6, 2025 23:59:59
+#### Scenario: Query on December 7 Beijing time
+**Given** current Beijing time is December 7, 2025 00:20 (after GitHub Action runs)  
+**When** export daily command executes  
+**Then** the system queries articles from December 6, 2025 00:00:00 to December 6, 2025 23:59:59 Beijing time  
+**And** converts Beijing time boundaries to Unix timestamps for API filtering
 
-#### Scenario: Query spans midnight
-- **WHEN** user runs command at December 7, 2025 01:30 AM
-- **THEN** the system queries December 6, 2025 (full day)
-- **AND** excludes any articles from December 7
+#### Scenario: Query spans midnight in Beijing time
+**Given** user runs command at December 7, 2025 01:30 AM Beijing time  
+**When** filtering articles  
+**Then** the system queries December 6, 2025 (full day in Beijing timezone)  
+**And** excludes any articles from December 7 Beijing time  
+**And** correctly handles UTC offset conversion (Beijing = UTC + 8)
+
+#### Scenario: Timestamp display in Beijing time
+**Given** an article with Unix timestamp  
+**When** formatting for display or export  
+**Then** the system converts timestamp to Beijing timezone  
+**And** displays time in format "YYYY-MM-DD HH:mm" in Beijing time  
+**And** ensures consistency with expected user timezone
 
 ### Requirement: Descending Creation Order
 The system SHALL sort exported articles by their creation timestamp in descending order (newest first).
@@ -38,52 +49,21 @@ The system SHALL sort exported articles by their creation timestamp in descendin
 - **AND** the first article in the file is the most recent from yesterday
 
 ### Requirement: Markdown File Generation
-The system SHALL generate a markdown file with Jekyll-compatible YAML front matter followed by clear hierarchical content structure optimized for markdown rendering.
+The system SHALL generate a markdown file with Jekyll-compatible YAML front matter using Beijing timezone dates followed by clear hierarchical content structure optimized for markdown rendering.
 
-#### Scenario: File creation with Jekyll front matter
-- **WHEN** articles are successfully fetched and filtered
-- **THEN** a markdown file is created at `hacknews-export/YYYY-MM-DD-daily.md`
-- **AND** the file starts with YAML front matter delimited by `---`
-- **AND** front matter contains three fields: `layout: post`, `title: HackerNews Daily - YYYY-MM-DD`, and `date: YYYY-MM-DD`
-- **AND** after the front matter, content contains article cards with rank, Chinese title, English title, timestamp, URL, description, and comment summary
-- **AND** articles are separated by horizontal rules
+#### Scenario: Jekyll front matter with Beijing date
+**Given** articles are successfully fetched and filtered  
+**When** generating Jekyll front matter  
+**Then** the `title` field SHALL use Beijing date: `HackerNews Daily - YYYY-MM-DD`  
+**And** the `date` field SHALL use Beijing date: `YYYY-MM-DD`  
+**And** both dates SHALL match the previous day in Beijing timezone
 
-#### Scenario: Jekyll front matter format
-- **WHEN** markdown file is generated
-- **THEN** the file SHALL start with YAML front matter in the following format:
-  ```
-  ---
-  layout: post
-  title: HackerNews Daily - YYYY-MM-DD
-  date: YYYY-MM-DD
-  ---
-  ```
-- **AND** the `layout` field SHALL always be `post`
-- **AND** the `title` field SHALL start with `HackerNews Daily - ` followed by the date in YYYY-MM-DD format
-- **AND** the `date` field SHALL contain the date in YYYY-MM-DD format matching the export date
-
-#### Scenario: File structure and hierarchy
-- **WHEN** markdown file is generated
-- **THEN** after the front matter, each article SHALL be a H2 section: `## N. 【Chinese Title】`
-- **AND** the English title SHALL be displayed as plain text on the next line
-- **AND** metadata SHALL be organized in a structured list format
-- **AND** description and comment summary SHALL be in separate paragraphs
-- **AND** articles SHALL be separated by horizontal rules (`---`)
-
-#### Scenario: Article metadata format
-- **WHEN** markdown file is generated
-- **THEN** each article SHALL include metadata in the following format:
-  - **发布时间**: YYYY-MM-DD HH:mm
-  - **链接**: [URL](URL) (clickable markdown link)
-  - **描述**: AI-generated summary in a separate paragraph
-  - **评论要点**: Comment summary in a separate paragraph (if available, otherwise omitted)
-
-#### Scenario: Markdown rendering optimization
-- **WHEN** the markdown file is opened in a markdown viewer, GitHub, or Jekyll
-- **THEN** the front matter SHALL be parsed correctly by Jekyll
-- **AND** each article SHALL appear as a distinct section with clear visual hierarchy
-- **AND** links SHALL be clickable
-- **AND** the structure SHALL be easy to navigate and read
+#### Scenario: Article timestamps in Beijing time
+**Given** markdown file is generated  
+**When** formatting article metadata  
+**Then** each article's **发布时间** SHALL display Beijing time in format `YYYY-MM-DD HH:mm`  
+**And** NOT display UTC time  
+**And** ensure all times are converted from Unix timestamp to Beijing timezone
 
 ### Requirement: Output Directory Management
 The system SHALL create and manage the `hacknews-export/` directory for storing exported markdown files.
@@ -101,35 +81,41 @@ The system SHALL create and manage the `hacknews-export/` directory for storing 
 - **AND** export proceeds normally
 
 ### Requirement: Filename Convention
-The system SHALL name exported files using the format `YYYY-MM-DD-daily.md` where the date represents the previous calendar day and the `-daily` suffix distinguishes daily export posts.
+The system SHALL name exported files using the format `YYYY-MM-DD-daily.md` where the date represents the previous calendar day in Beijing timezone (UTC+8) and the `-daily` suffix distinguishes daily export posts.
 
-#### Scenario: Export on December 7
-- **WHEN** export is run on December 7, 2025
-- **THEN** the filename SHALL be `2025-12-06-daily.md`
+#### Scenario: Export on December 7 Beijing time
+**Given** export runs at 00:20 Beijing time on December 7, 2025  
+**When** generating the markdown filename  
+**Then** the filename SHALL be `2025-12-06-daily.md`  
+**And** the date corresponds to the previous day in Beijing timezone
+
+#### Scenario: Filename uses Beijing date not UTC date
+**Given** the GitHub Action runs at 16:20 UTC (00:20 Beijing time next day)  
+**When** generating the markdown filename  
+**Then** the system SHALL use Beijing timezone date calculation  
+**And** NOT use UTC date which would be one day behind  
+**And** ensure consistency between filename and article content dates
 
 #### Scenario: File overwrite behavior
-- **WHEN** export is run
-- **AND** a file with the same date already exists
-- **THEN** the system SHALL overwrite the existing file
-- **AND** display a warning message indicating overwrite
+**Given** export is run  
+**When** a file with the same Beijing date already exists  
+**Then** the system SHALL overwrite the existing file  
+**And** display a warning message indicating overwrite
 
 ### Requirement: Export Success Feedback
-The system SHALL provide clear feedback about the export operation status using the new filename format.
+The system SHALL provide clear feedback about the export operation status using Beijing timezone dates in the new filename format.
 
-#### Scenario: Successful export
-- **WHEN** export completes successfully
-- **THEN** display message `✅ Successfully exported N stories to hacknews-export/YYYY-MM-DD-daily.md`
-- **AND** show file path in terminal
+#### Scenario: Successful export with Beijing date
+**Given** export completes successfully at 00:20 Beijing time December 7  
+**When** displaying success message  
+**Then** display message `✅ Successfully exported N stories to hacknews-export/2025-12-06-daily.md`  
+**And** show file path using Beijing date in terminal
 
-#### Scenario: No articles found
-- **WHEN** no articles exist for the previous calendar day
-- **THEN** display message `⚠️  No stories found for YYYY-MM-DD`
-- **AND** do not create an empty markdown file
-
-#### Scenario: Export error
-- **WHEN** export fails due to file system error
-- **THEN** display error message with details
-- **AND** suggest troubleshooting steps (directory permissions, disk space)
+#### Scenario: No articles found for Beijing date
+**Given** no articles exist for the previous calendar day in Beijing timezone  
+**When** displaying message  
+**Then** display message `⚠️  No stories found for 2025-12-06` using Beijing date  
+**And** do not create an empty markdown file
 
 ### Requirement: Existing Mode Compatibility
 The system SHALL maintain full backward compatibility with existing CLI and web modes when export mode is not active.

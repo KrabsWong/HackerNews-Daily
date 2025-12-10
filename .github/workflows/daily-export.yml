@@ -1,7 +1,9 @@
 name: Daily HackerNews Export
 
 on:
-  # Run daily at 01:00 UTC (after yesterday has fully passed)
+  # Run daily at 16:20 UTC, which is 00:20 Beijing time (UTC+8) the next day
+  # This timing ensures we capture the full previous day in Beijing timezone
+  # System internally uses Beijing timezone for all date calculations
   schedule:
     - cron: '20 16 * * *'
   
@@ -66,7 +68,10 @@ jobs:
       
       - name: Copy markdown file to Jekyll _posts directory
         run: |
-          # Get yesterday's date in YYYY-MM-DD format
+          # Get yesterday's date in YYYY-MM-DD format (Beijing timezone)
+          # Note: The date calculation is handled by the Node.js script in Beijing time
+          # GitHub Actions runs at 16:20 UTC = 00:20 Beijing time (next day)
+          # So the script will generate a file for the previous Beijing day
           YESTERDAY=$(date -u -d "yesterday" '+%Y-%m-%d' 2>/dev/null || date -u -v-1d '+%Y-%m-%d')
           FILENAME="${YESTERDAY}-daily.md"
           
