@@ -1,11 +1,10 @@
 name: Daily HackerNews Export
 
 on:
-  # Run daily at 16:20 UTC, which is 00:20 Beijing time (UTC+8) the next day
-  # This timing ensures we capture the full previous day in Beijing timezone
-  # System internally uses Beijing timezone for all date calculations
+  # Run daily at 01:00 UTC (after the previous UTC day has fully passed)
+  # System uses UTC timezone for all date calculations
   schedule:
-    - cron: '20 16 * * *'
+    - cron: '0 1 * * *'
   
   # Allow manual triggering for testing
   workflow_dispatch:
@@ -68,24 +67,46 @@ jobs:
       
       - name: Copy markdown file to Jekyll _posts directory
         run: |
-          # Get yesterday's date in YYYY-MM-DD format (Beijing timezone)
-          # Note: The date calculation is handled by the Node.js script in Beijing time
-          # GitHub Actions runs at 16:20 UTC = 00:20 Beijing time (next day)
-          # So the script will generate a file for the previous Beijing day
+          # Get yesterday's date in YYYY-MM-DD format (UTC)
           YESTERDAY=$(date -u -d "yesterday" '+%Y-%m-%d' 2>/dev/null || date -u -v-1d '+%Y-%m-%d')
           FILENAME="${YESTERDAY}-daily.md"
           
           # Ensure _posts directory exists
           mkdir -p tldr-repo/_posts
           
-          # Copy the generated file to _posts directory
-          if [ -f "hacknews-export/${FILENAME}" ]; then
-            cp "hacknews-export/${FILENAME}" "tldr-repo/_posts/${FILENAME}"
-            echo "✅ Copied ${FILENAME} to tldr-hacknews-24/_posts/"
-          else
+          # Check if generated file exists
+          if [ ! -f "hacknews-export/${FILENAME}" ]; then
             echo "❌ Error: ${FILENAME} not found in hacknews-export/"
             exit 1
           fi
+          
+          # Check for existing files and determine version number
+          TARGET_FILE="tldr-repo/_posts/${FILENAME}"
+          VERSION_NUM=""
+          
+          if [ -f "${TARGET_FILE}" ]; then
+            echo "⚠️  File ${FILENAME} already exists in _posts/"
+            
+            # Find the next available version number
+            VERSION=2
+            while [ -f "tldr-repo/_posts/${YESTERDAY}-daily-v${VERSION}.md" ]; do
+              VERSION=$((VERSION + 1))
+            done
+            
+            VERSION_NUM="-v${VERSION}"
+            FILENAME="${YESTERDAY}-daily${VERSION_NUM}.md"
+            TARGET_FILE="tldr-repo/_posts/${FILENAME}"
+            
+            echo "📝 Using versioned filename: ${FILENAME}"
+          fi
+          
+          # Copy the file
+          cp "hacknews-export/${YESTERDAY}-daily.md" "${TARGET_FILE}"
+          echo "✅ Copied to tldr-hacknews-24/_posts/${FILENAME}"
+          
+          # Export version info for commit message
+          echo "EXPORTED_FILENAME=${FILENAME}" >> $GITHUB_ENV
+          echo "VERSION_SUFFIX=${VERSION_NUM}" >> $GITHUB_ENV
       
       - name: Commit and push to tldr-hacknews-24 repository
         run: |
@@ -93,6 +114,13 @@ jobs:
           
           # Get yesterday's date for commit message
           YESTERDAY=$(date -u -d "yesterday" '+%Y-%m-%d' 2>/dev/null || date -u -v-1d '+%Y-%m-%d')
+          
+          # Build commit message with version suffix if applicable
+          if [ -n "${VERSION_SUFFIX}" ]; then
+            COMMIT_MSG="Add HackerNews daily export for ${YESTERDAY} (${VERSION_SUFFIX#-})"
+          else
+            COMMIT_MSG="Add HackerNews daily export for ${YESTERDAY}"
+          fi
           
           # Configure git
           git config user.name "github-actions[bot]"
@@ -105,7 +133,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "ℹ️ No changes to commit"
           else
-            git commit -m "Add HackerNews daily export for ${YESTERDAY}"
+            git commit -m "${COMMIT_MSG}"
             git push
             echo "✅ Successfully pushed to tldr-hacknews-24 repository"
           fi

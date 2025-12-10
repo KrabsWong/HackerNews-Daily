@@ -1,21 +1,9 @@
-# Daily Export Capability Specification
+# Daily Export Specification Delta
 
-## Purpose
-Specification for Daily Export Capability functionality.
-## Requirements
-### Requirement: Export Command Option
-The system SHALL provide a `--export-daily` command-line option to export articles from the previous calendar day to a markdown file.
+## Overview
+Revert timezone handling from Beijing time back to UTC for simplicity and consistency with HackerNews API timestamps.
 
-#### Scenario: User runs export command
-- **WHEN** user executes `npm run fetch -- --export-daily`
-- **THEN** the system queries articles from yesterday (previous calendar day 00:00 to 23:59)
-- **AND** generates a markdown file in `hacknews-export/` directory
-- **AND** displays success message with file path
-
-#### Scenario: Export with cache bypass
-- **WHEN** user executes `npm run fetch -- --export-daily --no-cache`
-- **THEN** the system bypasses cache and fetches fresh data
-- **AND** exports yesterday's articles to markdown file
+## MODIFIED Requirements
 
 ### Requirement: Previous Calendar Day Filtering
 The system SHALL filter articles to only include those created during the previous calendar day (00:00:00 to 23:59:59 in UTC timezone).
@@ -40,14 +28,6 @@ The system SHALL filter articles to only include those created during the previo
 **And** displays time in format "YYYY-MM-DD HH:mm" in UTC  
 **And** no timezone conversion is performed
 
-### Requirement: Descending Creation Order
-The system SHALL sort exported articles by their creation timestamp in descending order (newest first).
-
-#### Scenario: Multiple articles exported
-- **WHEN** exporting 10 articles from yesterday
-- **THEN** articles are ordered from newest to oldest by creation time
-- **AND** the first article in the file is the most recent from yesterday
-
 ### Requirement: Markdown File Generation
 The system SHALL generate a markdown file with Jekyll-compatible YAML front matter using UTC dates followed by clear hierarchical content structure optimized for markdown rendering.
 
@@ -64,21 +44,6 @@ The system SHALL generate a markdown file with Jekyll-compatible YAML front matt
 **Then** each article's **发布时间** SHALL display UTC time in format `YYYY-MM-DD HH:mm`  
 **And** no timezone offset is applied  
 **And** all times use UTC directly from Unix timestamps
-
-### Requirement: Output Directory Management
-The system SHALL create and manage the `hacknews-export/` directory for storing exported markdown files.
-
-#### Scenario: Directory creation on first export
-- **WHEN** export command is run for the first time
-- **AND** `hacknews-export/` directory does not exist
-- **THEN** the directory is created automatically
-- **AND** export proceeds normally
-
-#### Scenario: Directory already exists
-- **WHEN** export command is run
-- **AND** `hacknews-export/` directory already exists
-- **THEN** the system uses the existing directory
-- **AND** export proceeds normally
 
 ### Requirement: Filename Convention
 The system SHALL name exported files using the format `YYYY-MM-DD-daily.md` where the date represents the previous calendar day in UTC timezone and the `-daily` suffix distinguishes daily export posts.
@@ -115,17 +80,3 @@ The system SHALL provide clear feedback about the export operation status using 
 **When** displaying message  
 **Then** display message `⚠️  No stories found for 2025-12-06` using UTC date  
 **And** do not create an empty markdown file
-
-### Requirement: Existing Mode Compatibility
-The system SHALL maintain full backward compatibility with existing CLI and web modes when export mode is not active.
-
-#### Scenario: Normal CLI mode unchanged
-- **WHEN** user runs `npm run fetch` without `--export-daily` flag
-- **THEN** the system displays results in CLI terminal as before
-- **AND** no markdown file is created
-
-#### Scenario: Web mode unchanged
-- **WHEN** user runs `npm run fetch:web`
-- **THEN** the system starts web server and opens browser as before
-- **AND** no markdown file is created
-

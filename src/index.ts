@@ -19,49 +19,6 @@ import {
 } from './services/markdownExporter';
 
 /**
- * Beijing timezone offset in hours (UTC+8)
- */
-const BEIJING_TIMEZONE_OFFSET = 8;
-
-/**
- * Convert a Date object to Beijing timezone
- * @param date - Date object in any timezone
- * @returns New Date object adjusted to Beijing time
- */
-function toBeijingTime(date: Date): Date {
-  // Get UTC time in milliseconds
-  const utcTime = date.getTime() + (date.getTimezoneOffset() * 60000);
-  // Add Beijing offset (UTC+8)
-  return new Date(utcTime + (3600000 * BEIJING_TIMEZONE_OFFSET));
-}
-
-/**
- * Get current time in Beijing timezone
- * @returns Date object representing current Beijing time
- */
-function getBeijingNow(): Date {
-  return toBeijingTime(new Date());
-}
-
-/**
- * Convert Unix timestamp to Beijing time string
- * @param unixTime - Unix timestamp in seconds
- * @returns Formatted string in Beijing time (YYYY-MM-DD HH:mm)
- */
-function formatTimestampBeijing(unixTime: number): string {
-  const date = new Date(unixTime * 1000);
-  const beijingDate = toBeijingTime(date);
-  
-  const year = beijingDate.getFullYear();
-  const month = String(beijingDate.getMonth() + 1).padStart(2, '0');
-  const day = String(beijingDate.getDate()).padStart(2, '0');
-  const hours = String(beijingDate.getHours()).padStart(2, '0');
-  const minutes = String(beijingDate.getMinutes()).padStart(2, '0');
-  
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
-}
-
-/**
  * Parse command-line arguments
  */
 function parseArgs(): { webMode: boolean; noCache: boolean; exportDailyMode: boolean } {
@@ -74,35 +31,40 @@ function parseArgs(): { webMode: boolean; noCache: boolean; exportDailyMode: boo
 }
 
 /**
- * Get the date boundaries for the previous calendar day (yesterday) in Beijing timezone
+ * Get the date boundaries for the previous calendar day (yesterday) in UTC
  * Returns start (00:00:00) and end (23:59:59) timestamps in Unix seconds
- * All calculations are done in Beijing time (UTC+8)
+ * All calculations are done in UTC
  */
 function getPreviousDayBoundaries(): { start: number; end: number; date: Date } {
-  // Get current Beijing time
-  const nowBeijing = getBeijingNow();
+  const now = new Date();
   
-  // Create date for yesterday in Beijing timezone
-  const yesterdayBeijing = new Date(nowBeijing);
-  yesterdayBeijing.setDate(yesterdayBeijing.getDate() - 1);
+  // Create date for yesterday in UTC
+  const yesterday = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() - 1
+  ));
   
-  // Set to start of day (00:00:00) in Beijing time
-  const startOfDay = new Date(yesterdayBeijing);
-  startOfDay.setHours(0, 0, 0, 0);
+  // Set to start of day (00:00:00) in UTC
+  const startOfDay = new Date(Date.UTC(
+    yesterday.getUTCFullYear(),
+    yesterday.getUTCMonth(),
+    yesterday.getUTCDate(),
+    0, 0, 0, 0
+  ));
   
-  // Set to end of day (23:59:59.999) in Beijing time
-  const endOfDay = new Date(yesterdayBeijing);
-  endOfDay.setHours(23, 59, 59, 999);
-  
-  // Convert Beijing time back to UTC for Unix timestamps
-  // Subtract 8 hours to get UTC time
-  const startUTC = startOfDay.getTime() - (BEIJING_TIMEZONE_OFFSET * 3600000);
-  const endUTC = endOfDay.getTime() - (BEIJING_TIMEZONE_OFFSET * 3600000);
+  // Set to end of day (23:59:59.999) in UTC
+  const endOfDay = new Date(Date.UTC(
+    yesterday.getUTCFullYear(),
+    yesterday.getUTCMonth(),
+    yesterday.getUTCDate(),
+    23, 59, 59, 999
+  ));
   
   return {
-    start: Math.floor(startUTC / 1000), // Unix timestamp in seconds (UTC)
-    end: Math.floor(endUTC / 1000),     // Unix timestamp in seconds (UTC)
-    date: yesterdayBeijing // Beijing date for display
+    start: Math.floor(startOfDay.getTime() / 1000), // Unix timestamp in seconds
+    end: Math.floor(endOfDay.getTime() / 1000),     // Unix timestamp in seconds
+    date: yesterday // UTC date for display
   };
 }
 
@@ -383,12 +345,19 @@ async function fetchFreshData(
 }
 
 /**
- * Format Unix timestamp to Beijing time string (YYYY-MM-DD HH:mm)
+ * Format Unix timestamp to UTC datetime string (YYYY-MM-DD HH:mm)
  * @param unixTime - Unix timestamp in seconds
- * @returns Formatted string in Beijing timezone
+ * @returns Formatted string in UTC
  */
 function formatTimestamp(unixTime: number): string {
-  return formatTimestampBeijing(unixTime);
+  const date = new Date(unixTime * 1000);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+  
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
 /**

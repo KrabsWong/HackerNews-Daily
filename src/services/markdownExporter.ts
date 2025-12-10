@@ -1,23 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
-/**
- * Beijing timezone offset in hours (UTC+8)
- */
-const BEIJING_TIMEZONE_OFFSET = 8;
-
-/**
- * Convert a Date object to Beijing timezone
- * @param date - Date object in any timezone
- * @returns New Date object adjusted to Beijing time
- */
-function toBeijingTime(date: Date): Date {
-  // Get UTC time in milliseconds
-  const utcTime = date.getTime() + (date.getTimezoneOffset() * 60000);
-  // Add Beijing offset (UTC+8)
-  return new Date(utcTime + (3600000 * BEIJING_TIMEZONE_OFFSET));
-}
-
 interface ProcessedStory {
   rank: number;
   titleChinese: string;
@@ -32,13 +15,11 @@ interface ProcessedStory {
 
 /**
  * Generate Jekyll front matter with layout, title, and date
- * @param date - Date object for the export (expected to be in Beijing timezone)
+ * @param date - Date object for the export (in UTC)
  * @returns Jekyll-compatible YAML front matter block
  */
 export function generateJekyllFrontMatter(date: Date): string {
-  // Ensure we're using Beijing time
-  const beijingDate = toBeijingTime(date);
-  const dateStr = formatDateForDisplay(beijingDate);
+  const dateStr = formatDateForDisplay(date);
   let frontMatter = '---\n';
   frontMatter += 'layout: post\n';
   frontMatter += `title: HackerNews Daily - ${dateStr}\n`;
@@ -105,30 +86,26 @@ export async function ensureDirectoryExists(directory: string): Promise<void> {
 
 /**
  * Generate filename from date
- * @param date - Date object for the export (expected to be in Beijing timezone)
+ * @param date - Date object for the export (in UTC)
  * @returns Filename in Jekyll format YYYY-MM-DD-daily.md
  */
 export function generateFilename(date: Date): string {
-  // Ensure we're using Beijing time
-  const beijingDate = toBeijingTime(date);
-  const year = beijingDate.getFullYear();
-  const month = String(beijingDate.getMonth() + 1).padStart(2, '0');
-  const day = String(beijingDate.getDate()).padStart(2, '0');
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
   
   return `${year}-${month}-${day}-daily.md`;
 }
 
 /**
  * Format date for display messages
- * @param date - Date object (expected to be in Beijing timezone)
+ * @param date - Date object (in UTC)
  * @returns Date string in YYYY-MM-DD format
  */
 export function formatDateForDisplay(date: Date): string {
-  // Ensure we're using Beijing time
-  const beijingDate = toBeijingTime(date);
-  const year = beijingDate.getFullYear();
-  const month = String(beijingDate.getMonth() + 1).padStart(2, '0');
-  const day = String(beijingDate.getDate()).padStart(2, '0');
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
   
   return `${year}-${month}-${day}`;
 }
