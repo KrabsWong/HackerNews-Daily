@@ -12,7 +12,7 @@
     "build:worker": "node esbuild.worker.config.js",
     "build:worker:watch": "node esbuild.worker.config.js --watch",
     "clean:worker": "rm -rf dist/worker",
-    "dev:worker": "wrangler dev --local --persist",
+    "dev:worker": "wrangler dev --local --persist-to .wrangler/state",
     "deploy:worker": "npm run build:worker && wrangler deploy",
     "deploy:worker:staging": "npm run build:worker && wrangler deploy --env staging",
     "logs:worker": "wrangler tail",
@@ -46,6 +46,6 @@
     "esbuild": "^0.19.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3",
-    "wrangler": "^3.0.0"
+    "wrangler": "^4.53.0"
   }
 }
