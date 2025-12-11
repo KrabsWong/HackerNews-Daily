@@ -1,6 +1,6 @@
 # HackerNews Daily - Chinese Translation
 
-A CLI tool that fetches top-rated stories from HackerNews's curated "best" list, extracts full article content, generates AI-powered summaries, fetches and summarizes top comments, and translates everything to Chinese using DeepSeek AI. Supports multiple output formats: CLI display, Web UI, and daily Markdown exports with optional AI-based content filtering.
+A CLI tool that fetches top-rated stories from HackerNews's curated "best" list, extracts full article content, generates AI-powered summaries, fetches and summarizes top comments, and translates everything to Chinese using DeepSeek AI. Supports CLI display and daily Markdown exports with optional AI-based content filtering. Automated deployment via Cloudflare Workers.
 
 ## Features
 
@@ -11,45 +11,22 @@ A CLI tool that fetches top-rated stories from HackerNews's curated "best" list,
 - 🌏 Translates titles, article summaries, and comment summaries to Chinese using DeepSeek LLM
 - 🛡️ **AI Content Filter**: Optional filtering of sensitive content with three sensitivity levels (low/medium/high, disabled by default)
 - 📊 **CLI Mode**: Clean card-based display with timestamps and scores
-- 🌐 **Web UI Mode**: Vue.js interface with auto-opening browser (port 3000+)
 - 📝 **Daily Export Mode**: Export previous day's articles to Jekyll-compatible Markdown files
 - 📦 **Local Caching**: TTL-based file caching (default 30 minutes) to avoid redundant API calls
 - ⚙️ Configurable via environment variables (story limit, time window, summary length, cache TTL, filter settings)
 - 🛡️ Graceful error handling with multi-level fallbacks (content → meta description → original text)
 - ⚡ Efficient API usage: ~3 API calls for 30 stories (vs 31+ previously)
-- 🤖 **GitHub Actions**: Automated daily exports to separate Jekyll blog repository
-- ☁️ **Cloudflare Workers**: Alternative serverless deployment with cron triggers (see [Deployment Options](#deployment-options) below)
+- ☁️ **Cloudflare Workers**: Serverless deployment with cron triggers for automated daily exports
 
-## Deployment Options
+## Deployment
 
-This project supports multiple deployment methods for automated daily exports:
+For automated daily exports, this project uses **Cloudflare Workers** deployment:
 
-### Option 1: GitHub Actions (Traditional CI/CD)
-- Runs on GitHub's infrastructure
-- Free tier: 2,000 minutes/month
-- Configuration: `.github/workflows/daily-export.yml`
-- **Setup**: Already configured, just add repository secrets
-
-### Option 2: Cloudflare Workers (Serverless)
 - Runs on Cloudflare's global edge network
 - Free tier: 100,000 requests/day
-- Fast cold starts (<50ms vs 10-30s for GitHub Actions)
+- Fast cold starts (<50ms)
 - Built-in cron triggers for scheduling
 - **Setup**: See [docs/cloudflare-worker-deployment.md](./docs/cloudflare-worker-deployment.md)
-
-**Comparison**:
-
-| Feature | GitHub Actions | Cloudflare Workers |
-|---------|----------------|-------------------|
-| Free tier | 2,000 min/month | 100,000 req/day |
-| Cold start | 10-30 seconds | <50ms |
-| Scheduling | Cron syntax | Cron Triggers |
-| Setup complexity | Low | Medium |
-| Global distribution | No | Yes (edge network) |
-
-**Recommendation**: 
-- Use **GitHub Actions** if you prefer traditional CI/CD and minimal setup
-- Use **Cloudflare Workers** for faster execution, global distribution, and more generous free tier
 
 ## Prerequisites
 
@@ -92,22 +69,21 @@ CRAWLER_API_URL=
 
 ### CLI Mode (Default)
 
-Run the CLI tool:
+Run the CLI tool to fetch and display stories:
 ```bash
 npm run fetch
 ```
 
-### Web UI Mode
+This will:
+1. Fetch the top stories from HackerNews
+2. Filter stories from the past 24 hours
+3. Extract full article content from original URLs using smart content extraction
+4. Fetch top 10 comments for each story
+5. Generate AI-powered summaries of the article content and comments
+6. Translate titles and summaries to Chinese
+7. Display results in a card-based format with timestamps
 
-View stories in your browser with a clean web interface:
-```bash
-npm run fetch:web
-```
-
-Or use the `--web` flag:
-```bash
-npm run fetch -- --web
-```
+**Note**: The tool uses Mozilla Readability algorithm to extract article content, automatically filtering out navigation, ads, and other non-content elements. If content extraction fails for any article, it gracefully falls back to translating the meta description.
 
 ### Daily Export Mode
 
@@ -153,24 +129,6 @@ Or use the `--refresh` flag:
 ```bash
 npm run fetch -- --refresh
 ```
-
-When web mode is enabled:
-1. Stories are fetched and processed as usual
-2. A local web server starts on port 3000 (or next available port)
-3. Your default browser opens automatically
-4. Stories are displayed in a clean card-based layout
-5. Press `Ctrl+C` in the terminal to stop the server
-
-This will:
-1. Fetch the top stories from HackerNews
-2. Filter stories from the past 24 hours
-3. Extract full article content from original URLs using smart content extraction
-4. Fetch top 10 comments for each story
-5. Generate AI-powered summaries of the article content and comments
-6. Translate titles and summaries to Chinese
-7. Display results in a card-based format with timestamps
-
-**Note**: The tool uses Mozilla Readability algorithm to extract article content, automatically filtering out navigation, ads, and other non-content elements. If content extraction fails for any article, it gracefully falls back to translating the meta description.
 
 ### Comment Summaries
 
@@ -365,24 +323,9 @@ To build the TypeScript code:
 npm run build
 ```
 
-To build the Vue.js web frontend:
-```bash
-npm run build:web
-```
-
-To build everything (web frontend + TypeScript backend):
-```bash
-npm run build:all
-```
-
 This creates a `dist/` directory with compiled JavaScript. You can then run:
 ```bash
 npm start
-```
-
-Or with web mode:
-```bash
-npm start:web
 ```
 
 ## Error Handling
@@ -403,8 +346,6 @@ src/
 │   └── hackerNews.ts       # HackerNews API client
 ├── config/
 │   └── constants.ts        # Centralized configuration constants
-├── server/
-│   └── app.ts              # Express web server for web mode
 ├── services/
 │   ├── cache.ts            # Local file-based cache service
 │   ├── translator.ts       # DeepSeek translation service
@@ -417,15 +358,11 @@ hacknews-export/            # Daily export directory (auto-created)
 ├── 2025-12-05-daily.md
 └── ...
 
-web/                        # Vue.js frontend for web mode
-├── src/
-│   ├── App.vue             # Main app component
-│   ├── components/
-│   │   └── StoryCard.vue   # Story card component
-│   └── main.ts             # Vue app entry point
-├── index.html              # HTML template
-├── vite.config.ts          # Vite build configuration
-└── package.json            # Frontend dependencies
+src/worker/                 # Cloudflare Worker code
+├── index.ts                # Worker entry point
+├── exportHandler.ts        # Daily export handler
+├── githubClient.ts         # GitHub API integration
+└── ...
 ```
 
 ## Troubleshooting
@@ -477,20 +414,6 @@ This happens when:
 
 ### No stories found
 Try increasing `HN_TIME_WINDOW_HOURS` in your `.env` file to look further back in time.
-
-### Web mode issues
-
-**Browser doesn't open automatically:**
-- The URL is displayed in the terminal - copy and paste it into your browser
-- Try opening `http://localhost:3000` manually
-
-**Port already in use:**
-- The server automatically tries the next available port (3001, 3002, etc.)
-- Check the terminal output for the actual port being used
-
-**Web page shows "Loading stories...":**
-- Wait for the fetch process to complete
-- Check the terminal for progress and any errors
 
 ### Cache issues
 
@@ -556,134 +479,6 @@ If you're receiving fewer stories than requested (e.g., 8 stories when `HN_STORY
 - Stories are fetched from HN's "best" list (quality-curated)
 - Then sorted by score (points) in descending order
 - You get the top-rated stories from the "best" list within your time window
-
-## GitHub Actions Automation
-
-This project includes a GitHub Actions workflow that automatically exports daily HackerNews articles and pushes them to the [tldr-hacknews-24](https://github.com/KrabsWong/tldr-hacknews-24) Jekyll blog repository.
-
-### How It Works
-
-The workflow (`.github/workflows/daily-export.yml`) runs automatically:
-- **Schedule**: Daily at 01:00 UTC (after the previous UTC day has fully passed)
-- **Timezone**: All date calculations use **UTC timezone** for consistency with HackerNews API
-- **File Versioning**: If a file with the same date already exists in the target repository, the workflow automatically adds a version suffix (`-v2`, `-v3`, etc.) to prevent overwrites
-- **Process**:
-  1. Checks out this repository
-  2. Installs dependencies
-  3. Runs `npm run fetch -- --export-daily` to generate yesterday's markdown file (using UTC timezone)
-  4. Checks out the tldr-hacknews-24 Jekyll blog repository
-  5. Checks if the file already exists in `_posts/` directory
-  6. If exists, adds version suffix to filename (e.g., `2025-12-06-daily-v2.md`)
-  7. Copies the file to `tldr-repo/_posts/` directory
-  8. Commits with message including version number if applicable
-  9. Pushes changes with GitHub Actions bot account
-
-### Setup Instructions
-
-To enable automated daily exports, configure the following GitHub repository settings:
-
-1. **Navigate to Repository Settings**
-   - Go to your repository on GitHub
-   - Click `Settings` > `Secrets and variables` > `Actions`
-
-2. **Add Required Secrets** (Settings → Secrets and variables → Actions → Secrets)
-   
-   | Secret Name | Description | Required |
-   |-------------|-------------|----------|
-   | `DEEPSEEK_API_KEY` | DeepSeek API key for translation/summarization | Yes |
-   | `CRAWLER_API_URL` | Crawler service URL for content extraction | Yes |
-   | `TLDR_REPO_TOKEN` | GitHub PAT with `repo` scope for pushing to archive repo | Yes |
-
-   **`DEEPSEEK_API_KEY`**
-   - Your DeepSeek API key for translation and summarization
-   - Get one from https://platform.deepseek.com/
-
-   **`CRAWLER_API_URL`**
-   - URL of your crawler API service for content extraction
-   - Example: `https://tiny-crawl-production.up.railway.app`
-
-   **`TLDR_REPO_TOKEN`**
-   - GitHub Personal Access Token (PAT) with `repo` scope
-   - Used to push files to the tldr-hacknews-24 repository
-   - Create a PAT:
-     1. Go to GitHub Settings > Developer settings > Personal access tokens > Tokens (classic)
-     2. Click `Generate new token (classic)`
-     3. Give it a descriptive name (e.g., "HackNews Daily Export Bot")
-     4. Select scope: `repo` (Full control of private repositories)
-     5. Click `Generate token` and copy the token
-
-3. **Optional: Add Configuration Variables** (Settings → Secrets and variables → Actions → Variables)
-   
-   These are optional and have sensible defaults:
-
-   | Variable Name | Description | Default |
-   |---------------|-------------|---------|
-   | `HN_STORY_LIMIT` | Number of stories to fetch | 30 |
-   | `HN_TIME_WINDOW_HOURS` | Time window in hours | 24 |
-   | `SUMMARY_MAX_LENGTH` | Max summary length in characters | 300 |
-   | `CACHE_ENABLED` | Enable caching (not recommended for CI) | false |
-   | `CACHE_TTL_MINUTES` | Cache TTL in minutes | 30 |
-   | `ENABLE_CONTENT_FILTER` | Enable AI content filter | false |
-   | `CONTENT_FILTER_SENSITIVITY` | Filter sensitivity (low/medium/high) | medium |
-
-4. **Verify Setup**
-   - The workflow will automatically run at 01:00 UTC daily
-   - For immediate testing, manually trigger the workflow:
-     1. Go to `Actions` tab in your repository
-     2. Click `Daily HackerNews Export` workflow
-     3. Click `Run workflow` > `Run workflow`
-   - Check the workflow run logs for any errors
-   - Verify the file appears in [tldr-hacknews-24 _posts directory](https://github.com/KrabsWong/tldr-hacknews-24)
-
-### Manual Triggering
-
-You can manually trigger the workflow at any time:
-1. Go to the `Actions` tab in your GitHub repository
-2. Select the `Daily HackerNews Export` workflow
-3. Click `Run workflow` button
-4. Confirm by clicking `Run workflow`
-
-This is useful for:
-- Testing after initial setup
-- Regenerating a specific day's export
-- Debugging workflow issues
-
-### Workflow Monitoring
-
-Monitor workflow executions:
-- **Actions Tab**: View all workflow runs, their status, and logs
-- **Email Notifications**: GitHub sends notifications for failed workflows (configure in GitHub notification settings)
-- **Status Badge**: You can add a workflow status badge to your README (optional)
-
-### Troubleshooting
-
-**Workflow fails with "DEEPSEEK_API_KEY is required"**
-- Ensure `DEEPSEEK_API_KEY` secret is configured in repository settings
-- Check that the secret name is spelled correctly (case-sensitive)
-
-**Workflow fails when pushing to tldr-hacknews-24**
-- Verify `TLDR_REPO_TOKEN` has `repo` scope permissions
-- Ensure the token hasn't expired
-- Check that the tldr-hacknews-24 repository exists and is accessible
-
-**No file generated**
-- Check workflow logs for errors during the export step
-- Verify there were stories from yesterday (HackerNews might be quiet on some days)
-- Ensure API rate limits haven't been exceeded
-
-**Workflow doesn't run on schedule**
-- GitHub Actions may delay scheduled workflows by up to 15 minutes during high load
-- Verify the workflow file is on the default branch (usually `main` or `master`)
-- Check that GitHub Actions is enabled for your repository
-
-### Disabling Automation
-
-To temporarily disable automated exports:
-1. Go to `Actions` tab
-2. Select `Daily HackerNews Export` workflow
-3. Click the `...` menu > `Disable workflow`
-
-To re-enable, follow the same steps and click `Enable workflow`.
 
 ## API Documentation
 

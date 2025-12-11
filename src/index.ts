@@ -6,7 +6,6 @@ dotenv.config();
 import { fetchTopStories, HNStory, fetchCommentsBatch } from './api/hackerNews';
 import { translator } from './services/translator';
 import { fetchArticlesBatch } from './services/articleFetcher';
-import { startWebServer, ProcessedStory as WebProcessedStory } from './server/app';
 import { STORY_LIMITS, SUMMARY_CONFIG, ENV_DEFAULTS, CONTENT_FILTER } from './config/constants';
 import { checkCache, writeCache, isCacheEnabled, CachedStory } from './services/cache';
 import { AIContentFilter } from './services/contentFilter';
@@ -21,10 +20,9 @@ import {
 /**
  * Parse command-line arguments
  */
-function parseArgs(): { webMode: boolean; noCache: boolean; exportDailyMode: boolean } {
+function parseArgs(): { noCache: boolean; exportDailyMode: boolean } {
   const args = process.argv.slice(2);
   return {
-    webMode: args.includes('--web') || args.includes('-w'),
     noCache: args.includes('--no-cache') || args.includes('--refresh'),
     exportDailyMode: args.includes('--export-daily')
   };
@@ -143,13 +141,9 @@ function validateSummaryLength(requested: number): number {
 async function main(): Promise<void> {
   try {
     // Parse command-line arguments
-    const { webMode, noCache, exportDailyMode } = parseArgs();
+    const { noCache, exportDailyMode } = parseArgs();
     
     console.log('\n🔍 HackerNews Daily - Chinese Translation\n');
-    
-    if (webMode) {
-      console.log('📺 Web mode enabled - will open in browser\n');
-    }
     
     if (exportDailyMode) {
       console.log('📄 Export mode enabled - exporting yesterday\'s articles\n');
@@ -239,11 +233,6 @@ async function main(): Promise<void> {
       
       const filePath = `${exportDir}/${filename}`;
       console.log(`\n✅ Successfully exported ${rerankedStories.length} stories to ${filePath}\n`);
-    } else if (webMode) {
-      console.log('\nStarting web server...\n');
-      await startWebServer(processedStories);
-      // Keep process alive for web server
-      console.log('Press Ctrl+C to stop the server');
     } else {
       // CLI mode - display in terminal
       console.log('\nRendering results...\n');
