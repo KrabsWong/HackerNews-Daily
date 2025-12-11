@@ -18,6 +18,38 @@ A CLI tool that fetches top-rated stories from HackerNews's curated "best" list,
 - 🛡️ Graceful error handling with multi-level fallbacks (content → meta description → original text)
 - ⚡ Efficient API usage: ~3 API calls for 30 stories (vs 31+ previously)
 - 🤖 **GitHub Actions**: Automated daily exports to separate Jekyll blog repository
+- ☁️ **Cloudflare Workers**: Alternative serverless deployment with cron triggers (see [Deployment Options](#deployment-options) below)
+
+## Deployment Options
+
+This project supports multiple deployment methods for automated daily exports:
+
+### Option 1: GitHub Actions (Traditional CI/CD)
+- Runs on GitHub's infrastructure
+- Free tier: 2,000 minutes/month
+- Configuration: `.github/workflows/daily-export.yml`
+- **Setup**: Already configured, just add repository secrets
+
+### Option 2: Cloudflare Workers (Serverless)
+- Runs on Cloudflare's global edge network
+- Free tier: 100,000 requests/day
+- Fast cold starts (<50ms vs 10-30s for GitHub Actions)
+- Built-in cron triggers for scheduling
+- **Setup**: See [docs/cloudflare-worker-deployment.md](./docs/cloudflare-worker-deployment.md)
+
+**Comparison**:
+
+| Feature | GitHub Actions | Cloudflare Workers |
+|---------|----------------|-------------------|
+| Free tier | 2,000 min/month | 100,000 req/day |
+| Cold start | 10-30 seconds | <50ms |
+| Scheduling | Cron syntax | Cron Triggers |
+| Setup complexity | Low | Medium |
+| Global distribution | No | Yes (edge network) |
+
+**Recommendation**: 
+- Use **GitHub Actions** if you prefer traditional CI/CD and minimal setup
+- Use **Cloudflare Workers** for faster execution, global distribution, and more generous free tier
 
 ## Prerequisites
 
@@ -658,6 +690,14 @@ To re-enable, follow the same steps and click `Enable workflow`.
 - **Algolia HN Search API**: https://hn.algolia.com/api (used for fetching stories by date)
 - **HackerNews Firebase API**: https://github.com/HackerNews/API (used for fetching comments)
 - **DeepSeek API**: https://platform.deepseek.com/api-docs/
+
+## Documentation
+
+Additional documentation is available in the [`docs/`](./docs) directory:
+
+- **[Cloudflare Worker Deployment Guide](./docs/cloudflare-worker-deployment.md)** - Complete guide for deploying to Cloudflare Workers as an alternative to GitHub Actions
+
+For technical specifications and change history, see the [`openspec/`](./openspec) directory.
 
 ## License
 

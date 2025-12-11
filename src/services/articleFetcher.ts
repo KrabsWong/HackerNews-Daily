@@ -1,5 +1,5 @@
-import axios, { AxiosError } from 'axios';
 import { CONTENT_CONFIG, CRAWLER_API } from '../config/constants';
+import { post, FetchError } from '../utils/fetch';
 
 export interface ArticleMetadata {
   url: string;
@@ -37,18 +37,15 @@ async function fetchWithCrawlerAPI(url: string): Promise<{ content: string | nul
   }
 
   try {
-    const response = await axios.post(
+    const response = await post<{ success: boolean; markdown?: string; error?: string }>(
       `${CRAWLER_API.BASE_URL}/crawl`,
       { url },
       {
-        headers: {
-          'Content-Type': 'application/json',
-        },
         timeout: CRAWLER_API.REQUEST_TIMEOUT,
       }
     );
 
-    if (response.status === 200 && response.data) {
+    if (response.data) {
       const { success, markdown, error } = response.data;
       
       if (success && markdown && markdown.trim().length > 0) {
@@ -75,11 +72,11 @@ async function fetchWithCrawlerAPI(url: string): Promise<{ content: string | nul
       }
     }
 
-    console.warn(`  ⚠️  Unexpected status ${response.status}`);
+    console.warn(`  ⚠️  No response data`);
     return { content: null, description: null };
   } catch (error) {
-    if (error instanceof AxiosError) {
-      if (error.code === 'ECONNABORTED') {
+    if (error instanceof FetchError) {
+      if (error.message.includes('timeout')) {
         console.warn(`  ⏱️  Timeout`);
       } else {
         console.warn(`  ⚠️  Error: ${error.message}`);

@@ -1,0 +1,16 @@
+# Local development secrets for Cloudflare Worker
+# Copy this file to .dev.vars and fill in your actual values
+# .dev.vars is git-ignored and will be loaded by `wrangler dev`
+
+# DeepSeek API Key (required)
+# Get your API key from https://platform.deepseek.com/
+DEEPSEEK_API_KEY=your_deepseek_key_here
+
+# GitHub Personal Access Token (required)
+# Create a token with 'repo' scope for tldr-hacknews-24 repository
+# https://github.com/settings/tokens/new
+GITHUB_TOKEN=your_github_token_here
+
+# Crawler API URL (optional)
+# Fallback content extraction service
+CRAWLER_API_URL=https://your-crawler-api.com

@@ -1,6 +1,6 @@
-import axios, { AxiosError } from 'axios';
 import * as cheerio from 'cheerio';
 import { HN_API, ALGOLIA_HN_API, STORY_LIMITS } from '../config/constants';
+import { get, FetchError } from '../utils/fetch';
 
 export interface HNStory {
   id: number;
@@ -128,7 +128,7 @@ export async function fetchStoriesFromAlgolia(
     
     const url = `${ALGOLIA_HN_API.BASE_URL}/search_by_date?${params}`;
     
-    const response = await axios.get<AlgoliaSearchResponse>(url, {
+    const response = await get<AlgoliaSearchResponse>(url, {
       timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT,
     });
     
@@ -154,7 +154,7 @@ export async function fetchStoriesFromAlgolia(
         });
         
         pagePromises.push(
-          axios.get<AlgoliaSearchResponse>(
+          get<AlgoliaSearchResponse>(
             `${ALGOLIA_HN_API.BASE_URL}/search_by_date?${pageParams}`,
             { timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT }
           ).then(res => res.data)
@@ -172,8 +172,8 @@ export async function fetchStoriesFromAlgolia(
     return limitedHits.map(mapAlgoliaStoryToHNStory);
     
   } catch (error) {
-    if (error instanceof AxiosError) {
-      if (error.response?.status === 429) {
+    if (error instanceof FetchError) {
+      if (error.status === 429) {
         throw new Error('Algolia API rate limit exceeded, please try again later');
       }
       throw new Error(`Failed to fetch stories from Algolia HN API: ${error.message}`);
@@ -207,7 +207,7 @@ export async function fetchTopStoriesByScore(
     });
     
     const url = `${ALGOLIA_HN_API.BASE_URL}/search_by_date?${params}`;
-    const response = await axios.get<AlgoliaSearchResponse>(url, {
+    const response = await get<AlgoliaSearchResponse>(url, {
       timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT,
     });
     
@@ -231,7 +231,7 @@ export async function fetchTopStoriesByScore(
         });
         
         pagePromises.push(
-          axios.get<AlgoliaSearchResponse>(
+          get<AlgoliaSearchResponse>(
             `${ALGOLIA_HN_API.BASE_URL}/search_by_date?${pageParams}`,
             { timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT }
           ).then(res => res.data)
@@ -254,8 +254,8 @@ export async function fetchTopStoriesByScore(
     return topHits.map(mapAlgoliaStoryToHNStory);
     
   } catch (error) {
-    if (error instanceof AxiosError) {
-      if (error.response?.status === 429) {
+    if (error instanceof FetchError) {
+      if (error.status === 429) {
         throw new Error('Algolia API rate limit exceeded, please try again later');
       }
       throw new Error(`Failed to fetch stories from Algolia HN API: ${error.message}`);
@@ -270,12 +270,12 @@ export async function fetchTopStoriesByScore(
  */
 export async function fetchBestStoryIds(): Promise<number[]> {
   try {
-    const response = await axios.get<number[]>(`${HN_API.BASE_URL}/beststories.json`, {
+    const response = await get<number[]>(`${HN_API.BASE_URL}/beststories.json`, {
       timeout: HN_API.REQUEST_TIMEOUT,
     });
     return response.data;
   } catch (error) {
-    if (error instanceof AxiosError) {
+    if (error instanceof FetchError) {
       throw new Error(`Failed to fetch best story IDs: ${error.message}`);
     }
     throw error;
@@ -318,7 +318,7 @@ export async function fetchBestStoriesByDateAndScore(
       });
       
       try {
-        const response = await axios.get<AlgoliaSearchResponse>(
+        const response = await get<AlgoliaSearchResponse>(
           `${ALGOLIA_HN_API.BASE_URL}/search?${params}`,
           { timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT }
         );
@@ -346,8 +346,8 @@ export async function fetchBestStoriesByDateAndScore(
     return topStories.map(mapAlgoliaStoryToHNStory);
     
   } catch (error) {
-    if (error instanceof AxiosError) {
-      if (error.response?.status === 429) {
+    if (error instanceof FetchError) {
+      if (error.status === 429) {
         throw new Error('API rate limit exceeded, please try again later');
       }
       throw new Error(`Failed to fetch best stories: ${error.message}`);
@@ -363,7 +363,7 @@ export async function fetchBestStoriesByDateAndScore(
  */
 export async function fetchStoryDetails(id: number): Promise<HNStory | null> {
   try {
-    const response = await axios.get<HNStory>(`${HN_API.BASE_URL}/item/${id}.json`, {
+    const response = await get<HNStory>(`${HN_API.BASE_URL}/item/${id}.json`, {
       timeout: HN_API.REQUEST_TIMEOUT,
     });
     
@@ -388,7 +388,7 @@ export async function fetchStoryDetails(id: number): Promise<HNStory | null> {
  */
 async function fetchCommentDetails(id: number): Promise<HNComment | null> {
   try {
-    const response = await axios.get<HNComment>(`${HN_API.BASE_URL}/item/${id}.json`, {
+    const response = await get<HNComment>(`${HN_API.BASE_URL}/item/${id}.json`, {
       timeout: HN_API.REQUEST_TIMEOUT,
     });
     

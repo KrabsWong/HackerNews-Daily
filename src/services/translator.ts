@@ -1,6 +1,6 @@
-import axios, { AxiosError } from 'axios';
 import { HNComment, stripHTML } from '../api/hackerNews';
 import { DEEPSEEK_API, CONTENT_CONFIG } from '../config/constants';
+import { post, FetchError } from '../utils/fetch';
 
 interface DeepSeekMessage {
   role: 'user' | 'system' | 'assistant';
@@ -94,13 +94,12 @@ Output only the translated title, no explanations.`
         temperature: 0.3,
       };
 
-      const response = await axios.post<DeepSeekResponse>(
+      const response = await post<DeepSeekResponse>(
         `${DEEPSEEK_API.BASE_URL}/chat/completions`,
         request,
         {
           headers: {
             'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json',
           },
           timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
         }
@@ -116,7 +115,7 @@ Output only the translated title, no explanations.`
       return translation;
     } catch (error) {
       // Retry once on rate limit or temporary errors
-      if (retry && error instanceof AxiosError && error.response?.status === 429) {
+      if (retry && error instanceof FetchError && error.status === 429) {
         console.warn('Rate limit hit, retrying after delay...');
         await new Promise(resolve => setTimeout(resolve, DEEPSEEK_API.RETRY_DELAY));
         return this.translateTitle(title, false);
@@ -175,13 +174,12 @@ Output only the translated title, no explanations.`
         temperature: 0.3,
       };
 
-      const response = await axios.post<DeepSeekResponse>(
+      const response = await post<DeepSeekResponse>(
         `${DEEPSEEK_API.BASE_URL}/chat/completions`,
         request,
         {
           headers: {
             'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json',
           },
           timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
         }
@@ -234,13 +232,12 @@ ${content}`
         temperature: 0.5,
       };
 
-      const response = await axios.post<DeepSeekResponse>(
+      const response = await post<DeepSeekResponse>(
         `${DEEPSEEK_API.BASE_URL}/chat/completions`,
         request,
         {
           headers: {
             'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json',
           },
           timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
         }
@@ -256,7 +253,7 @@ ${content}`
       return summary;
     } catch (error) {
       // Retry once on rate limit or temporary errors
-      if (retry && error instanceof AxiosError && error.response?.status === 429) {
+      if (retry && error instanceof FetchError && error.status === 429) {
         console.warn('Rate limit hit during summarization, retrying after delay...');
         await new Promise(resolve => setTimeout(resolve, DEEPSEEK_API.RETRY_DELAY));
         return this.summarizeContent(content, maxLength, false);
@@ -318,13 +315,12 @@ ${combinedText}`
         temperature: 0.5,
       };
 
-      const response = await axios.post<DeepSeekResponse>(
+      const response = await post<DeepSeekResponse>(
         `${DEEPSEEK_API.BASE_URL}/chat/completions`,
         request,
         {
           headers: {
             'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json',
           },
           timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
         }

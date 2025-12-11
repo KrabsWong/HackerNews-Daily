@@ -9,6 +9,14 @@
     "build": "tsc",
     "build:web": "cd web && npm run build",
     "build:all": "npm run build:web && npm run build",
+    "build:worker": "node esbuild.worker.config.js",
+    "build:worker:watch": "node esbuild.worker.config.js --watch",
+    "clean:worker": "rm -rf dist/worker",
+    "dev:worker": "wrangler dev --local --persist",
+    "deploy:worker": "npm run build:worker && wrangler deploy",
+    "deploy:worker:staging": "npm run build:worker && wrangler deploy --env staging",
+    "logs:worker": "wrangler tail",
+    "validate:worker": "wrangler validate",
     "start": "node dist/index.js",
     "start:web": "node dist/index.js --web"
   },
@@ -24,18 +32,20 @@
     "@mozilla/readability": "^0.6.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
-    "axios": "^1.6.2",
     "cheerio": "^1.1.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^5.2.1",
-    "jsdom": "^27.2.0",
+    "linkedom": "^0.16.0",
     "open": "^11.0.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.0.0",
     "@types/jsdom": "^27.0.0",
     "@types/node": "^20.10.5",
+    "esbuild": "^0.19.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "wrangler": "^3.0.0"
   }
 }

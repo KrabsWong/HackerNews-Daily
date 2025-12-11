@@ -1,6 +1,6 @@
 import { HNStory } from '../api/hackerNews';
 import { CONTENT_FILTER, SensitivityLevel } from '../config/constants';
-import axios from 'axios';
+import { post } from '../utils/fetch';
 
 // TranslationService type (we only use it for type annotations)
 type TranslationService = {
@@ -174,7 +174,15 @@ export class AIContentFilter implements ContentFilter {
       throw new Error('DEEPSEEK_API_KEY not configured');
     }
 
-    const response = await axios.post(
+    const response = await post<{
+      choices: Array<{
+        message: {
+          content: string;
+          role: string;
+        };
+        finish_reason: string;
+      }>;
+    }>(
       'https://api.deepseek.com/v1/chat/completions',
       {
         model: 'deepseek-chat',
@@ -189,7 +197,6 @@ export class AIContentFilter implements ContentFilter {
       {
         headers: {
           'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
         },
         timeout: CONTENT_FILTER.TIMEOUT,
       }

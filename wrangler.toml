@@ -1,0 +1,16 @@
+name = "hacknews-daily-export"
+main = "dist/worker/index.js"
+compatibility_date = "2024-12-11"
+
+[vars]
+HN_STORY_LIMIT = "30"
+HN_TIME_WINDOW_HOURS = "24"
+SUMMARY_MAX_LENGTH = "300"
+ENABLE_CONTENT_FILTER = "false"
+CONTENT_FILTER_SENSITIVITY = "medium"
+CACHE_ENABLED = "false"
+TARGET_REPO = "KrabsWong/tldr-hacknews-24"
+TARGET_BRANCH = "main"
+
+[triggers]
+crons = ["0 1 * * *"]
