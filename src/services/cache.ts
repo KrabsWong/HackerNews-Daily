@@ -1,6 +1,21 @@
-import fs from 'fs';
-import path from 'path';
+// Note: fs and path imports moved to function scope to prevent bundling issues in Workers
 import { CACHE_CONFIG, ENV_DEFAULTS, CONTENT_FILTER } from '../config/constants';
+
+// Helper to dynamically import Node.js modules (only used in Node.js environment)
+async function getNodeModules() {
+  const fs = await import('fs');
+  const path = await import('path');
+  return { fs: fs.default, path: path.default };
+}
+
+// Synchronous version for sync functions
+function getNodeModulesSync() {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const fs = require('fs');
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const path = require('path');
+  return { fs, path };
+}
 
 /**
  * Configuration used to generate cache
@@ -57,6 +72,7 @@ export interface CacheResult {
  * Get the cache directory path (relative to project root)
  */
 function getCacheDir(): string {
+  const { path } = getNodeModulesSync();
   return path.join(process.cwd(), CACHE_CONFIG.CACHE_DIR);
 }
 
@@ -64,6 +80,7 @@ function getCacheDir(): string {
  * Get the full cache file path
  */
 function getCachePath(): string {
+  const { path } = getNodeModulesSync();
   return path.join(getCacheDir(), CACHE_CONFIG.CACHE_FILE);
 }
 
@@ -71,6 +88,7 @@ function getCachePath(): string {
  * Ensure cache directory exists
  */
 function ensureCacheDir(): void {
+  const { fs } = getNodeModulesSync();
   const cacheDir = getCacheDir();
   if (!fs.existsSync(cacheDir)) {
     fs.mkdirSync(cacheDir, { recursive: true });
@@ -104,6 +122,7 @@ export function isCacheEnabled(): boolean {
  * Returns null if cache doesn't exist or is corrupted
  */
 function readCache(): CacheData | null {
+  const { fs } = getNodeModulesSync();
   const cachePath = getCachePath();
   
   if (!fs.existsSync(cachePath)) {
@@ -144,6 +163,7 @@ export function writeCache(stories: CachedStory[], config: CacheConfig): void {
   }
   
   try {
+    const { fs } = getNodeModulesSync();
     ensureCacheDir();
     
     const cacheData: CacheData = {
@@ -215,6 +235,7 @@ export function checkCache(currentConfig: CacheConfig): CacheResult {
  * Clear the cache file
  */
 export function clearCache(): void {
+  const { fs } = getNodeModulesSync();
   const cachePath = getCachePath();
   
   if (fs.existsSync(cachePath)) {

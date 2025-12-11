@@ -3,15 +3,16 @@
  * Orchestrates the daily HackerNews export pipeline
  */
 
-import { fetchTopStoriesByScore, fetchCommentsBatch, HNStory } from '../api/hackerNews';
+import { fetchTopStoriesByScore, fetchCommentsBatchFromAlgolia, HNStory } from '../api/hackerNews';
 import { translator } from '../services/translator';
 import { fetchArticlesBatch, ArticleMetadata } from '../services/articleFetcher';
 import { AIContentFilter } from '../services/contentFilter';
 import { generateMarkdownContent, generateFilename, formatDateForDisplay } from '../services/markdownExporter';
 import { logInfo, logError, logWarn, logMetrics } from './logger';
+import { LLM_BATCH_CONFIG } from '../config/constants';
 import type { Env } from './index';
 
-interface ProcessedStory {
+export interface ProcessedStory {
   rank: number;
   titleChinese: string;
   titleEnglish: string;
@@ -60,6 +61,30 @@ function getPreviousDayBoundaries(): { start: number; end: number; date: Date } 
 }
 
 /**
+ * Parse LLM batch size from environment variable
+ * Returns 0 for no batching (process all at once), or a valid batch size
+ */
+function parseLLMBatchSize(envValue: string | undefined): number {
+  const parsed = parseInt(envValue || String(LLM_BATCH_CONFIG.DEFAULT_BATCH_SIZE), 10);
+  
+  // 0 means no batching - process all items at once
+  if (parsed === 0 || LLM_BATCH_CONFIG.MAX_BATCH_SIZE === 0) {
+    return 0;
+  }
+  
+  // Apply min/max constraints only when batching is enabled
+  let batchSize = parsed;
+  if (LLM_BATCH_CONFIG.MIN_BATCH_SIZE > 0) {
+    batchSize = Math.max(LLM_BATCH_CONFIG.MIN_BATCH_SIZE, batchSize);
+  }
+  if (LLM_BATCH_CONFIG.MAX_BATCH_SIZE > 0) {
+    batchSize = Math.min(LLM_BATCH_CONFIG.MAX_BATCH_SIZE, batchSize);
+  }
+  
+  return batchSize;
+}
+
+/**
  * Format timestamp as human-readable date
  */
 function formatTimestamp(timestamp: number): string {
@@ -96,12 +121,14 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
     const storyLimit = parseInt(env.HN_STORY_LIMIT || '30', 10);
     const summaryMaxLength = parseInt(env.SUMMARY_MAX_LENGTH || '300', 10);
     const enableContentFilter = env.ENABLE_CONTENT_FILTER === 'true';
+    const llmBatchSize = parseLLMBatchSize(env.LLM_BATCH_SIZE);
     
     logInfo('Configuration loaded', { 
       storyLimit,
       summaryMaxLength,
       enableContentFilter,
-      filterSensitivity: env.CONTENT_FILTER_SENSITIVITY 
+      filterSensitivity: env.CONTENT_FILTER_SENSITIVITY,
+      llmBatchSize
     });
 
     // Step 1: Fetch stories from HackerNews (best stories filtered by date and score)
@@ -135,12 +162,15 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
       });
     }
 
-    // Step 3: Fetch article content
-    logInfo('Fetching article content');
+    // Step 3: Fetch article content via Crawler API
+    logInfo('Fetching article content via Crawler API');
     const urls = filteredStories.map(story => story.url).filter((url): url is string => !!url);
     
-    apiCalls['crawler_api'] = (apiCalls['crawler_api'] || 0) + urls.length;
     const articleMetadata = await fetchArticlesBatch(urls);
+    
+    // Count crawler API calls
+    const crawlerCalls = articleMetadata.filter(m => m.fullContent !== null).length;
+    apiCalls['crawler_api'] = (apiCalls['crawler_api'] || 0) + crawlerCalls;
     
     // Create metadata map for quick lookup
     const metadataMap = new Map<string, ArticleMetadata>();
@@ -148,69 +178,95 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
       metadataMap.set(meta.url, meta);
     });
 
-    // Step 4: Fetch comments for all stories
-    logInfo('Fetching comments');
-    apiCalls['hn_comments'] = (apiCalls['hn_comments'] || 0) + filteredStories.length;
-    const commentsArrays = await fetchCommentsBatch(filteredStories, 10);
+    // Step 4: Fetch comments for all stories using Algolia (optimized)
+    logInfo('Fetching comments from Algolia');
+    apiCalls['algolia_comments'] = (apiCalls['algolia_comments'] || 0) + filteredStories.length;
+    const commentsArrays = await fetchCommentsBatchFromAlgolia(filteredStories, 10);
 
-    // Step 5: Process stories (translate, summarize)
-    logInfo('Processing stories with AI');
+    // Step 5: Process stories with AI (OPTIMIZED with batch processing)
+    logInfo('Processing stories with AI (batch mode)');
     const processedStories: ProcessedStory[] = [];
     let successCount = 0;
     let failCount = 0;
 
-    for (let i = 0; i < filteredStories.length; i++) {
-      const story = filteredStories[i];
-      const comments = commentsArrays[i] || [];
+    try {
+      // Phase 1: Collect all data for batch processing
+      logInfo('Phase 1: Collecting data for batch processing');
+      const titles: string[] = [];
+      const contents: (string | null)[] = [];
+      const metaDescriptions: (string | null)[] = [];
       
-      try {
-        // Get metadata
+      for (let i = 0; i < filteredStories.length; i++) {
+        const story = filteredStories[i];
         const metadata = story.url ? metadataMap.get(story.url) : null;
-        const fullContent = metadata?.fullContent || null;
-        const metaDescription = metadata?.description || null;
-
-        // Translate title
-        apiCalls['deepseek_translate'] = (apiCalls['deepseek_translate'] || 0) + 1;
-        const translatedTitle = await translator.translateTitle(story.title);
-
-        // Generate/translate summary
-        let description: string;
-        if (fullContent) {
-          apiCalls['deepseek_summarize'] = (apiCalls['deepseek_summarize'] || 0) + 1;
-          const aiSummary = await translator.summarizeContent(fullContent, summaryMaxLength);
-          description = aiSummary || await translator.translateDescription(metaDescription);
-        } else {
-          description = await translator.translateDescription(metaDescription);
-        }
-
-        // Summarize comments (if available)
-        let commentSummary: string | null = null;
-        if (comments.length >= 3) {
-          apiCalls['deepseek_comments'] = (apiCalls['deepseek_comments'] || 0) + 1;
-          commentSummary = await translator.summarizeComments(comments);
-        }
-
-        processedStories.push({
-          rank: i + 1,
-          titleChinese: translatedTitle,
-          titleEnglish: story.title,
-          score: story.score,
-          url: story.url || '',
-          time: formatTimestamp(story.time),
-          timestamp: story.time,
-          description,
-          commentSummary,
-        });
-
-        successCount++;
-      } catch (error) {
-        failCount++;
-        logError(`Failed to process story ${story.id}`, error, { 
-          storyId: story.id,
-          title: story.title 
-        });
-        // Continue with other stories (graceful degradation)
+        
+        titles.push(story.title);
+        contents.push(metadata?.fullContent || null);
+        metaDescriptions.push(metadata?.description || null);
       }
+
+      // Phase 2: Batch translate/summarize everything
+      logInfo('Phase 2: Batch AI processing');
+      
+      // Batch translate titles (30 titles -> 3 requests instead of 30)
+      logInfo('Batch translating titles');
+      apiCalls['deepseek_translate'] = (apiCalls['deepseek_translate'] || 0) + Math.ceil(titles.length / llmBatchSize);
+      const translatedTitles = await translator.translateTitlesBatch(titles, llmBatchSize);
+      
+      // Batch summarize contents (30 contents -> 3 requests instead of 30)
+      logInfo('Batch summarizing contents');
+      apiCalls['deepseek_summarize'] = (apiCalls['deepseek_summarize'] || 0) + Math.ceil(contents.filter(c => c).length / llmBatchSize);
+      const contentSummaries = await translator.summarizeContentBatch(contents, summaryMaxLength, llmBatchSize);
+      
+      // For stories without content, translate meta descriptions
+      logInfo('Processing descriptions');
+      const descriptions: string[] = [];
+      for (let i = 0; i < filteredStories.length; i++) {
+        if (contentSummaries[i]) {
+          descriptions.push(contentSummaries[i]!);
+        } else {
+          const translated = await translator.translateDescription(metaDescriptions[i]);
+          descriptions.push(translated);
+        }
+      }
+      
+      // Batch summarize comments (30 comment arrays -> 3 requests instead of 30)
+      logInfo('Batch summarizing comments');
+      apiCalls['deepseek_comments'] = (apiCalls['deepseek_comments'] || 0) + Math.ceil(commentsArrays.filter(c => c.length >= 3).length / llmBatchSize);
+      const commentSummaries = await translator.summarizeCommentsBatch(commentsArrays, llmBatchSize);
+
+      // Phase 3: Assemble processed stories
+      logInfo('Phase 3: Assembling results');
+      for (let i = 0; i < filteredStories.length; i++) {
+        const story = filteredStories[i];
+        
+        try {
+          processedStories.push({
+            rank: i + 1,
+            titleChinese: translatedTitles[i] || story.title,
+            titleEnglish: story.title,
+            score: story.score,
+            url: story.url || '',
+            time: formatTimestamp(story.time),
+            timestamp: story.time,
+            description: descriptions[i] || '暂无描述',
+            commentSummary: commentSummaries[i] || null,
+          });
+          
+          successCount++;
+        } catch (error) {
+          failCount++;
+          logError(`Failed to assemble story ${story.id}`, error, { 
+            storyId: story.id,
+            title: story.title 
+          });
+          // Continue with other stories (graceful degradation)
+        }
+      }
+    } catch (error) {
+      // If batch processing fails entirely, log the error
+      logError('Batch processing failed', error);
+      failCount = filteredStories.length;
     }
 
     logInfo('Story processing completed', { 

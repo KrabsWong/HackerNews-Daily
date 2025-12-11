@@ -105,17 +105,17 @@ export async function fetchArticleMetadata(url: string): Promise<ArticleMetadata
 /**
  * Fetch metadata for multiple articles SERIALLY (one at a time)
  * Serial processing avoids overwhelming the crawler service
+ * All content is fetched via Crawler API for richer, more complete data
+ * @param urls - Array of URLs to fetch
  */
 export async function fetchArticlesBatch(urls: string[]): Promise<ArticleMetadata[]> {
-  if (!CRAWLER_API.ENABLED) {
-    console.warn('\n⚠️  CRAWLER_API_URL not configured. Set it in .env file.\n');
-    return urls.map(url => ({ url, description: null, fullContent: null }));
-  }
-
   const results: ArticleMetadata[] = [];
   const total = urls.length;
   
-  console.log(`\n📦 Processing ${total} articles serially...\n`);
+  console.log(`\n📦 Fetching ${total} articles via Crawler API...\n`);
+  
+  let successCount = 0;
+  let emptyCount = 0;
   
   for (let i = 0; i < total; i++) {
     const url = urls[i];
@@ -123,17 +123,31 @@ export async function fetchArticlesBatch(urls: string[]): Promise<ArticleMetadat
     
     console.log(`${progress} ${url}`);
     
-    const result = await fetchArticleMetadata(url);
-    results.push(result);
-    
-    if (result.fullContent) {
-      console.log(`${progress} ✅ ${result.fullContent.length} chars\n`);
+    if (CRAWLER_API.ENABLED) {
+      const result = await fetchArticleMetadata(url);
+      results.push(result);
+      
+      if (result.fullContent) {
+        successCount++;
+        console.log(`${progress} ✅ Crawler API (${result.fullContent.length} chars)\n`);
+      } else {
+        emptyCount++;
+        console.log(`${progress} ⚠️  No content\n`);
+      }
     } else {
-      console.log(`${progress} ⚠️  No content\n`);
+      // No crawler configured
+      results.push({
+        url,
+        description: null,
+        fullContent: null,
+      });
+      emptyCount++;
+      console.log(`${progress} ⚠️  No content (crawler disabled)\n`);
     }
   }
   
-  console.log(`\n✅ Completed ${total} articles\n`);
+  console.log(`\n✅ Completed ${total} articles`);
+  console.log(`   📊 Results: ${successCount} success | ${emptyCount} empty\n`);
   
   return results;
 }

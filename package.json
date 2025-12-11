@@ -4,7 +4,7 @@
   "description": "Fetch and translate HackerNews top stories to Chinese",
   "main": "dist/index.js",
   "scripts": {
-    "fetch": "ts-node src/index.ts",
+    "fetch": "ts-node --project tsconfig.node.json src/index.ts",
     "build": "tsc",
     "build:worker": "node esbuild.worker.config.js",
     "build:worker:watch": "node esbuild.worker.config.js --watch",

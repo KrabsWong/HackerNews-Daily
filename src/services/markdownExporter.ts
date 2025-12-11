@@ -1,5 +1,5 @@
-import * as fs from 'fs/promises';
-import * as path from 'path';
+// Note: fs and path imports are moved into functions that use them
+// This prevents bundling issues in Cloudflare Workers environment
 
 interface ProcessedStory {
   rank: number;
@@ -69,8 +69,12 @@ export function generateMarkdownContent(stories: ProcessedStory[], date: Date): 
 /**
  * Ensure the export directory exists, create if necessary
  * @param directory - Directory path to ensure exists
+ * Note: This function is only used in Node.js environment (not in Workers)
  */
 export async function ensureDirectoryExists(directory: string): Promise<void> {
+  // Dynamic import for Node.js-only module
+  const fs = await import('fs/promises');
+  
   try {
     await fs.access(directory);
   } catch (error) {
@@ -115,12 +119,17 @@ export function formatDateForDisplay(date: Date): string {
  * @param content - Markdown content to write
  * @param filename - Filename (without path)
  * @param directory - Directory path
+ * Note: This function is only used in Node.js environment (not in Workers)
  */
 export async function writeMarkdownFile(
   content: string,
   filename: string,
   directory: string
 ): Promise<void> {
+  // Dynamic import for Node.js-only modules
+  const fs = await import('fs/promises');
+  const path = await import('path');
+  
   const filePath = path.join(directory, filename);
   
   // Check if file exists for overwrite warning

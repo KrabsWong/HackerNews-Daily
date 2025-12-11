@@ -1,11 +1,11 @@
 # HackerNews Daily - Chinese Translation
 
-A CLI tool that fetches top-rated stories from HackerNews's curated "best" list, extracts full article content, generates AI-powered summaries, fetches and summarizes top comments, and translates everything to Chinese using DeepSeek AI. Supports CLI display and daily Markdown exports with optional AI-based content filtering. Automated deployment via Cloudflare Workers.
+A CLI tool that fetches top-rated stories from HackerNews's curated "best" list, extracts full article content via Crawler API, generates AI-powered summaries, fetches and summarizes top comments, and translates everything to Chinese using DeepSeek AI. Supports CLI display and daily Markdown exports with optional AI-based content filtering. Automated deployment via Cloudflare Workers.
 
 ## Features
 
 - 🎯 Fetches stories from HackerNews's curated "best" list via hybrid Firebase + Algolia API strategy
-- 📄 Extracts full article content using Mozilla Readability (smart content extraction)
+- 📄 Extracts full article content via Crawler API (headless browser for rich content)
 - 🤖 Generates AI-powered summaries (configurable 100-500 characters, default 300) from full article text
 - 💬 Fetches top 10 comments and generates concise AI summaries (~100 characters, requires 3+ comments)
 - 🌏 Translates titles, article summaries, and comment summaries to Chinese using DeepSeek LLM
@@ -83,7 +83,7 @@ This will:
 6. Translate titles and summaries to Chinese
 7. Display results in a card-based format with timestamps
 
-**Note**: The tool uses Mozilla Readability algorithm to extract article content, automatically filtering out navigation, ads, and other non-content elements. If content extraction fails for any article, it gracefully falls back to translating the meta description.
+**Note**: The tool uses a Crawler API with headless browser technology to extract article content, automatically handling JavaScript-rendered pages and anti-crawling mechanisms. If content extraction fails for any article, it gracefully falls back to showing no description.
 
 ### Daily Export Mode
 
@@ -163,27 +163,21 @@ The tool generates AI-powered summaries in two steps:
 
 **Fallback Behavior**: If content extraction or summarization fails, the tool falls back to translating the meta description (if available) or displays "暂无描述".
 
-### Crawler API Fallback (Optional)
+### Crawler API (Required for Content)
 
-The tool supports an optional crawler API fallback for improved content extraction success rates. When configured, the crawler API is used as a last resort for sites that block standard HTTP requests.
-
-**How it works**:
-- **Three-tier fallback strategy**:
-  1. **Primary**: Axios + Readability (fast, works for ~60% of sites)
-  2. **Secondary**: Meta description extraction (fallback for basic info)
-  3. **Tertiary**: Crawler API (comprehensive, for difficult sites with anti-crawling)
+The tool uses a Crawler API to extract full article content via headless browser technology. This ensures rich, complete content extraction for all articles.
 
 **Configuration**:
 
 Add the crawler API URL to your `.env` file:
 ```bash
-# Optional: Crawler API for fallback content extraction
-CRAWLER_API_URL=https://tiny-crawl-production.up.railway.app
+# Required: Crawler API for article content extraction
+CRAWLER_API_URL=https://your-crawler-api.example.com
 ```
 
-**When the crawler is used**:
-- The crawler API is only called when both Readability extraction AND meta description fail
-- It uses headless browser technology to bypass:
+**How it works**:
+- All article content is fetched via Crawler API
+- Uses headless browser technology to handle:
   - Anti-crawling mechanisms (Cloudflare, bot detection)
   - JavaScript-rendered content (SPA frameworks)
   - CAPTCHA challenges and rate limiting
@@ -198,18 +192,11 @@ CRAWLER_API_URL=https://tiny-crawl-production.up.railway.app
 - Logs show batch progress: `📦 Processing batch 1/6 (5 articles)...`
 
 **Performance**:
-- Both default fetch and crawler requests have a 10-second timeout
-- Only triggered as last resort (when both Readability AND meta description fail)
-- Minimal impact on overall performance due to infrequent usage
-- Significantly improves success rate for sites that block standard requests
+- Crawler requests have a 10-second timeout
+- Articles are processed serially to avoid overwhelming the crawler service
+- ~30 articles takes approximately 2-3 minutes
 
-**Logging Visibility**:
-- Each URL shows extraction method: `🌐 Method: Default Fetch (Axios + Readability)`
-- When crawler is triggered: `🕷️  Switching to: Crawler Fallback`
-- Completion shows successful method: `✅ Completed: {url} (Default Fetch)` or `(Crawler Fallback)`
-- Clear visibility into which method is being used at all times
-
-**Note**: The crawler API is **optional** and **disabled by default**. Uncomment `CRAWLER_API_URL` in your `.env` file to enable it.
+**Note**: The crawler API is **required** for content extraction. Set `CRAWLER_API_URL` in your `.env` file to enable article content fetching.
 
 ### Caching
 
@@ -491,6 +478,8 @@ If you're receiving fewer stories than requested (e.g., 8 stories when `HN_STORY
 Additional documentation is available in the [`docs/`](./docs) directory:
 
 - **[Cloudflare Worker Deployment Guide](./docs/cloudflare-worker-deployment.md)** - Complete guide for deploying to Cloudflare Workers as an alternative to GitHub Actions
+- **[Local Development Guide](./docs/LOCAL_DEVELOPMENT.md)** - Guide for local development, testing, and npm run fetch usage
+- **[Logging Configuration](./docs/LOGGING.md)** - How to view and configure logs in Cloudflare Workers
 
 For technical specifications and change history, see the [`openspec/`](./openspec) directory.
 

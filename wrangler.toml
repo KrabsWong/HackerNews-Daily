@@ -1,6 +1,17 @@
 name = "hacknews-daily-export"
 main = "dist/worker/index.js"
 compatibility_date = "2024-12-11"
+compatibility_flags = ["nodejs_compat"]
+
+# Enable observability features
+observability = { enabled = true }
+
+# Log level configuration (default: "log", options: "none", "error", "warn", "log", "debug")
+[env.production]
+log_level = "log"
+
+[env.dev]
+log_level = "debug"
 
 [vars]
 HN_STORY_LIMIT = "30"
@@ -11,6 +22,7 @@ CONTENT_FILTER_SENSITIVITY = "medium"
 CACHE_ENABLED = "false"
 TARGET_REPO = "KrabsWong/tldr-hacknews-24"
 TARGET_BRANCH = "main"
+LLM_BATCH_SIZE = "15"
 
 [triggers]
 crons = ["0 1 * * *"]

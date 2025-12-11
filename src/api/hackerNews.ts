@@ -25,15 +25,27 @@ export interface AlgoliaStory {
   created_at_i: number;
   author: string;
   num_comments: number | null;
-  story_text?: string;
   _tags: string[];
 }
 
 /**
- * Algolia search response structure
+ * Algolia HN API comment response structure
+ */
+export interface AlgoliaComment {
+  objectID: string;
+  author: string;
+  comment_text: string;
+  created_at_i: number;
+  story_id: number;
+  parent_id?: number;
+  _tags: string[];
+}
+
+/**
+ * Algolia search response structure (generic for stories and comments)
  */
 export interface AlgoliaSearchResponse {
-  hits: AlgoliaStory[];
+  hits: any[]; // Can be AlgoliaStory[] or AlgoliaComment[]
   nbHits: number;
   page: number;
   nbPages: number;
@@ -130,6 +142,8 @@ export async function fetchStoriesFromAlgolia(
     
     const response = await get<AlgoliaSearchResponse>(url, {
       timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT,
+      retries: ALGOLIA_HN_API.RETRIES,
+      retryDelay: ALGOLIA_HN_API.RETRY_DELAY,
     });
     
     const { hits, nbPages, page } = response.data;
@@ -156,7 +170,11 @@ export async function fetchStoriesFromAlgolia(
         pagePromises.push(
           get<AlgoliaSearchResponse>(
             `${ALGOLIA_HN_API.BASE_URL}/search_by_date?${pageParams}`,
-            { timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT }
+            { 
+              timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT,
+              retries: ALGOLIA_HN_API.RETRIES,
+              retryDelay: ALGOLIA_HN_API.RETRY_DELAY,
+            }
           ).then(res => res.data)
         );
       }
@@ -209,6 +227,8 @@ export async function fetchTopStoriesByScore(
     const url = `${ALGOLIA_HN_API.BASE_URL}/search_by_date?${params}`;
     const response = await get<AlgoliaSearchResponse>(url, {
       timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT,
+      retries: ALGOLIA_HN_API.RETRIES,
+      retryDelay: ALGOLIA_HN_API.RETRY_DELAY,
     });
     
     const { hits, nbPages, nbHits } = response.data;
@@ -233,7 +253,11 @@ export async function fetchTopStoriesByScore(
         pagePromises.push(
           get<AlgoliaSearchResponse>(
             `${ALGOLIA_HN_API.BASE_URL}/search_by_date?${pageParams}`,
-            { timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT }
+            { 
+              timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT,
+              retries: ALGOLIA_HN_API.RETRIES,
+              retryDelay: ALGOLIA_HN_API.RETRY_DELAY,
+            }
           ).then(res => res.data)
         );
       }
@@ -320,7 +344,11 @@ export async function fetchBestStoriesByDateAndScore(
       try {
         const response = await get<AlgoliaSearchResponse>(
           `${ALGOLIA_HN_API.BASE_URL}/search?${params}`,
-          { timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT }
+          { 
+            timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT,
+            retries: ALGOLIA_HN_API.RETRIES,
+            retryDelay: ALGOLIA_HN_API.RETRY_DELAY,
+          }
         );
         allStories.push(...response.data.hits);
       } catch (err) {
@@ -439,10 +467,69 @@ export async function fetchComments(storyId: number, limit: number = 10): Promis
 }
 
 /**
+ * Fetch comments for a single story using Algolia Search API
+ * This is much more efficient than Firebase API (1 request vs N requests per story)
+ * @param storyId - The story ID
+ * @param limit - Maximum number of comments to fetch (default 10)
+ * @returns Array of comment objects, sorted by relevance
+ */
+async function fetchCommentsFromAlgolia(storyId: number, limit: number = 10): Promise<HNComment[]> {
+  try {
+    // Use Algolia to query comments by story_id
+    // This retrieves all comments for a story in a single request
+    const params = new URLSearchParams({
+      tags: `comment,story_${storyId}`,
+      hitsPerPage: limit.toString(),
+    });
+    
+    const url = `${ALGOLIA_HN_API.BASE_URL}/search?${params}`;
+    
+    const response = await get<AlgoliaSearchResponse>(url, {
+      timeout: ALGOLIA_HN_API.REQUEST_TIMEOUT,
+      retries: ALGOLIA_HN_API.RETRIES,
+      retryDelay: ALGOLIA_HN_API.RETRY_DELAY,
+    });
+    
+    const { hits } = response.data;
+    
+    // Map Algolia comment format to HNComment format
+    const comments: HNComment[] = hits.map(hit => ({
+      id: parseInt(hit.objectID, 10),
+      by: hit.author,
+      text: hit.comment_text || '',
+      time: hit.created_at_i,
+      parent: hit.story_id || storyId,
+    }));
+    
+    return comments;
+  } catch (error) {
+    console.warn(`Failed to fetch comments from Algolia for story ${storyId}:`, error instanceof Error ? error.message : 'Unknown error');
+    return [];
+  }
+}
+
+/**
+ * Fetch comments for multiple stories using Algolia (optimized)
+ * Uses Algolia Search API which is much more efficient than Firebase
+ * @param stories - Array of stories to fetch comments for
+ * @param limit - Maximum number of comments per story
+ * @returns Array of comment arrays, maintaining order with input stories
+ */
+export async function fetchCommentsBatchFromAlgolia(stories: HNStory[], limit: number = 10): Promise<HNComment[][]> {
+  // Fetch comments for each story using Algolia (1 request per story)
+  // This replaces 30 stories × (1 story + 10 comments) = 330 Firebase requests
+  // with just 30 Algolia requests (1 per story)
+  const fetchPromises = stories.map(story => fetchCommentsFromAlgolia(story.id, limit));
+  const results = await Promise.all(fetchPromises);
+  return results;
+}
+
+/**
  * Fetch comments for multiple stories in parallel
  * @param stories - Array of stories to fetch comments for
  * @param limit - Maximum number of comments per story
  * @returns Array of comment arrays, maintaining order with input stories
+ * @deprecated Use fetchCommentsBatchFromAlgolia for better performance
  */
 export async function fetchCommentsBatch(stories: HNStory[], limit: number = 10): Promise<HNComment[][]> {
   const fetchPromises = stories.map(story => fetchComments(story.id, limit));

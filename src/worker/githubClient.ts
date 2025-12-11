@@ -104,7 +104,20 @@ export class GitHubClient {
         }
 
         // Success or 404 (which is handled by caller)
-        const data = response.status === 404 ? null : await response.json();
+        let data: T | null = null;
+        
+        if (response.status !== 404) {
+          // Validate content-type before parsing JSON
+          const contentType = response.headers.get('content-type');
+          if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            throw new Error(
+              `GitHub API returned unexpected content-type: ${contentType || 'unknown'}. ` +
+              `Expected JSON. Body: ${text.substring(0, 200)}`
+            );
+          }
+          data = await response.json();
+        }
         
         return {
           data: data as T,

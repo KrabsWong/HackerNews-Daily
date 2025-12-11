@@ -39,8 +39,12 @@ export const ALGOLIA_HN_API = {
   REQUEST_TIMEOUT: 10000,
   /** Default number of results per page */
   DEFAULT_HITS_PER_PAGE: 30,
-  /** Maximum hits per page allowed by API */
-  MAX_HITS_PER_PAGE: 100,
+  /** Maximum hits per page allowed by API (increased from 100 to 1000 for optimization) */
+  MAX_HITS_PER_PAGE: 1000,
+  /** Number of retry attempts for transient errors (5xx, network errors) */
+  RETRIES: 3,
+  /** Initial delay between retries in milliseconds (exponential backoff applied) */
+  RETRY_DELAY: 1000,
 } as const;
 
 /**
@@ -63,13 +67,13 @@ export const ARTICLE_FETCHER = {
 } as const;
 
 /**
- * Crawler API configuration for fallback content extraction
- * Used when standard HTTP requests fail due to anti-crawling mechanisms
+ * Crawler API configuration for article content extraction
+ * All article content is fetched via Crawler API for richer, more complete data
  */
 export const CRAWLER_API = {
   /** 
    * Base URL for crawler API service (from CRAWLER_API_URL environment variable)
-   * Returns undefined if not configured - crawler fallback will be disabled
+   * Returns undefined if not configured - content fetching will be disabled
    */
   get BASE_URL(): string | undefined {
     return process.env.CRAWLER_API_URL || undefined;
@@ -144,6 +148,35 @@ export const CONTENT_CONFIG = {
   MAX_COMMENTS_LENGTH: 5000,
   /** Minimum number of comments required for summarization */
   MIN_COMMENTS_FOR_SUMMARY: 3,
+} as const;
+
+// =============================================================================
+// LLM Batch Configuration
+// =============================================================================
+
+/**
+ * LLM batch processing settings for translation and summarization
+ * Since subrequest limits are no longer a concern, batch sizes can be more relaxed
+ */
+export const LLM_BATCH_CONFIG = {
+  /** 
+   * Default batch size for LLM operations
+   * Set to 0 to process all items in a single batch (no splitting)
+   */
+  DEFAULT_BATCH_SIZE: 0,
+  /** Minimum batch size (only applies when batch size > 0) */
+  MIN_BATCH_SIZE: 5,
+  /** 
+   * Maximum batch size limit
+   * Set to 0 for no limit (process all at once)
+   */
+  MAX_BATCH_SIZE: 0,
+  /**
+   * Maximum characters per article content in batch summarization
+   * Set to 0 for no limit (use full content)
+   * Higher values = richer content but larger API payloads
+   */
+  MAX_CONTENT_PER_ARTICLE: 0,
 } as const;
 
 // =============================================================================

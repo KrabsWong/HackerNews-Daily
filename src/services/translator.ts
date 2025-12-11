@@ -1,5 +1,5 @@
 import { HNComment, stripHTML } from '../api/hackerNews';
-import { DEEPSEEK_API, CONTENT_CONFIG } from '../config/constants';
+import { DEEPSEEK_API, CONTENT_CONFIG, LLM_BATCH_CONFIG } from '../config/constants';
 import { post, FetchError } from '../utils/fetch';
 
 interface DeepSeekMessage {
@@ -31,6 +31,21 @@ interface DeepSeekResponse {
 class TranslationService {
   private apiKey: string | null = null;
   private initialized = false;
+
+  /**
+   * Split array into chunks for batch processing
+   * If size is 0 or >= array length, returns entire array as single batch (no splitting)
+   */
+  private chunk<T>(arr: T[], size: number): T[][] {
+    if (size === 0 || size >= arr.length) {
+      return [arr];
+    }
+    const chunks: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) {
+      chunks.push(arr.slice(i, i + size));
+    }
+    return chunks;
+  }
 
   /**
    * Initialize the translation service with API key from environment
@@ -342,34 +357,6 @@ ${combinedText}`
   }
 
   /**
-   * Summarize comments for multiple stories sequentially
-   * @param commentArrays - Array of comment arrays (one per story)
-   * @returns Array of summary strings (or null if insufficient comments)
-   */
-  async summarizeCommentsBatch(commentArrays: HNComment[][]): Promise<(string | null)[]> {
-    const summaries: (string | null)[] = [];
-    
-    for (let i = 0; i < commentArrays.length; i++) {
-      const comments = commentArrays[i];
-      
-      // Skip if too few comments
-      if (comments.length < CONTENT_CONFIG.MIN_COMMENTS_FOR_SUMMARY) {
-        summaries.push(null);
-      } else {
-        const summary = await this.summarizeComments(comments);
-        summaries.push(summary);
-      }
-      
-      // Show progress
-      if ((i + 1) % 5 === 0 || i === commentArrays.length - 1) {
-        console.log(`Summarized ${i + 1}/${commentArrays.length} comment threads...`);
-      }
-    }
-    
-    return summaries;
-  }
-
-  /**
    * Translate multiple descriptions sequentially
    * Maintains order and handles errors gracefully
    */
@@ -428,6 +415,373 @@ ${combinedText}`
       }
     }
     
+    return summaries;
+  }
+
+  /**
+   * Batch translate multiple titles in a single API call (OPTIMIZED)
+   * Reduces API calls from N to ceil(N/batchSize)
+   * @param titles - Array of titles to translate
+   * @param batchSize - Number of titles per batch (default 10)
+   * @returns Array of translated titles in the same order
+   */
+  async translateTitlesBatch(titles: string[], batchSize: number = 10): Promise<string[]> {
+    if (!this.apiKey) {
+      throw new Error('Translation service not initialized');
+    }
+
+    if (titles.length === 0) {
+      return [];
+    }
+
+    const batches = this.chunk(titles, batchSize);
+    const allTranslations: string[] = [];
+
+    for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+      const batch = batches[batchIdx];
+      
+      try {
+        const request: DeepSeekRequest = {
+          model: 'deepseek-chat',
+          messages: [
+            {
+              role: 'user',
+              content: `Translate the following HackerNews titles to Chinese. Return ONLY a JSON array of translated titles in the same order.
+
+Input JSON array:
+${JSON.stringify(batch, null, 2)}
+
+Rules:
+1. PRESERVE technical terms (TypeScript, JavaScript, GitHub, API, AWS, React, etc.)
+2. Output ONLY the JSON array, no explanations or markdown code blocks
+3. Maintain exact order
+4. Each translation should be accurate and natural Chinese
+
+Output format: ["翻译1", "翻译2", ...]`
+            }
+          ],
+          temperature: 0.3,
+        };
+
+        const response = await post<DeepSeekResponse>(
+          `${DEEPSEEK_API.BASE_URL}/chat/completions`,
+          request,
+          {
+            headers: {
+              'Authorization': `Bearer ${this.apiKey}`,
+            },
+            timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
+          }
+        );
+
+        const content = response.data.choices[0]?.message?.content?.trim();
+        
+        if (!content) {
+          console.warn(`Batch translation ${batchIdx + 1} returned empty, falling back to individual`);
+          // Fallback to individual translation
+          for (const title of batch) {
+            const translated = await this.translateTitle(title);
+            allTranslations.push(translated);
+          }
+          continue;
+        }
+
+        // Remove markdown code blocks if present
+        const cleanContent = content.replace(/```json\n?|```\n?/g, '').trim();
+        
+        try {
+          const translations = JSON.parse(cleanContent);
+          
+          if (Array.isArray(translations) && translations.length === batch.length) {
+            allTranslations.push(...translations);
+          } else {
+            console.warn(`Batch ${batchIdx + 1}: Expected ${batch.length} translations, got ${translations.length}, falling back`);
+            // Fallback to individual translation
+            for (const title of batch) {
+              const translated = await this.translateTitle(title);
+              allTranslations.push(translated);
+            }
+          }
+        } catch (parseError) {
+          console.warn(`Batch ${batchIdx + 1}: Failed to parse JSON, falling back to individual translation`);
+          // Fallback to individual translation
+          for (const title of batch) {
+            const translated = await this.translateTitle(title);
+            allTranslations.push(translated);
+          }
+        }
+      } catch (error) {
+        console.warn(`Batch ${batchIdx + 1}: API error, falling back to individual translation:`, error instanceof Error ? error.message : 'Unknown');
+        // Fallback to individual translation
+        for (const title of batch) {
+          const translated = await this.translateTitle(title);
+          allTranslations.push(translated);
+        }
+      }
+
+      // Show progress
+      console.log(`Batch translated ${allTranslations.length}/${titles.length} titles...`);
+    }
+
+    return allTranslations;
+  }
+
+  /**
+   * Batch summarize multiple article contents in a single API call (OPTIMIZED)
+   * @param contents - Array of article contents to summarize
+   * @param maxLength - Target summary length in characters
+   * @param batchSize - Number of articles per batch (default 10)
+   * @returns Array of summaries (null for empty contents)
+   */
+  async summarizeContentBatch(
+    contents: (string | null)[],
+    maxLength: number,
+    batchSize: number = 10
+  ): Promise<(string | null)[]> {
+    if (!this.apiKey) {
+      throw new Error('Translation service not initialized');
+    }
+
+    if (contents.length === 0) {
+      return [];
+    }
+
+    // Filter out null/empty contents and track their indices
+    const validContents: Array<{ index: number; content: string }> = [];
+    contents.forEach((content, index) => {
+      if (content && content.trim() !== '') {
+        validContents.push({ index, content });
+      }
+    });
+
+    if (validContents.length === 0) {
+      return contents.map(() => null);
+    }
+
+    const batches = this.chunk(validContents, batchSize);
+    const summaries: (string | null)[] = new Array(contents.length).fill(null);
+
+    for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+      const batch = batches[batchIdx];
+      
+      try {
+        // Prepare batch input as JSON array
+        // Use configured max length per article, or full content if set to 0
+        const maxContentLength = LLM_BATCH_CONFIG.MAX_CONTENT_PER_ARTICLE;
+        const batchInput = batch.map(item => ({
+          index: item.index,
+          content: maxContentLength > 0 ? item.content.substring(0, maxContentLength) : item.content,
+        }));
+
+        const request: DeepSeekRequest = {
+          model: 'deepseek-chat',
+          messages: [
+            {
+              role: 'user',
+              content: `请用中文总结以下文章内容。返回一个 JSON 数组，每个元素是对应文章的摘要。
+
+输入 JSON 数组：
+${JSON.stringify(batchInput, null, 2)}
+
+要求：
+- 每个摘要长度约为 ${maxLength} 个字符
+- 抓住文章的核心要点和关键见解
+- 使用清晰、简洁的中文表达
+- 输出格式：["摘要1", "摘要2", ...]
+- 只输出 JSON 数组，不要其他说明`
+            }
+          ],
+          temperature: 0.5,
+        };
+
+        const response = await post<DeepSeekResponse>(
+          `${DEEPSEEK_API.BASE_URL}/chat/completions`,
+          request,
+          {
+            headers: {
+              'Authorization': `Bearer ${this.apiKey}`,
+            },
+            timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
+          }
+        );
+
+        const content = response.data.choices[0]?.message?.content?.trim();
+        
+        if (!content) {
+          console.warn(`Batch summarization ${batchIdx + 1} returned empty, falling back`);
+          // Fallback to individual
+          for (const item of batch) {
+            const summary = await this.summarizeContent(item.content, maxLength);
+            summaries[item.index] = summary;
+          }
+          continue;
+        }
+
+        const cleanContent = content.replace(/```json\n?|```\n?/g, '').trim();
+        
+        try {
+          const batchSummaries = JSON.parse(cleanContent);
+          
+          if (Array.isArray(batchSummaries) && batchSummaries.length === batch.length) {
+            batch.forEach((item, idx) => {
+              summaries[item.index] = batchSummaries[idx];
+            });
+          } else {
+            console.warn(`Batch ${batchIdx + 1}: Expected ${batch.length} summaries, got ${batchSummaries.length}`);
+            // Fallback
+            for (const item of batch) {
+              const summary = await this.summarizeContent(item.content, maxLength);
+              summaries[item.index] = summary;
+            }
+          }
+        } catch (parseError) {
+          console.warn(`Batch ${batchIdx + 1}: Parse error, falling back`);
+          for (const item of batch) {
+            const summary = await this.summarizeContent(item.content, maxLength);
+            summaries[item.index] = summary;
+          }
+        }
+      } catch (error) {
+        console.warn(`Batch ${batchIdx + 1}: API error, falling back:`, error instanceof Error ? error.message : 'Unknown');
+        for (const item of batch) {
+          const summary = await this.summarizeContent(item.content, maxLength);
+          summaries[item.index] = summary;
+        }
+      }
+
+      console.log(`Batch summarized ${batchIdx + 1}/${batches.length} batches...`);
+    }
+
+    return summaries;
+  }
+
+  /**
+   * Batch summarize comments for multiple stories (OPTIMIZED)
+   * @param commentArrays - Array of comment arrays (one per story)
+   * @param batchSize - Number of stories per batch (default 10)
+   * @returns Array of comment summaries (null for insufficient comments)
+   */
+  async summarizeCommentsBatch(
+    commentArrays: HNComment[][],
+    batchSize: number = 10
+  ): Promise<(string | null)[]> {
+    if (!this.apiKey) {
+      throw new Error('Translation service not initialized');
+    }
+
+    if (commentArrays.length === 0) {
+      return [];
+    }
+
+    // Filter stories with enough comments
+    const validStories: Array<{ index: number; comments: HNComment[] }> = [];
+    commentArrays.forEach((comments, index) => {
+      if (comments && comments.length >= CONTENT_CONFIG.MIN_COMMENTS_FOR_SUMMARY) {
+        validStories.push({ index, comments });
+      }
+    });
+
+    if (validStories.length === 0) {
+      return commentArrays.map(() => null);
+    }
+
+    const batches = this.chunk(validStories, batchSize);
+    const summaries: (string | null)[] = new Array(commentArrays.length).fill(null);
+
+    for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+      const batch = batches[batchIdx];
+      
+      try {
+        // Prepare batch input
+        const batchInput = batch.map(item => {
+          const commentTexts = item.comments.map(c => stripHTML(c.text)).filter(t => t.length > 0);
+          let combined = commentTexts.join('\n---\n');
+          if (combined.length > CONTENT_CONFIG.MAX_COMMENTS_LENGTH) {
+            combined = combined.substring(0, CONTENT_CONFIG.MAX_COMMENTS_LENGTH) + '...';
+          }
+          return {
+            index: item.index,
+            comments: combined,
+          };
+        });
+
+        const request: DeepSeekRequest = {
+          model: 'deepseek-chat',
+          messages: [
+            {
+              role: 'user',
+              content: `总结以下 HackerNews 评论中的关键讨论要点。返回 JSON 数组，每个元素是对应评论的摘要。
+
+输入 JSON 数组：
+${JSON.stringify(batchInput, null, 2)}
+
+要求：
+- 总结长度约为 100 个字符
+- 保留重要的技术术语、库名称、工具名称
+- 捕捉评论中的主要观点和共识
+- 输出格式：["摘要1", "摘要2", ...]
+- 只输出 JSON 数组`
+            }
+          ],
+          temperature: 0.5,
+        };
+
+        const response = await post<DeepSeekResponse>(
+          `${DEEPSEEK_API.BASE_URL}/chat/completions`,
+          request,
+          {
+            headers: {
+              'Authorization': `Bearer ${this.apiKey}`,
+            },
+            timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
+          }
+        );
+
+        const content = response.data.choices[0]?.message?.content?.trim();
+        
+        if (!content) {
+          console.warn(`Batch comment summarization ${batchIdx + 1} returned empty`);
+          for (const item of batch) {
+            const summary = await this.summarizeComments(item.comments);
+            summaries[item.index] = summary;
+          }
+          continue;
+        }
+
+        const cleanContent = content.replace(/```json\n?|```\n?/g, '').trim();
+        
+        try {
+          const batchSummaries = JSON.parse(cleanContent);
+          
+          if (Array.isArray(batchSummaries) && batchSummaries.length === batch.length) {
+            batch.forEach((item, idx) => {
+              summaries[item.index] = batchSummaries[idx];
+            });
+          } else {
+            console.warn(`Batch ${batchIdx + 1}: Expected ${batch.length} summaries, got ${batchSummaries.length}`);
+            for (const item of batch) {
+              const summary = await this.summarizeComments(item.comments);
+              summaries[item.index] = summary;
+            }
+          }
+        } catch (parseError) {
+          console.warn(`Batch ${batchIdx + 1}: Parse error`);
+          for (const item of batch) {
+            const summary = await this.summarizeComments(item.comments);
+            summaries[item.index] = summary;
+          }
+        }
+      } catch (error) {
+        console.warn(`Batch ${batchIdx + 1}: API error:`, error instanceof Error ? error.message : 'Unknown');
+        for (const item of batch) {
+          const summary = await this.summarizeComments(item.comments);
+          summaries[item.index] = summary;
+        }
+      }
+
+      console.log(`Batch summarized comments ${batchIdx + 1}/${batches.length} batches...`);
+    }
+
     return summaries;
   }
 }
