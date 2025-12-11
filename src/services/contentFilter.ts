@@ -50,15 +50,20 @@ export class AIContentFilter implements ContentFilter {
   private translator: TranslationService;
   private enabled: boolean;
   private sensitivity: SensitivityLevel;
+  private apiKey: string | null = null;
 
   /**
    * Create a new AI content filter
    * @param translator - Translator instance for LLM communication
+   * @param apiKey - Optional API key for DeepSeek (for Cloudflare Workers environment)
    */
-  constructor(translator: TranslationService) {
+  constructor(translator: TranslationService, apiKey?: string) {
     this.translator = translator;
     this.enabled = CONTENT_FILTER.ENABLED;
     this.sensitivity = CONTENT_FILTER.SENSITIVITY;
+    
+    // Store API key if provided, otherwise will try to use process.env in Node.js
+    this.apiKey = apiKey || (typeof process !== 'undefined' && process.env?.DEEPSEEK_API_KEY) || null;
   }
 
   /**
@@ -166,9 +171,8 @@ export class AIContentFilter implements ContentFilter {
    * @returns The AI's response content
    */
   private async sendClassificationRequest(prompt: string): Promise<string> {
-    // Access translator's API key (it's private, but we have the translator instance)
-    // We'll use the same DeepSeek API endpoint
-    const apiKey = process.env.DEEPSEEK_API_KEY;
+    // Use the API key provided in constructor
+    const apiKey = this.apiKey;
     
     if (!apiKey) {
       throw new Error('DEEPSEEK_API_KEY not configured');

@@ -35,17 +35,18 @@ class TranslationService {
   /**
    * Initialize the translation service with API key from environment
    */
-  init(): void {
+  init(apiKey?: string): void {
     if (this.initialized) {
       return;
     }
 
-    this.apiKey = process.env.DEEPSEEK_API_KEY || null;
+    // Try parameter first, then fall back to process.env if available (for Node.js environments)
+    this.apiKey = apiKey || (typeof process !== 'undefined' && process.env?.DEEPSEEK_API_KEY) || null;
     
     if (!this.apiKey) {
       throw new Error(
-        'DEEPSEEK_API_KEY environment variable is required.\n' +
-        'Please create a .env file with your DeepSeek API key.\n' +
+        'DEEPSEEK_API_KEY is required.\n' +
+        'Please provide it via init(apiKey) or set the DEEPSEEK_API_KEY environment variable.\n' +
         'Example: DEEPSEEK_API_KEY=your_api_key_here'
       );
     }

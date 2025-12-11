@@ -71,20 +71,7 @@ function formatTimestamp(timestamp: number): string {
  * Initialize translator service with API key from environment
  */
 function initializeTranslator(apiKey: string): void {
-  // Set environment variable for translator to access
-  (process as any).env = (process as any).env || {};
-  (process as any).env.DEEPSEEK_API_KEY = apiKey;
-  
-  translator.init();
-}
-
-/**
- * Initialize content filter with API key from environment
- */
-function initializeContentFilter(apiKey: string): void {
-  // Set environment variable for content filter to access
-  (process as any).env = (process as any).env || {};
-  (process as any).env.DEEPSEEK_API_KEY = apiKey;
+  translator.init(apiKey);
 }
 
 /**
@@ -134,9 +121,8 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
     let filteredStories = stories;
     if (enableContentFilter) {
       logInfo('Applying content filter');
-      initializeContentFilter(env.DEEPSEEK_API_KEY);
       
-      const contentFilter = new AIContentFilter(translator);
+      const contentFilter = new AIContentFilter(translator, env.DEEPSEEK_API_KEY);
       
       apiCalls['deepseek_filter'] = (apiCalls['deepseek_filter'] || 0) + 1;
       filteredStories = await contentFilter.filterStories(stories);
