@@ -25,4 +25,4 @@ TARGET_BRANCH = "main"
 LLM_BATCH_SIZE = "15"
 
 [triggers]
-crons = ["0 1 * * *"]
+crons = ["15 0 * * *"]
