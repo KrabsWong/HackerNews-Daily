@@ -1,19 +1,17 @@
 # Project Context
 
 ## Purpose
-HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内容（best 列表），使用 AI 生成文章摘要和评论要点，翻译成中文，并支持多种输出格式（CLI、Web UI、Markdown 日报）。使用混合 Firebase + Algolia API 策略提高效率，并提供可选的 AI 内容过滤功能。
+HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内容（best 列表），使用 AI 生成文章摘要和评论要点，翻译成中文，并支持多种输出格式（CLI、Markdown 日报）。支持 CLI 本地运行和 Cloudflare Worker 云端部署。使用混合 Firebase + Algolia API 策略提高效率，并提供可选的 AI 内容过滤功能。
 
 ## Tech Stack
-- **Runtime**: Node.js 20+
+- **Runtime**: Node.js 20+ (CLI), Cloudflare Workers (云端)
 - **Language**: TypeScript 5.3+ (strict mode)
-- **Build**: tsc (CommonJS output to ES2020)
-- **Web Frontend**: Vite + Vue.js (web/ 目录)
-- **Content Extraction**: Mozilla Readability
-- **LLM Provider**: DeepSeek API (翻译、摘要、内容过滤)
-- **HTTP Client**: Axios
-- **HTML Parsing**: Cheerio, JSDOM, @mozilla/readability
-- **Server**: Express 5.x
-- **Environment**: dotenv
+- **Build**: tsc (CLI), esbuild (Worker)
+- **Content Extraction**: Mozilla Readability, Crawler API
+- **LLM Provider**: DeepSeek API / OpenRouter (翻译、摘要、内容过滤)
+- **HTTP Client**: Native fetch (utils/fetch.ts 封装)
+- **HTML Parsing**: Cheerio, linkedom, @mozilla/readability
+- **Environment**: dotenv (CLI), Cloudflare secrets (Worker)
 
 ## Project Conventions
 
@@ -34,22 +32,31 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
   ```
   src/
   ├── api/          # 外部 API 调用 (Firebase, Algolia)
-  │   └── hackerNews.ts
+  │   ├── types.ts           # API 类型定义
+  │   ├── algolia.ts         # Algolia HN Search API
+  │   └── firebase.ts        # Firebase HN API
   ├── config/       # 配置常量
   │   └── constants.ts
   ├── services/     # 业务逻辑服务
-  │   ├── translator.ts      # DeepSeek 翻译和 AI 服务
+  │   ├── translator/        # LLM 翻译和摘要服务
   │   ├── articleFetcher.ts  # 文章内容抓取
   │   ├── cache.ts           # 本地文件缓存
   │   ├── contentFilter.ts   # AI 内容过滤
+  │   ├── llmProvider.ts     # LLM 提供商抽象层
   │   └── markdownExporter.ts
-  ├── server/       # Express 服务器
-  │   └── app.ts
+  ├── shared/       # CLI 和 Worker 共享代码
+  │   ├── dateUtils.ts       # 日期工具函数
+  │   └── types.ts           # 共享类型定义
+  ├── worker/       # Cloudflare Worker
+  │   ├── index.ts           # Worker 入口
+  │   ├── exportHandler.ts   # 导出处理
+  │   ├── githubClient.ts    # GitHub API
+  │   └── githubPush.ts      # Git 操作
   └── index.ts      # CLI 入口
   ```
 - **API Pattern**: 
-  - 混合策略: Firebase (best story IDs) + Algolia (批量查询详情)
-  - 使用 Axios 进行 HTTP 请求
+  - 混合策略: Firebase (best story IDs) + Algolia (批量查询详情和评论)
+  - 使用原生 fetch 进行 HTTP 请求 (utils/fetch.ts 封装)
   - 所有 API 配置集中在 `config/constants.ts`
   - 超时和重试策略在配置中定义
 - **Data Flow**: 
@@ -67,9 +74,10 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
 - 目前无自动化测试
 - 手动测试命令: 
   - CLI: `npm run fetch`
-  - Web UI: `npm run fetch:web`
   - Daily Export: `npm run fetch -- --export-daily`
   - 强制刷新: `npm run fetch -- --no-cache`
+  - Worker 本地: `npm run dev:worker`
+  - Worker 部署: `npm run deploy:worker`
 
 ### Git Workflow
 - **Branch**: 直接在 main 分支开发

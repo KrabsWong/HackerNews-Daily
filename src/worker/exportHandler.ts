@@ -3,62 +3,17 @@
  * Orchestrates the daily HackerNews export pipeline
  */
 
-import { fetchTopStoriesByScore, fetchCommentsBatchFromAlgolia, HNStory } from '../api/hackerNews';
+import { fetchTopStoriesByScore, fetchCommentsBatchFromAlgolia } from '../api';
+import { HNStory } from '../types/api';
 import { translator, CreateProviderOptions } from '../services/translator';
 import { fetchArticlesBatch, ArticleMetadata } from '../services/articleFetcher';
 import { AIContentFilter } from '../services/contentFilter';
-import { generateMarkdownContent, generateFilename, formatDateForDisplay } from '../services/markdownExporter';
+import { generateMarkdownContent, generateFilename } from '../services/markdownExporter';
 import { logInfo, logError, logWarn, logMetrics } from './logger';
 import { LLM_BATCH_CONFIG } from '../config/constants';
+import { ProcessedStory } from '../types/shared';
+import { getPreviousDayBoundaries, formatTimestamp, formatDateForDisplay } from '../utils/date';
 import type { Env } from './index';
-
-export interface ProcessedStory {
-  rank: number;
-  titleChinese: string;
-  titleEnglish: string;
-  score: number;
-  url: string;
-  time: string;
-  timestamp: number;
-  description: string;
-  commentSummary: string | null;
-}
-
-/**
- * Get the date boundaries for the previous calendar day (yesterday) in UTC
- */
-function getPreviousDayBoundaries(): { start: number; end: number; date: Date } {
-  const now = new Date();
-  
-  // Create date for yesterday in UTC
-  const yesterday = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate() - 1
-  ));
-  
-  // Set to start of day (00:00:00) in UTC
-  const startOfDay = new Date(Date.UTC(
-    yesterday.getUTCFullYear(),
-    yesterday.getUTCMonth(),
-    yesterday.getUTCDate(),
-    0, 0, 0, 0
-  ));
-  
-  // Set to end of day (23:59:59.999) in UTC
-  const endOfDay = new Date(Date.UTC(
-    yesterday.getUTCFullYear(),
-    yesterday.getUTCMonth(),
-    yesterday.getUTCDate(),
-    23, 59, 59, 999
-  ));
-  
-  return {
-    start: Math.floor(startOfDay.getTime() / 1000), // Unix timestamp in seconds
-    end: Math.floor(endOfDay.getTime() / 1000),     // Unix timestamp in seconds
-    date: yesterday // UTC date for display
-  };
-}
 
 /**
  * Parse LLM batch size from environment variable
@@ -82,14 +37,6 @@ function parseLLMBatchSize(envValue: string | undefined): number {
   }
   
   return batchSize;
-}
-
-/**
- * Format timestamp as human-readable date
- */
-function formatTimestamp(timestamp: number): string {
-  const date = new Date(timestamp * 1000);
-  return date.toISOString().replace('T', ' ').split('.')[0] + ' UTC';
 }
 
 /**
@@ -261,14 +208,14 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
         try {
           processedStories.push({
             rank: i + 1,
-            titleChinese: translatedTitles[i] || story.title,
+            titleChinese: translatedTitles[i] ?? story.title,
             titleEnglish: story.title,
             score: story.score,
-            url: story.url || '',
-            time: formatTimestamp(story.time),
+            url: story.url ?? '',
+            time: formatTimestamp(story.time, true),
             timestamp: story.time,
-            description: descriptions[i] || '暂无描述',
-            commentSummary: commentSummaries[i] || null,
+            description: descriptions[i] ?? '暂无描述',
+            commentSummary: commentSummaries[i] ?? null,
           });
           
           successCount++;

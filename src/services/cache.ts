@@ -142,12 +142,12 @@ function readCache(): CacheData | null {
     return data;
   } catch (error) {
     console.warn(`⚠️  Failed to read cache: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    // Delete corrupted cache file
+    // Delete corrupted cache file - failure here is non-critical
     try {
       fs.unlinkSync(cachePath);
       console.warn('⚠️  Deleted corrupted cache file');
-    } catch {
-      // Ignore deletion errors
+    } catch (_) {
+      // Cache deletion failure is non-critical - file may already be gone or locked
     }
     return null;
   }

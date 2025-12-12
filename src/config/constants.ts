@@ -260,20 +260,6 @@ export const CACHE_CONFIG = {
 } as const;
 
 // =============================================================================
-// Server Configuration
-// =============================================================================
-
-/**
- * Web server settings
- */
-export const SERVER_CONFIG = {
-  /** Default port for web server */
-  DEFAULT_PORT: 3000,
-  /** Timeout for graceful shutdown in milliseconds */
-  SHUTDOWN_TIMEOUT: 5000,
-} as const;
-
-// =============================================================================
 // Content Filter Configuration
 // =============================================================================
 

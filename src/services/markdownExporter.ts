@@ -1,17 +1,11 @@
 // Note: fs and path imports are moved into functions that use them
 // This prevents bundling issues in Cloudflare Workers environment
 
-interface ProcessedStory {
-  rank: number;
-  titleChinese: string;
-  titleEnglish: string;
-  score: number;
-  url: string;
-  time: string;
-  timestamp: number;
-  description: string;
-  commentSummary: string | null;
-}
+import { formatDateForDisplay } from '../utils/date';
+import { ProcessedStory } from '../types/shared';
+
+// Re-export for backward compatibility
+export { formatDateForDisplay };
 
 /**
  * Generate Jekyll front matter with layout, title, and date
@@ -102,19 +96,6 @@ export function generateFilename(date: Date): string {
 }
 
 /**
- * Format date for display messages
- * @param date - Date object (in UTC)
- * @returns Date string in YYYY-MM-DD format
- */
-export function formatDateForDisplay(date: Date): string {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
-  
-  return `${year}-${month}-${day}`;
-}
-
-/**
  * Write markdown content to file
  * @param content - Markdown content to write
  * @param filename - Filename (without path)
@@ -137,8 +118,8 @@ export async function writeMarkdownFile(
   try {
     await fs.access(filePath);
     fileExists = true;
-  } catch {
-    // File doesn't exist, no warning needed
+  } catch (_) {
+    // File doesn't exist - this is expected for new files, no warning needed
   }
   
   if (fileExists) {

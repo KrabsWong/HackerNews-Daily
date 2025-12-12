@@ -1,4 +1,4 @@
-import { ProcessedStory } from '../worker/exportHandler';
+import { ProcessedStory } from './shared';
 
 /**
  * 批次任务元数据

@@ -3,7 +3,8 @@ import dotenv from 'dotenv';
 // Load environment variables FIRST before importing anything that uses them
 dotenv.config();
 
-import { fetchTopStories, HNStory, fetchCommentsBatch } from './api/hackerNews';
+import { fetchTopStories, fetchCommentsBatchFromAlgolia } from './api';
+import { HNStory } from './types/api';
 import { translator } from './services/translator';
 import { fetchArticlesBatch } from './services/articleFetcher';
 import { STORY_LIMITS, SUMMARY_CONFIG, ENV_DEFAULTS, CONTENT_FILTER } from './config/constants';
@@ -13,9 +14,10 @@ import {
   generateMarkdownContent,
   ensureDirectoryExists,
   generateFilename,
-  formatDateForDisplay,
   writeMarkdownFile
 } from './services/markdownExporter';
+import { ProcessedStory } from './types/shared';
+import { getPreviousDayBoundaries, formatTimestamp, filterByDateRange, formatDateForDisplay } from './utils/date';
 
 /**
  * Parse command-line arguments
@@ -26,63 +28,6 @@ function parseArgs(): { noCache: boolean; exportDailyMode: boolean } {
     noCache: args.includes('--no-cache') || args.includes('--refresh'),
     exportDailyMode: args.includes('--export-daily')
   };
-}
-
-/**
- * Get the date boundaries for the previous calendar day (yesterday) in UTC
- * Returns start (00:00:00) and end (23:59:59) timestamps in Unix seconds
- * All calculations are done in UTC
- */
-function getPreviousDayBoundaries(): { start: number; end: number; date: Date } {
-  const now = new Date();
-  
-  // Create date for yesterday in UTC
-  const yesterday = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate() - 1
-  ));
-  
-  // Set to start of day (00:00:00) in UTC
-  const startOfDay = new Date(Date.UTC(
-    yesterday.getUTCFullYear(),
-    yesterday.getUTCMonth(),
-    yesterday.getUTCDate(),
-    0, 0, 0, 0
-  ));
-  
-  // Set to end of day (23:59:59.999) in UTC
-  const endOfDay = new Date(Date.UTC(
-    yesterday.getUTCFullYear(),
-    yesterday.getUTCMonth(),
-    yesterday.getUTCDate(),
-    23, 59, 59, 999
-  ));
-  
-  return {
-    start: Math.floor(startOfDay.getTime() / 1000), // Unix timestamp in seconds
-    end: Math.floor(endOfDay.getTime() / 1000),     // Unix timestamp in seconds
-    date: yesterday // UTC date for display
-  };
-}
-
-/**
- * Filter stories by date range (Unix timestamps)
- */
-function filterStoriesByDateRange(stories: ProcessedStory[], startTime: number, endTime: number): ProcessedStory[] {
-  return stories.filter(story => story.timestamp >= startTime && story.timestamp <= endTime);
-}
-
-interface ProcessedStory {
-  rank: number;
-  titleChinese: string;
-  titleEnglish: string;
-  score: number;
-  url: string;
-  time: string;
-  timestamp: number; // Unix timestamp for filtering and sorting
-  description: string;
-  commentSummary: string | null; // AI summary of top comments
 }
 
 /**
@@ -201,7 +146,7 @@ async function main(): Promise<void> {
     if (exportDailyMode) {
       // Export mode - filter by previous calendar day and export to markdown
       const { start, end, date } = getPreviousDayBoundaries();
-      const filteredStories = filterStoriesByDateRange(processedStories, start, end);
+      const filteredStories = filterByDateRange(processedStories, start, end);
       
       if (filteredStories.length === 0) {
         const dateStr = formatDateForDisplay(date);
@@ -309,9 +254,9 @@ async function fetchFreshData(
   const metaDescriptions = articleMetadata.map(meta => meta.description);
   const summaries = await translator.summarizeBatch(fullContents, metaDescriptions, summaryMaxLength);
   
-  // Fetch top comments for each story
+  // Fetch top comments for each story using Algolia (optimized)
   console.log('\nFetching top comments for each story...');
-  const commentArrays = await fetchCommentsBatch(storiesToProcess, 10);
+  const commentArrays = await fetchCommentsBatchFromAlgolia(storiesToProcess, 10);
   
   // Summarize comments
   console.log('\nSummarizing comments...');
@@ -331,22 +276,6 @@ async function fetchFreshData(
   }));
   
   return processedStories;
-}
-
-/**
- * Format Unix timestamp to UTC datetime string (YYYY-MM-DD HH:mm)
- * @param unixTime - Unix timestamp in seconds
- * @returns Formatted string in UTC
- */
-function formatTimestamp(unixTime: number): string {
-  const date = new Date(unixTime * 1000);
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
-  const hours = String(date.getUTCHours()).padStart(2, '0');
-  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-  
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
 /**

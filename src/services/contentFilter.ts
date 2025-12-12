@@ -1,4 +1,4 @@
-import { HNStory } from '../api/hackerNews';
+import { HNStory } from '../types/api';
 import { CONTENT_FILTER, SensitivityLevel } from '../config/constants';
 import { LLMProvider, createLLMProvider, CreateProviderOptions } from './llmProvider';
 
