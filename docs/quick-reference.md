@@ -46,7 +46,7 @@ npx wrangler whoami
 # 健康检查
 curl https://your-worker.workers.dev/
 
-# 手动触发导出（异步）
+# 手动触发导出（异步，后台执行）
 curl -X POST https://your-worker.workers.dev/trigger-export
 
 # 手动触发导出（同步，等待完成）
@@ -88,26 +88,47 @@ hacknews-daily/
 ├── src/
 │   ├── index.ts                 # 本地 CLI 入口
 │   ├── api/                     # API 调用层
-│   │   └── hackerNews.ts        # HN API (Algolia)
+│   │   ├── hackernews/          # HackerNews API 模块
+│   │   │   ├── algolia.ts       # Algolia Search API
+│   │   │   ├── firebase.ts      # Firebase API
+│   │   │   ├── index.ts         # 统一导出
+│   │   │   └── mapper.ts        # 数据映射
+│   │   └── index.ts             # API 统一导出
 │   ├── services/                # 业务逻辑层
-│   │   ├── translator.ts        # DeepSeek 翻译/摘要
+│   │   ├── translator/          # 翻译服务
+│   │   │   ├── index.ts         # 翻译服务入口
+│   │   │   ├── summary.ts       # 摘要翻译
+│   │   │   └── title.ts         # 标题翻译
 │   │   ├── articleFetcher.ts    # 文章内容抓取
-│   │   ├── contentFilter.ts     # AI 内容过滤
 │   │   ├── cache.ts             # 本地缓存管理
+│   │   ├── contentFilter.ts     # AI 内容过滤
+│   │   ├── llmProvider.ts       # LLM 提供商抽象
 │   │   └── markdownExporter.ts  # Markdown 导出
+│   ├── types/                   # 类型定义
+│   │   ├── api.ts               # API 相关类型
+│   │   ├── shared.ts            # 共享类型
+│   │   └── task.ts              # 任务类型
+│   ├── utils/                   # 工具函数
+│   │   ├── array.ts             # 数组工具
+│   │   ├── date.ts              # 日期工具
+│   │   ├── fetch.ts             # HTTP 请求封装
+│   │   ├── html.ts              # HTML 处理
+│   │   └── result.ts            # Result 类型
 │   ├── worker/                  # Cloudflare Worker
 │   │   ├── index.ts             # Worker 入口
 │   │   ├── exportHandler.ts     # 导出处理器
+│   │   ├── githubClient.ts      # GitHub API
 │   │   ├── githubPush.ts        # GitHub 推送
-│   │   └── logger.ts            # 日志工具
-│   ├── utils/                   # 工具函数
-│   │   └── fetch.ts             # HTTP 请求封装
+│   │   ├── logger.ts            # 日志工具
+│   │   └── stubs/               # Worker 存根
 │   └── config/                  # 配置文件
 │       └── constants.ts         # 常量配置
 ├── docs/                        # 文档
+│   ├── cloudflare-worker-deployment.md
 │   ├── LOCAL_DEVELOPMENT.md     # 本地开发指南
 │   ├── LOGGING.md               # 日志配置指南
-│   └── QUICK_REFERENCE.md       # 快速参考（本文件）
+│   ├── QUICK_REFERENCE.md       # 快速参考（本文件）
+│   └── README.md                # 文档索引
 ├── wrangler.toml                # Cloudflare Worker 配置
 ├── tsconfig.json                # TypeScript 配置（Worker）
 ├── tsconfig.node.json           # TypeScript 配置（本地）
@@ -121,8 +142,8 @@ hacknews-daily/
 | 端点 | 方法 | 用途 | 返回 |
 |-----|------|------|------|
 | `/` | GET | 健康检查 | 文本状态 |
-| `/trigger-export` | POST | 手动触发导出（异步） | `{ success, message }` |
-| `/trigger-export-sync` | POST | 手动触发导出（同步） | `{ success, message }` |
+| `/trigger-export` | POST | 手动触发导出（异步，后台执行） | `{ success, message }` |
+| `/trigger-export-sync` | POST | 手动触发导出（同步，等待完成） | `{ success, message }` |
 
 ### Cron 触发器
 
@@ -142,43 +163,31 @@ Cron Trigger (01:00 UTC 每天)
 handleDailyExport()
     ↓
 runDailyExport(env)
-  - 获取故事列表 (Algolia)
-  - 获取评论 (Algolia)
+  - 获取故事列表 (Firebase + Algolia)
   - 获取文章内容 (Crawler API)
-  - 批量翻译和摘要 (DeepSeek)
+  - 生成 AI 摘要 (LLM Provider)
+  - 获取评论 (Algolia)
+  - 生成评论摘要 (LLM Provider)
+  - 翻译标题和摘要 (LLM Provider)
   - 生成 Markdown
     ↓
 pushToGitHub()
   - 推送到目标仓库
 ```
 
-### 三阶段批量处理
+### API 调用说明
 
-1. **Phase 1: 数据收集**
-   - 获取故事列表
-   - 获取评论
-   - 获取文章内容
+处理 30 个故事的典型 API 调用数：
 
-2. **Phase 2: 批量 AI 处理**
-   - 批量翻译标题
-   - 批量摘要内容
-   - 批量摘要评论
-
-3. **Phase 3: 组装结果**
-   - 合并所有数据
-   - 生成 Markdown
-   - 推送到 GitHub
-
-### API 调用统计
-
-| API Type | 请求数 | 说明 |
-|----------|--------|------|
-| Algolia (stories) | 2 | 分页获取故事 |
-| Algolia (comments) | 30 | 每个故事 1 次 |
-| Crawler API | 30 | 每个文章 1 次 |
-| DeepSeek API | 3-9 | 批量处理 |
-| GitHub API | 1 | 推送结果 |
-| **总计** | **~57** | |
+| API Type | 调用次数 | 说明 |
+|----------|---------|------|
+| Firebase API | 1 | 获取 best stories ID 列表 |
+| Algolia API (stories) | 1 | 批量获取故事详情 |
+| Crawler API | 30 | 每个故事 1 次内容抓取 |
+| Algolia API (comments) | 30 | 每个故事 1 次评论查询 |
+| LLM API (翻译/摘要) | 3-6 | 批量处理（取决于配置） |
+| GitHub API | 1 | 推送最终结果 |
+| **总计** | **~66** | 实际数量取决于批次配置 |
 
 ## 故障排查
 
@@ -231,9 +240,10 @@ npx wrangler dev
 Error: Failed to fetch stories from Algolia HN API: HTTP 500: Internal Server Error
 ```
 
-Algolia API 偶尔会返回 500 错误（服务器临时问题）。系统已内置自动重试机制：
-- 默认重试 3 次
-- 使用指数退避：1s → 2s → 4s
+**解决方案**:
+- Algolia API 偶尔会返回 500 错误（服务器临时问题）
+- 系统已内置自动重试机制（默认 3 次，指数退避）
+- 如果持续失败，稍后重试或检查 Algolia 服务状态
 
 ## 性能调优
 
@@ -264,15 +274,13 @@ LLM_BATCH_SIZE = "15"  # 每批 15 个
 
 ### LLM 批量配置
 
-在 `src/config/constants.ts` 中配置：
+通过环境变量 `LLM_BATCH_SIZE` 配置：
 
-```typescript
-export const LLM_BATCH_CONFIG = {
-  DEFAULT_BATCH_SIZE: 0,        // 0 = 不分批
-  MIN_BATCH_SIZE: 5,            // 最小批量
-  MAX_BATCH_SIZE: 0,            // 0 = 无上限
-  MAX_CONTENT_PER_ARTICLE: 0,   // 0 = 不截断
-}
+```bash
+# wrangler.toml 或 .env
+LLM_BATCH_SIZE=0   # 0 = 不分批，一次处理所有（推荐）
+LLM_BATCH_SIZE=10  # 每批 10 个
+LLM_BATCH_SIZE=15  # 每批 15 个
 ```
 
 ## 监控和日志
@@ -289,10 +297,11 @@ curl -X POST https://your-worker.workers.dev/trigger-export
 # 你会看到：
 # === Daily Export Started ===
 # Running export pipeline
-# Fetching stories from Algolia...
+# Fetching stories from Firebase and Algolia...
+# Fetching article content from Crawler API...
+# Generating AI summaries...
 # Fetching comments...
-# Batch translating titles...
-# Batch summarizing contents...
+# Translating titles and summaries...
 # Pushing to GitHub repository
 # === Daily Export Completed ===
 ```

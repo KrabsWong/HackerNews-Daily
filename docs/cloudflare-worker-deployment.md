@@ -334,48 +334,6 @@ You may need to upgrade to Paid plan ($5/month) if:
 - 50ms CPU time per request
 - 10 million requests/month
 
-## Migration from GitHub Actions
-
-### Phase 1: Parallel Run (Recommended)
-
-Keep both GitHub Actions and Worker running simultaneously for 7 days:
-
-1. Deploy Worker with `npm run deploy:worker`
-2. Keep GitHub Actions `daily-export.yml` active  
-3. Compare outputs daily
-4. Fix any discrepancies in Worker
-
-### Phase 2: Cutover
-
-After successful validation:
-
-1. **Disable GitHub Actions schedule**:
-   ```yaml
-   # .github/workflows/daily-export.yml
-   on:
-     # schedule:  # Commented out - now using Cloudflare Worker
-     #   - cron: '0 1 * * *'
-     workflow_dispatch:  # Keep manual trigger as fallback
-   ```
-
-2. **Commit changes**:
-   ```bash
-   git add .github/workflows/daily-export.yml
-   git commit -m "chore: migrate daily export to Cloudflare Worker"
-   git push
-   ```
-
-3. **Monitor Worker for 30 days**
-
-### Rollback Plan
-
-If Worker fails consistently:
-
-1. Re-enable GitHub Actions schedule in `daily-export.yml`
-2. Push change to trigger immediate run
-3. Disable Worker cron in Cloudflare dashboard (Triggers → Cron Triggers → Delete)
-4. Investigate Worker errors via `npm run logs:worker`
-
 ## Advanced Topics
 
 ### Multiple Environments

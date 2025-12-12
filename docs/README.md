@@ -6,7 +6,13 @@ This directory contains user-facing documentation for the HackerNews Daily proje
 
 ### Deployment
 
-- **[cloudflare-worker-deployment.md](./cloudflare-worker-deployment.md)** - Complete guide for deploying the daily export automation to Cloudflare Workers as an alternative to GitHub Actions. Includes setup instructions, configuration details, troubleshooting, and migration from GitHub Actions.
+- **[cloudflare-worker-deployment.md](./cloudflare-worker-deployment.md)** - Complete guide for deploying the daily export automation to Cloudflare Workers. Includes setup instructions, configuration details, and troubleshooting.
+
+### Development
+
+- **[local-development.md](./local-development.md)** - Guide for local development, testing, and using npm run fetch for CLI mode and daily exports.
+- **[logging.md](./logging.md)** - How to view and configure logs in Cloudflare Workers.
+- **[quick-reference.md](./quick-reference.md)** - Quick reference for common commands, workflows, and project structure.
 
 ## Documentation Organization
 

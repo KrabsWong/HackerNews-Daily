@@ -1,6 +1,6 @@
 # HackerNews Daily - Chinese Translation
 
-A CLI tool that fetches top-rated stories from HackerNews's curated "best" list, extracts full article content via Crawler API, generates AI-powered summaries, fetches and summarizes top comments, and translates everything to Chinese using DeepSeek AI. Supports CLI display and daily Markdown exports with optional AI-based content filtering. Automated deployment via Cloudflare Workers.
+A CLI tool that fetches top-rated stories from HackerNews's curated "best" list, extracts full article content via Crawler API, generates AI-powered summaries, fetches and summarizes top comments, and translates everything to Chinese using configurable LLM providers. Supports CLI display and daily Markdown exports with optional AI-based content filtering. Automated deployment via Cloudflare Workers.
 
 ## Features
 
@@ -8,7 +8,7 @@ A CLI tool that fetches top-rated stories from HackerNews's curated "best" list,
 - 📄 Extracts full article content via Crawler API (headless browser for rich content)
 - 🤖 Generates AI-powered summaries (configurable 100-500 characters, default 300) from full article text
 - 💬 Fetches top 10 comments and generates concise AI summaries (~100 characters, requires 3+ comments)
-- 🌏 Translates titles, article summaries, and comment summaries to Chinese using DeepSeek LLM
+- 🌏 Translates titles, article summaries, and comment summaries to Chinese using configurable LLM providers (DeepSeek or OpenRouter)
 - 🛡️ **AI Content Filter**: Optional filtering of sensitive content with three sensitivity levels (low/medium/high, disabled by default)
 - 📊 **CLI Mode**: Clean card-based display with timestamps and scores
 - 📝 **Daily Export Mode**: Export previous day's articles to Jekyll-compatible Markdown files
@@ -17,6 +17,31 @@ A CLI tool that fetches top-rated stories from HackerNews's curated "best" list,
 - 🛡️ Graceful error handling with multi-level fallbacks (content → meta description → original text)
 - ⚡ Efficient API usage: ~3 API calls for 30 stories (vs 31+ previously)
 - ☁️ **Cloudflare Workers**: Serverless deployment with cron triggers for automated daily exports
+
+## Prerequisites
+
+- Node.js 20+
+- DeepSeek API key ([Get one here](https://platform.deepseek.com/))
+
+## Quick Start
+
+1. Clone and install: 
+   ```bash
+   git clone <repository-url> && cd hacknews-daily && npm install
+   ```
+
+2. Configure: 
+   ```bash
+   cp .env.example .env
+   # Edit .env and add your DEEPSEEK_API_KEY
+   ```
+
+3. Run: 
+   ```bash
+   npm run fetch
+   ```
+
+For detailed setup instructions, see [Local Development Guide](./docs/local-development.md).
 
 ## Deployment
 
@@ -27,43 +52,6 @@ For automated daily exports, this project uses **Cloudflare Workers** deployment
 - Fast cold starts (<50ms)
 - Built-in cron triggers for scheduling
 - **Setup**: See [docs/cloudflare-worker-deployment.md](./docs/cloudflare-worker-deployment.md)
-
-## Prerequisites
-
-- Node.js (≥20.x recommended)
-- DeepSeek API key (get one from [https://platform.deepseek.com/](https://platform.deepseek.com/))
-
-## Installation
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd hacknews-daily
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Configure your API key:
-```bash
-cp .env.example .env
-# Edit .env and add your DeepSeek API key
-```
-
-Your `.env` file should look like:
-```
-DEEPSEEK_API_KEY=your_api_key_here
-HN_STORY_LIMIT=30
-HN_TIME_WINDOW_HOURS=24
-SUMMARY_MAX_LENGTH=300
-CACHE_TTL_MINUTES=30
-CACHE_ENABLED=true
-ENABLE_CONTENT_FILTER=false
-CONTENT_FILTER_SENSITIVITY=medium
-CRAWLER_API_URL=
-```
 
 ## Usage
 
@@ -77,13 +65,11 @@ npm run fetch
 This will:
 1. Fetch the top stories from HackerNews
 2. Filter stories from the past 24 hours
-3. Extract full article content from original URLs using smart content extraction
+3. Extract full article content from original URLs
 4. Fetch top 10 comments for each story
 5. Generate AI-powered summaries of the article content and comments
 6. Translate titles and summaries to Chinese
 7. Display results in a card-based format with timestamps
-
-**Note**: The tool uses a Crawler API with headless browser technology to extract article content, automatically handling JavaScript-rendered pages and anti-crawling mechanisms. If content extraction fails for any article, it gracefully falls back to showing no description.
 
 ### Daily Export Mode
 
@@ -98,23 +84,14 @@ This will:
 - Generate a markdown file at `hacknews-export/YYYY-MM-DD-daily.md`
 - Display success message with file path
 
-**Note on Timezone**: All date/time operations use **UTC timezone** for consistency with HackerNews API timestamps. This includes:
-- Article timestamp displays (shown in UTC)
-- Markdown filename generation (uses UTC date)
-- Previous day boundary calculations (00:00-23:59 UTC)
-- Jekyll front matter dates (UTC date)
+**Note on Timezone**: All date/time operations use **UTC timezone** for consistency with HackerNews API timestamps.
 
 You can combine with `--no-cache` to force fresh data:
 ```bash
 npm run fetch -- --export-daily --no-cache
 ```
 
-**Output Format**: The exported markdown file includes Jekyll-compatible YAML front matter (layout, title, date) and uses clear hierarchical structure:
-- Date as H1 heading
-- Each article as H2 section with rank number
-- Metadata with clear labels (timestamp, clickable URL link)
-- Description and comment summary in separate paragraphs
-- Horizontal rules between articles for visual separation
+**Output Format**: The exported markdown file includes Jekyll-compatible YAML front matter (layout, title, date) and uses clear hierarchical structure with ranked articles, metadata, descriptions, and comment summaries.
 
 **Filename**: Files are named `YYYY-MM-DD-daily.md` where the date represents the previous calendar day. The `-daily` suffix distinguishes daily export posts for Jekyll.
 
@@ -154,319 +131,6 @@ Configure the tool by editing `.env`:
 | `CONTENT_FILTER_SENSITIVITY` | Filter sensitivity level: "low", "medium", or "high" | medium |
 | `CRAWLER_API_URL` | Crawler API base URL for fallback content extraction (optional) | - |
 
-### Summary Generation
-
-The tool generates AI-powered summaries in two steps:
-
-1. **Content Extraction**: Uses Mozilla Readability to extract the main article text from HTML, automatically removing ads, navigation, and other clutter
-2. **AI Summarization**: Sends the extracted content to DeepSeek API to generate a concise Chinese summary of approximately `SUMMARY_MAX_LENGTH` characters
-
-**Fallback Behavior**: If content extraction or summarization fails, the tool falls back to translating the meta description (if available) or displays "暂无描述".
-
-### Crawler API (Required for Content)
-
-The tool uses a Crawler API to extract full article content via headless browser technology. This ensures rich, complete content extraction for all articles.
-
-**Configuration**:
-
-Add the crawler API URL to your `.env` file:
-```bash
-# Required: Crawler API for article content extraction
-CRAWLER_API_URL=https://your-crawler-api.example.com
-```
-
-**How it works**:
-- All article content is fetched via Crawler API
-- Uses headless browser technology to handle:
-  - Anti-crawling mechanisms (Cloudflare, bot detection)
-  - JavaScript-rendered content (SPA frameworks)
-  - CAPTCHA challenges and rate limiting
-- Returns markdown-formatted content optimized for AI summarization
-
-**Batch Processing for Rate Limiting**:
-- Articles are fetched in batches of 5 concurrently (configurable in `constants.ts`)
-- Prevents sudden traffic spikes to target servers
-- Reduces risk of rate limiting or IP blocking
-- More polite crawling behavior
-- Example: 30 articles = 6 batches processed sequentially
-- Logs show batch progress: `📦 Processing batch 1/6 (5 articles)...`
-
-**Performance**:
-- Crawler requests have a 10-second timeout
-- Articles are processed serially to avoid overwhelming the crawler service
-- ~30 articles takes approximately 2-3 minutes
-
-**Note**: The crawler API is **required** for content extraction. Set `CRAWLER_API_URL` in your `.env` file to enable article content fetching.
-
-### Caching
-
-The tool implements local file-based caching to avoid redundant API calls:
-
-- **Cache Location**: `.cache/stories.json` (automatically gitignored)
-- **Cache Hit**: If valid cache exists, data is returned instantly without any API calls
-- **Cache Miss**: Fresh data is fetched and saved to cache for future use
-- **Cache Invalidation**: Cache is invalidated when:
-  - TTL expires (default: 30 minutes)
-  - Configuration changes (story limit, time window, or summary length)
-  - `--no-cache` or `--refresh` flag is used
-
-**Benefits**:
-- Instant results on subsequent runs within TTL
-- Reduced API costs (no DeepSeek API calls when using cache)
-- Lower risk of hitting rate limits
-
-### Content Filtering
-
-The tool includes an optional AI-based content filter to remove stories containing sensitive or controversial topics. This is useful for content moderation in certain regions or contexts.
-
-**How it works**:
-- When enabled, story titles are classified by DeepSeek AI before translation
-- Stories classified as "SENSITIVE" are filtered out
-- Only "SAFE" stories proceed to translation and display
-- Adds 2-5 seconds to fetch time (batch classification)
-
-**Configuration**:
-
-Enable the filter in your `.env` file:
-```bash
-ENABLE_CONTENT_FILTER=true
-CONTENT_FILTER_SENSITIVITY=medium
-```
-
-**Sensitivity Levels**:
-
-- **`low`**: Only filters explicitly illegal content or explicit adult/violent material
-  - Most permissive, minimal filtering
-  
-- **`medium`** (recommended default): Filters political controversies, explicit content, and illegal activities
-  - Balanced approach for general content moderation
-  
-- **`high`**: Broadly filters any potentially sensitive topics
-  - Most restrictive, includes borderline topics
-
-**Behavior**:
-- Filtered stories are silently removed from results
-- Console shows: `Filtered X stories based on content policy`
-- Final story count may be less than `HN_STORY_LIMIT`
-- If AI classification fails, stories are allowed through (fail-open)
-- Warning shown if more than 50% of stories are filtered
-
-**Performance**:
-- Classification adds ~2-5 seconds per fetch
-- Minimal API cost (~$0.001-0.002 per batch)
-- Saves translation costs for filtered stories
-
-**Note**: Filter is **disabled by default** for backward compatibility.
-
-## Example Output
-
-```
-🔍 HackerNews Daily - Chinese Translation
-
-Validating configuration...
-Fetching HackerNews stories...
-Found 28 stories from the past 24 hours
-
-Translating titles to Chinese...
-Translated 5/28 titles...
-Translated 10/28 titles...
-...
-
-Fetching and extracting article content...
-
-Generating AI-powered summaries...
-Processed 5/28 summaries...
-...
-
-Fetching top comments for each story...
-
-Summarizing comments...
-Summarized 5/28 comment threads...
-...
-
-Rendering results...
-
-#1 【人工智能的未来展望】
-The Future of Artificial Intelligence
-发布时间：2025-12-06 14:30
-链接：https://example.com/article
-描述：本文探讨了人工智能技术的最新发展和未来趋势...
-评论要点：社区讨论了 GPT-4 的性能提升，多数认为新的推理能力很实用，但有人担心成本问题
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#2 【新型编程语言发布】
-New Programming Language Released
-发布时间：2025-12-06 12:15
-链接：https://example.com/article2
-描述：一个专注于性能和安全性的全新编程语言正式发布...
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-✅ Successfully fetched and translated 28 stories
-```
-
-## Build
-
-To build the TypeScript code:
-```bash
-npm run build
-```
-
-This creates a `dist/` directory with compiled JavaScript. You can then run:
-```bash
-npm start
-```
-
-## Error Handling
-
-The tool handles various error scenarios gracefully:
-
-- **Missing API key**: Shows setup instructions
-- **Network errors**: Suggests checking internet connection
-- **API failures**: Falls back to original English titles
-- **Invalid stories**: Skips and continues processing
-
-## Development
-
-Project structure:
-```
-src/
-├── api/
-│   └── hackerNews.ts       # HackerNews API client
-├── config/
-│   └── constants.ts        # Centralized configuration constants
-├── services/
-│   ├── cache.ts            # Local file-based cache service
-│   ├── translator.ts       # DeepSeek translation service
-│   ├── articleFetcher.ts   # Article metadata fetching service
-│   └── markdownExporter.ts # Markdown export service for daily exports
-└── index.ts                # Main CLI entry point
-
-hacknews-export/            # Daily export directory (auto-created)
-├── 2025-12-06-daily.md
-├── 2025-12-05-daily.md
-└── ...
-
-src/worker/                 # Cloudflare Worker code
-├── index.ts                # Worker entry point
-├── exportHandler.ts        # Daily export handler
-├── githubClient.ts         # GitHub API integration
-└── ...
-```
-
-## Troubleshooting
-
-### "DEEPSEEK_API_KEY environment variable is required"
-Make sure you've created a `.env` file with your API key.
-
-### "Failed to fetch stories from Algolia HN API"
-Check your internet connection and verify that https://hn.algolia.com is accessible.
-
-### "Algolia API rate limit exceeded"
-Wait a few minutes before trying again, or reduce `HN_STORY_LIMIT` in your `.env` file.
-
-### Translation shows original English
-This happens when:
-- DeepSeek API is temporarily unavailable
-- Rate limits are hit
-- The tool falls back gracefully to English titles
-
-### No descriptions shown ("暂无描述")
-This happens when:
-- Content extraction fails (JavaScript-heavy sites, paywalls, PDFs)
-- The article URL blocks automated requests
-- The website doesn't have meta description tags
-- The fetch times out after 5 seconds
-- AI summarization fails (falls back to meta description translation)
-- The tool continues gracefully without breaking
-
-**Solution**: Configure the optional crawler API fallback by setting `CRAWLER_API_URL` in your `.env` file. The crawler uses headless browser technology to bypass anti-crawling mechanisms and significantly improves content extraction success rates.
-
-### Performance & Timing
-The tool processes articles and comments sequentially to respect API rate limits:
-- **Per article**: ~4-6 seconds (content + comments extraction + AI summarization + translation)
-- **For 30 articles**: ~2.5-3.5 minutes total
-- This is normal and expected behavior due to AI processing
-
-**Comment processing adds ~1.5-3s per story:**
-- Fetching 10 comments: ~0.5-1s
-- AI summarization: ~1-2s
-
-**Tip**: Start with `HN_STORY_LIMIT=5` for quick testing before processing larger batches.
-
-### No comment summary shown
-This happens when:
-- The story has fewer than 3 comments (not enough for meaningful summary)
-- Comment fetching fails (deleted comments, API issues)
-- Comment summarization fails
-- The tool continues gracefully, showing only article content
-
-### No stories found
-Try increasing `HN_TIME_WINDOW_HOURS` in your `.env` file to look further back in time.
-
-### Cache issues
-
-**Cache not working:**
-- Ensure `CACHE_ENABLED` is not set to "false" in your `.env` file
-- Check that the `.cache/` directory is writable
-- The `--no-cache` flag bypasses cache entirely
-
-**Stale data showing:**
-- Use `--no-cache` or `--refresh` flag to force a fresh fetch
-- Reduce `CACHE_TTL_MINUTES` in your `.env` file
-- Delete `.cache/stories.json` manually to clear cache
-
-**Cache cleared unexpectedly:**
-- Cache is invalidated when configuration changes
-- Changing `HN_STORY_LIMIT`, `HN_TIME_WINDOW_HOURS`, or `SUMMARY_MAX_LENGTH` will trigger a fresh fetch
-
-### Daily export issues
-
-**No markdown file created:**
-- Check that `hacknews-export/` directory exists and is writable
-- Ensure there are articles from yesterday (previous calendar day 00:00-23:59)
-- Run with `--no-cache` to fetch fresh data
-- Check terminal output for "⚠️ No stories found for YYYY-MM-DD" message
-
-**Permission denied error:**
-- Ensure you have write permissions in the project directory
-- Try creating `hacknews-export/` directory manually: `mkdir hacknews-export`
-- Check directory ownership and permissions
-
-**File overwrite warning:**
-- This is normal behavior when exporting the same date multiple times
-- The tool overwrites the existing file with fresh data
-- Previous export data will be replaced
-
-**No stories from yesterday:**
-- HackerNews may not have had active stories from the "best" list during yesterday's date range
-- The tool fetches from HN's curated "best" list (not all stories), so the available count depends on HN's algorithm
-- Try increasing `HN_STORY_LIMIT` to fetch more stories
-- The tool only exports stories from the previous calendar day (00:00-23:59)
-
-### Fewer stories than expected
-If you're receiving fewer stories than requested (e.g., 8 stories when `HN_STORY_LIMIT=30`), this may happen because:
-
-**Why this happens:**
-- The tool fetches stories from HackerNews's curated "best" list (https://news.ycombinator.com/best)
-- Only stories that appear in this curated list AND match your time window are included
-- The "best" list contains ~200 stories, but they may not all be within your time window
-- Content filtering (if enabled) may remove additional stories
-
-**Solutions:**
-- **Increase the time window**: Set `HN_TIME_WINDOW_HOURS=48` or `72` for more results
-- **Disable content filter**: Set `ENABLE_CONTENT_FILTER=false` if enabled
-- **Lower filter sensitivity**: Set `CONTENT_FILTER_SENSITIVITY=low` instead of medium/high
-- **Expect some variation**: The final count depends on HN's "best" algorithm and your filters
-
-**Note about limits:**
-- Maximum supported limit: **30 stories** (for performance and API rate limiting)
-- Requesting more than 50 stories will show a warning and cap at 30
-- This ensures optimal performance and prevents API abuse
-
-**Note about sorting:**
-- Stories are fetched from HN's "best" list (quality-curated)
-- Then sorted by score (points) in descending order
-- You get the top-rated stories from the "best" list within your time window
-
 ## API Documentation
 
 - **Algolia HN Search API**: https://hn.algolia.com/api (used for fetching stories by date)
@@ -477,9 +141,10 @@ If you're receiving fewer stories than requested (e.g., 8 stories when `HN_STORY
 
 Additional documentation is available in the [`docs/`](./docs) directory:
 
-- **[Cloudflare Worker Deployment Guide](./docs/cloudflare-worker-deployment.md)** - Complete guide for deploying to Cloudflare Workers as an alternative to GitHub Actions
-- **[Local Development Guide](./docs/LOCAL_DEVELOPMENT.md)** - Guide for local development, testing, and npm run fetch usage
-- **[Logging Configuration](./docs/LOGGING.md)** - How to view and configure logs in Cloudflare Workers
+- **[Cloudflare Worker Deployment Guide](./docs/cloudflare-worker-deployment.md)** - Complete guide for deploying to Cloudflare Workers
+- **[Local Development Guide](./docs/local-development.md)** - Guide for local development, testing, and npm run fetch usage
+- **[Logging Configuration](./docs/logging.md)** - How to view and configure logs in Cloudflare Workers
+- **[Quick Reference](./docs/quick-reference.md)** - Quick reference for common commands and workflows
 
 For technical specifications and change history, see the [`openspec/`](./openspec) directory.
 

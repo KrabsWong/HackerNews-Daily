@@ -167,11 +167,11 @@ npx wrangler dev
 # 健康检查
 curl http://localhost:8787/
 
-# 启动分布式导出
-curl http://localhost:8787/start-export
+# 触发导出（异步）
+curl -X POST http://localhost:8787/trigger-export
 
-# 查询任务状态
-curl "http://localhost:8787/task-status?taskId=task_xxx"
+# 触发导出（同步）
+curl -X POST http://localhost:8787/trigger-export-sync
 ```
 
 ### Worker 日志
@@ -191,11 +191,10 @@ npx wrangler tail --format pretty
 |------|-----------|-------------------|
 | 执行位置 | 本地机器 | Cloudflare Edge |
 | 触发方式 | 手动运行 | Cron 定时 / HTTP 触发 |
-| 处理方式 | 单进程串行 | 分布式并行（3 批次） |
-| Subrequest 限制 | 无 | 50/Worker 调用 |
-| 执行时间 | ~180 秒（串行） | ~70 秒（并行） |
-| API 调用 | ~160 次 | ~85 次（分布式） |
-| 缓存 | 本地文件缓存 | Workers KV |
+| 处理方式 | 单进程串行 | 串行处理（付费计划无限制） |
+| 执行时间 | ~2-3 分钟（取决于网络和API） | ~2-3 分钟（取决于网络和API） |
+| API 调用 | 约 66 次 | 约 66 次 |
+| 缓存 | 本地文件缓存 | 本地文件缓存（CLI） |
 | 日志 | 终端输出 | Cloudflare Logs |
 | 适用场景 | 开发调试、一次性导出 | 生产自动化、定时任务 |
 
@@ -255,15 +254,11 @@ Could not resolve "fs/promises"
 - 确保 `compatibility_flags = ["nodejs_compat"]` 在 wrangler.toml 中
 - 确保 tsconfig.json 使用 `"module": "ES2020"`
 
-#### 问题 2: Subrequest 超限
-```
-❌ Worker exceeded subrequest limit
-```
+#### 问题 2: Worker 执行超时
 
 **解决方案**:
-- 分布式架构已解决此问题
-- 每个 Worker 调用 < 25 subrequests
-- 检查日志确认批次数量：`npx wrangler tail`
+- 项目使用 Cloudflare Workers 付费计划，无 CPU 时间和 subrequest 限制
+- 如果使用免费计划遇到限制，需要升级或减少 `HN_STORY_LIMIT`
 
 ## 开发工作流
 
@@ -290,7 +285,7 @@ Could not resolve "fs/promises"
    npx wrangler dev
    
    # 在另一个终端测试
-   curl http://localhost:8787/start-export
+   curl -X POST http://localhost:8787/trigger-export
    ```
 
 3. **部署到生产**:

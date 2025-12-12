@@ -31,28 +31,43 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
 - **Directory Structure**:
   ```
   src/
-  ├── api/          # 外部 API 调用 (Firebase, Algolia)
-  │   ├── types.ts           # API 类型定义
-  │   ├── algolia.ts         # Algolia HN Search API
-  │   └── firebase.ts        # Firebase HN API
-  ├── config/       # 配置常量
-  │   └── constants.ts
-  ├── services/     # 业务逻辑服务
-  │   ├── translator/        # LLM 翻译和摘要服务
-  │   ├── articleFetcher.ts  # 文章内容抓取
-  │   ├── cache.ts           # 本地文件缓存
-  │   ├── contentFilter.ts   # AI 内容过滤
-  │   ├── llmProvider.ts     # LLM 提供商抽象层
+  ├── api/
+  │   ├── hackernews/        # HackerNews API 模块
+  │   │   ├── algolia.ts     # Algolia Search API
+  │   │   ├── firebase.ts    # Firebase API
+  │   │   ├── index.ts       # 统一导出
+  │   │   └── mapper.ts      # 数据映射
+  │   └── index.ts           # API 统一导出
+  ├── config/
+  │   └── constants.ts       # 配置常量
+  ├── services/
+  │   ├── translator/        # 翻译服务
+  │   │   ├── index.ts       # 翻译服务入口
+  │   │   ├── summary.ts     # 摘要翻译
+  │   │   └── title.ts       # 标题翻译
+  │   ├── articleFetcher.ts  # 文章抓取
+  │   ├── cache.ts           # 本地缓存
+  │   ├── contentFilter.ts   # 内容过滤
+  │   ├── llmProvider.ts     # LLM 提供商抽象
   │   └── markdownExporter.ts
-  ├── shared/       # CLI 和 Worker 共享代码
-  │   ├── dateUtils.ts       # 日期工具函数
-  │   └── types.ts           # 共享类型定义
-  ├── worker/       # Cloudflare Worker
+  ├── types/                 # 类型定义
+  │   ├── api.ts             # API 相关类型
+  │   ├── shared.ts          # 共享类型
+  │   └── task.ts            # 任务类型
+  ├── utils/                 # 工具函数
+  │   ├── array.ts           # 数组工具
+  │   ├── date.ts            # 日期工具
+  │   ├── fetch.ts           # HTTP 请求封装
+  │   ├── html.ts            # HTML 处理
+  │   └── result.ts          # Result 类型
+  ├── worker/                # Cloudflare Worker
   │   ├── index.ts           # Worker 入口
   │   ├── exportHandler.ts   # 导出处理
   │   ├── githubClient.ts    # GitHub API
-  │   └── githubPush.ts      # Git 操作
-  └── index.ts      # CLI 入口
+  │   ├── githubPush.ts      # Git 操作
+  │   ├── logger.ts          # 日志工具
+  │   └── stubs/             # Worker 存根
+  └── index.ts               # CLI 入口
   ```
 - **API Pattern**: 
   - 混合策略: Firebase (best story IDs) + Algolia (批量查询详情和评论)
@@ -87,6 +102,30 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
   - `chore:` 维护性工作
   - `docs:` 文档更新
 - **Commit Message**: 使用英文，简洁描述变更内容
+
+### Documentation Maintenance
+
+**Critical Rule**: Documentation MUST be updated with every code change that affects:
+- User-facing features or APIs
+- Configuration or environment variables
+- Project structure or architecture
+- Deployment or setup procedures
+
+**Update Targets:**
+- `README.md` - High-level overview, features, usage, configuration
+- `openspec/project.md` - Project structure, conventions, architecture
+- `docs/` directory - Detailed guides and troubleshooting
+
+**Verification:**
+- Every proposal implementation MUST include a documentation update check
+- Every archive operation MUST verify docs are in sync with code
+- Use `rg` to search for references to removed features
+- Test all code examples in documentation
+
+**Automation:**
+- AI assistants MUST check documentation in every change implementation
+- Documentation updates are part of the Definition of Done
+- No change is complete without documentation verification
 
 ## Domain Context
 
@@ -216,3 +255,23 @@ The system SHALL <requirement description>.
 1. 将 `## ADDED Requirements` 替换为 `## Requirements`
 2. 将标题中的 "Specification Delta" 替换为 "Specification"
 3. **添加 `## Purpose` 段落**（这是最关键的一步）
+
+### tasks.md Template Convention
+
+Every `tasks.md` MUST include a final documentation update section:
+
+```markdown
+## X. Documentation Update (REQUIRED)
+
+- [ ] X.1 Check README.md for affected sections
+- [ ] X.2 Check openspec/project.md for structural changes
+- [ ] X.3 Check docs/ for affected guides
+- [ ] X.4 Update or remove references to changed features
+- [ ] X.5 Test code examples in documentation
+- [ ] X.6 Verify no broken links or outdated information
+```
+
+Where X is the next section number after implementation tasks.
+
+**Example**:
+If implementation tasks end at "## 3. Testing", then documentation section should be "## 4. Documentation Update (REQUIRED)".

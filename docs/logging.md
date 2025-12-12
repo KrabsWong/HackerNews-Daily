@@ -43,45 +43,32 @@ Logpush 可以将日志推送到外部存储（如 S3、Google Cloud Storage 等
 
 ## 当前项目的日志输出
 
-### Orchestrator (`/start-export`)
+### 主要执行流程日志
+
 ```
-🚀 Starting distributed export task {taskId}
-  - totalStories: 30
-  - batchSize: 10
-  - totalBatches: 3
+=== Daily Export Started ===
+Running export pipeline
+Fetching stories from Firebase and Algolia...
+Found X stories from best list
+Fetching article content...
+Generating AI summaries...
+Fetching comments...
+Translating titles and summaries...
+Pushing to GitHub repository
+=== Daily Export Completed ===
 ```
 
-### Batch Processor (`/process-batch`)
-```
-📦 Processing batch {batchIndex} for task {taskId}: {count} stories
-📥 Phase 1: Fetching comments and content for batch {batchIndex}
-✅ Phase 1 complete: {count} comment arrays, {count} crawler calls
-🤖 Phase 2: Batch AI processing for batch {batchIndex}
-✅ Phase 2 complete: {count} LLM calls
-📦 Phase 3: Assembling processed stories for batch {batchIndex}
-✅ Phase 3 complete: {count} stories processed
-✅ Batch {batchIndex} completed in {duration}ms: {count} stories, {count} subrequests
-```
+### 错误日志示例
 
-### Aggregator (`/aggregate-and-publish`)
 ```
-📊 Aggregating results for task {taskId}
-✅ Aggregated {count} stories from {count} batches
-📊 Total subrequests across all batches: {count}
-🚀 Pushing to GitHub repository
-✅ Successfully published {count} stories to GitHub
-```
-
-### 错误日志
-```
-❌ Batch {batchIndex} failed after {duration}ms: {error}
-⚠️ Only {completedBatches}/{totalBatches} batches completed
-⚠️ Batch {batchIndex} failed: {error}
+❌ Export failed: <error message>
+❌ Failed to fetch stories: <error details>
+❌ GitHub push failed: <error details>
 ```
 
 ## 日志级别配置
 
-在 `wrangler.toml` 中已配置：
+在 `wrangler.toml` 中可配置（可选）:
 
 ```toml
 # 生产环境：记录所有日志
@@ -95,16 +82,6 @@ log_level = "debug"
 
 ## 监控任务执行
 
-### 查询任务状态
-
-```bash
-# 获取任务 ID（从 /start-export 返回）
-curl https://your-worker.workers.dev/start-export
-
-# 查询任务状态
-curl "https://your-worker.workers.dev/task-status?taskId=task_xxx"
-```
-
 ### 查看实时执行过程
 
 ```bash
@@ -112,18 +89,26 @@ curl "https://your-worker.workers.dev/task-status?taskId=task_xxx"
 npx wrangler tail --format pretty
 
 # 在另一个终端触发任务
-curl https://your-worker.workers.dev/start-export
+curl -X POST https://your-worker.workers.dev/trigger-export
 ```
+
+### 检查定时任务执行
+
+Cloudflare Dashboard 会显示每次 Cron 触发的执行结果：
+
+1. 进入 Worker 页面
+2. 点击 "Triggers" 标签
+3. 查看 "Cron Triggers" 部分的执行历史
 
 ## 性能指标
 
 当前实现会自动记录以下指标：
 
-- ✅ 每个批次的处理时间
-- ✅ 每个批次的 subrequest 计数
-- ✅ 总 subrequest 计数
-- ✅ 失败的批次信息
-- ✅ API 调用统计（Algolia, Crawler, LLM）
+- ✅ 总执行时间
+- ✅ 故事数量
+- ✅ API 调用状态（成功/失败）
+- ✅ GitHub 推送结果
+- ✅ 错误详情和堆栈跟踪
 
 ## 故障排查
 
@@ -139,7 +124,7 @@ npx wrangler tail --status error
 在 Cloudflare Dashboard 中：
 1. 进入 Worker 的 Logs 页面
 2. 使用时间过滤器选择时间范围
-3. 搜索特定的 taskId 或错误信息
+3. 搜索特定的错误信息
 
 ### 调试模式
 
@@ -156,26 +141,27 @@ npx wrangler dev --log-level debug
 
 ## 最佳实践
 
-1. ✅ **使用结构化日志**: 当前代码已使用 emoji 和清晰的标识符
-2. ✅ **记录关键指标**: 处理时间、请求计数、错误信息
-3. ✅ **使用 taskId 关联**: 所有日志都包含 taskId 便于追踪
-4. ✅ **区分日志级别**: 
+1. ✅ **使用结构化日志**: 当前代码使用清晰的日志前缀（如 `===`、`❌`）
+2. ✅ **记录关键指标**: 处理时间、故事数量、错误信息
+3. ✅ **区分日志级别**: 
    - `console.log()`: 正常操作
-   - `console.warn()`: 警告（如部分批次失败）
+   - `console.warn()`: 警告
    - `console.error()`: 错误
-5. ✅ **避免敏感信息**: 不记录 API keys 或用户数据
+4. ✅ **避免敏感信息**: 不记录 API keys 或敏感数据
+5. ✅ **包含上下文**: 日志中包含足够信息用于调试
 
 ## 告警配置（可选）
 
 如果需要自动告警，可以使用以下方案：
 
 ### 方案 1: Workers Analytics Engine
+
 ```typescript
 // 在 Worker 中记录自定义指标
 env.ANALYTICS_ENGINE.writeDataPoint({
-  blobs: [taskId, 'export_completed'],
-  doubles: [totalSubrequests, duration],
-  indexes: [taskId]
+  blobs: ['export_completed'],
+  doubles: [duration, storiesCount],
+  indexes: [dateStr]
 });
 ```
 
@@ -185,7 +171,8 @@ env.ANALYTICS_ENGINE.writeDataPoint({
 - New Relic (监控)
 
 ### 方案 3: Discord/Slack Webhook
-在 Aggregator 完成时发送通知：
+
+在导出完成时发送通知：
 ```typescript
 await fetch('https://discord.com/api/webhooks/xxx', {
   method: 'POST',
@@ -203,22 +190,37 @@ await fetch('https://discord.com/api/webhooks/xxx', {
 $ npx wrangler tail --format pretty
 
 # 终端 2: 触发任务
-$ curl https://your-worker.workers.dev/start-export
-{"success":true,"taskId":"task_1234","totalBatches":3}
+$ curl -X POST https://your-worker.workers.dev/trigger-export
+{"success":true,"message":"Export started in background"}
 
 # 终端 1 会显示：
-🚀 Starting distributed export task task_1234
-📦 Processing batch 0 for task task_1234: 10 stories
-📦 Processing batch 1 for task task_1234: 10 stories
-📦 Processing batch 2 for task task_1234: 10 stories
-✅ Batch 0 completed in 15000ms: 10 stories, 22 subrequests
-✅ Batch 1 completed in 14500ms: 10 stories, 21 subrequests
-✅ Batch 2 completed in 15200ms: 10 stories, 23 subrequests
-📊 Aggregating results for task task_1234
-✅ Aggregated 30 stories from 3 batches
-📊 Total subrequests across all batches: 66
-✅ Successfully published 30 stories to GitHub
+=== Daily Export Started ===
+Running export pipeline
+Fetching stories from Firebase and Algolia...
+Found 30 stories from best list
+Fetching article content from Crawler API...
+Generating AI summaries...
+Fetching comments...
+Translating titles and summaries...
+Pushing to GitHub repository
+=== Daily Export Completed ===
 ```
+
+## 常见日志消息说明
+
+| 日志消息 | 含义 | 级别 |
+|---------|------|------|
+| `=== Daily Export Started ===` | 导出任务开始 | INFO |
+| `Running export pipeline` | 执行导出流程 | INFO |
+| `Fetching stories from...` | 获取故事列表 | INFO |
+| `Found X stories...` | 找到 X 个故事 | INFO |
+| `Fetching article content...` | 获取文章内容 | INFO |
+| `Generating AI summaries...` | 生成 AI 摘要 | INFO |
+| `Translating...` | 翻译内容 | INFO |
+| `Pushing to GitHub repository` | 推送到 GitHub | INFO |
+| `=== Daily Export Completed ===` | 导出完成 | INFO |
+| `Export failed: ...` | 导出失败 | ERROR |
+| `Missing ... secret` | 缺少必需的密钥 | ERROR |
 
 ## 更多资源
 

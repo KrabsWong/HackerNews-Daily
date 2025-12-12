@@ -52,9 +52,46 @@ Track these steps as TODOs and complete them one by one.
 2. **Read design.md** (if exists) - Review technical decisions
 3. **Read tasks.md** - Get implementation checklist
 4. **Implement tasks sequentially** - Complete in order
-5. **Confirm completion** - Ensure every item in `tasks.md` is finished before updating statuses
-6. **Update checklist** - After all work is done, set every task to `- [x]` so the list reflects reality
-7. **Approval gate** - Do not start implementation until the proposal is reviewed and approved
+5. **Update documentation** - REQUIRED: Check and update affected docs (see Documentation Update Checklist below)
+6. **Confirm completion** - Ensure every item in `tasks.md` is finished before updating statuses
+7. **Update checklist** - After all work is done, set every task to `- [x]` so the list reflects reality
+8. **Approval gate** - Do not start implementation until the proposal is reviewed and approved
+
+### Documentation Update Checklist
+
+**REQUIRED for every change implementation and archive:**
+
+After completing code changes, ALWAYS check and update the following if affected:
+
+1. **README.md**
+   - [ ] Features list reflects new/changed capabilities
+   - [ ] Configuration table includes new environment variables
+   - [ ] Usage examples are accurate
+   - [ ] API documentation is up-to-date
+   - [ ] No references to removed features
+
+2. **openspec/project.md**
+   - [ ] Directory structure matches actual `src/` layout
+   - [ ] Architecture patterns describe current implementation
+   - [ ] Configuration section lists all current env vars
+   - [ ] External dependencies are accurate
+
+3. **docs/ directory**
+   - [ ] All guides reflect current API endpoints and architecture
+   - [ ] Code examples are valid and tested
+   - [ ] No references to removed features or old implementations
+   - [ ] New features are documented if user-facing
+
+**How to verify:**
+- Run `git diff` on docs to see what changed
+- Test code examples in documentation
+- Search for references to removed features: `rg "old-feature-name" README.md docs/`
+- Check that file paths and code structure match reality
+
+**When to skip:**
+- Bug fixes that don't change user-facing behavior
+- Internal refactoring with no API changes
+- Dependency updates (non-breaking)
 
 ### Stage 3: Archiving Changes
 After deployment, create separate PR to:
@@ -236,34 +273,6 @@ Minimal `design.md` skeleton:
 
 ## Spec File Format
 
-### Critical: Final Spec Structure (openspec/specs/)
-
-**Every spec file in `openspec/specs/<capability>/spec.md` MUST have this structure:**
-
-```markdown
-# <capability-name> Specification
-
-## Purpose
-<Brief description of this capability's purpose, 1-2 sentences>
-
-## Requirements
-
-### Requirement: <Requirement Name>
-The system SHALL <requirement description>.
-
-#### Scenario: <Scenario Name>
-**Given** <precondition>  
-**When** <action>  
-**Then** <expected result>
-```
-
-**CRITICAL**: The `## Purpose` section is REQUIRED. Without it, openspec will report `requirements 0` even if requirements exist in the file.
-
-**Common mistakes to avoid:**
-- ❌ Missing `## Purpose` section → openspec cannot parse requirements
-- ❌ Using "Specification Delta" in title → should be just "Specification"
-- ❌ Starting directly with `## Requirements` without Purpose
-
 ### Critical: Scenario Formatting
 
 **CORRECT** (use #### headers):
@@ -325,17 +334,6 @@ Example for RENAMED:
 **"Requirement must have at least one scenario"**
 - Check scenarios use `#### Scenario:` format (4 hashtags)
 - Don't use bullet points or bold for scenario headers
-
-**Spec shows "requirements 0" but file has requirements**
-- **Most common cause**: Missing `## Purpose` section
-- Fix: Add `## Purpose` section with 1-2 sentence description before `## Requirements`
-- Also check: Title should be `# name Specification` (not "Specification Delta")
-
-**Archive creates specs that openspec can't parse**
-- Archive only copies delta files; ensure when rebuilding specs from archive:
-  1. Replace `## ADDED Requirements` with `## Requirements`
-  2. Remove "Delta" from title
-  3. **Add `## Purpose` section** (archives don't include this)
 
 **Silent scenario parsing failures**
 - Exact format required: `#### Scenario: Name`
