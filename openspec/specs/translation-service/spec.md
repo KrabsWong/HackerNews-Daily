@@ -4,19 +4,31 @@
 Specification for Spec: translation-service functionality.
 ## Requirements
 ### Requirement: Configure DeepSeek API Access
-The system SHALL read DeepSeek API credentials from environment variables.
+The system SHALL read LLM API credentials from environment variables based on the selected provider.
 
 #### Scenario: Valid API key is configured
-**Given** the environment variable `DEEPSEEK_API_KEY` is set  
+**Given** the environment variable for the selected provider's API key is set  
 **When** the translation service initializes  
 **Then** the API key is loaded successfully  
-**And** requests include proper authentication headers
+**And** requests include proper authentication headers for the provider
 
 #### Scenario: Missing API key
-**Given** the environment variable `DEEPSEEK_API_KEY` is not set  
+**Given** the API key for the selected provider is not set  
 **When** the translation service initializes  
-**Then** the system displays error "DEEPSEEK_API_KEY environment variable is required"  
+**Then** the system displays an error indicating which API key is required  
 **And** exits with non-zero status code
+
+#### Scenario: DeepSeek provider selected
+**Given** `LLM_PROVIDER` is `deepseek` or not set  
+**When** the translation service initializes  
+**Then** the system requires `DEEPSEEK_API_KEY`  
+**And** uses DeepSeek API endpoint
+
+#### Scenario: OpenRouter provider selected
+**Given** `LLM_PROVIDER` is `openrouter`  
+**When** the translation service initializes  
+**Then** the system requires `OPENROUTER_API_KEY`  
+**And** uses OpenRouter API endpoint
 
 ### Requirement: Translate Titles to Chinese
 The system SHALL translate story titles from English to Chinese using DeepSeek LLM while preserving technical terminology.
@@ -92,4 +104,25 @@ The system SHALL preserve common technical terms, acronyms, and proper nouns in 
 **Then** the prompt SHALL include explicit instructions to preserve technical terms  
 **And** provide examples of terms to preserve (programming languages, cloud services, technical acronyms)  
 **And** request standard Chinese abbreviations where appropriate (e.g., "MCP协议" for "Model Context Protocol")
+
+### Requirement: Use Provider Abstraction for API Calls
+The system SHALL use the LLM provider abstraction layer for all API calls.
+
+#### Scenario: Translation via provider abstraction
+**Given** a valid LLM provider is initialized  
+**When** translating a title  
+**Then** the system sends the request through the provider's chat completion interface  
+**And** receives the response in a consistent format regardless of provider
+
+#### Scenario: Summarization via provider abstraction
+**Given** a valid LLM provider is initialized  
+**When** summarizing article content  
+**Then** the system sends the request through the provider's chat completion interface  
+**And** receives the response in a consistent format regardless of provider
+
+#### Scenario: Provider initialization in TranslationService
+**Given** the TranslationService is created  
+**When** calling `init()` method  
+**Then** the system creates an LLM provider based on configuration  
+**And** stores the provider instance for subsequent API calls
 

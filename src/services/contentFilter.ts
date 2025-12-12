@@ -1,11 +1,6 @@
 import { HNStory } from '../api/hackerNews';
 import { CONTENT_FILTER, SensitivityLevel } from '../config/constants';
-import { post } from '../utils/fetch';
-
-// TranslationService type (we only use it for type annotations)
-type TranslationService = {
-  init(): void;
-};
+import { LLMProvider, createLLMProvider, CreateProviderOptions } from './llmProvider';
 
 /**
  * Classification result for a single story title
@@ -44,26 +39,54 @@ export interface ContentFilter {
 }
 
 /**
- * AI-based content filter using DeepSeek LLM for classification
+ * AI-based content filter using LLM for classification
+ * Supports multiple LLM providers (DeepSeek, OpenRouter)
  */
 export class AIContentFilter implements ContentFilter {
-  private translator: TranslationService;
+  private provider: LLMProvider | null = null;
+  private providerOptions: CreateProviderOptions;
   private enabled: boolean;
   private sensitivity: SensitivityLevel;
-  private apiKey: string | null = null;
 
   /**
    * Create a new AI content filter
-   * @param translator - Translator instance for LLM communication
-   * @param apiKey - Optional API key for DeepSeek (for Cloudflare Workers environment)
+   * @param providerOrOptions - LLM provider instance or options to create one
+   *                            For backward compatibility, can also be a translator instance (ignored)
+   * @param apiKey - Optional API key (deprecated, use providerOptions instead)
    */
-  constructor(translator: TranslationService, apiKey?: string) {
-    this.translator = translator;
+  constructor(
+    providerOrOptions?: LLMProvider | CreateProviderOptions | { init(): void },
+    apiKey?: string
+  ) {
     this.enabled = CONTENT_FILTER.ENABLED;
     this.sensitivity = CONTENT_FILTER.SENSITIVITY;
     
-    // Store API key if provided, otherwise will try to use process.env in Node.js
-    this.apiKey = apiKey || (typeof process !== 'undefined' && process.env?.DEEPSEEK_API_KEY) || null;
+    // Handle different constructor signatures for backward compatibility
+    if (providerOrOptions && 'chatCompletion' in providerOrOptions) {
+      // It's an LLMProvider instance
+      this.provider = providerOrOptions;
+      this.providerOptions = {};
+    } else if (providerOrOptions && 'init' in providerOrOptions) {
+      // It's a translator instance (old API) - ignore it, we'll create our own provider
+      // Use apiKey if provided for backward compatibility
+      this.providerOptions = apiKey ? { deepseekApiKey: apiKey } : {};
+    } else if (providerOrOptions) {
+      // It's CreateProviderOptions
+      this.providerOptions = providerOrOptions as CreateProviderOptions;
+    } else {
+      // No options provided, use defaults
+      this.providerOptions = apiKey ? { deepseekApiKey: apiKey } : {};
+    }
+  }
+
+  /**
+   * Get or create the LLM provider
+   */
+  private getProvider(): LLMProvider {
+    if (!this.provider) {
+      this.provider = createLLMProvider(this.providerOptions);
+    }
+    return this.provider;
   }
 
   /**
@@ -115,7 +138,7 @@ export class AIContentFilter implements ContentFilter {
         
         // Warn if more than 50% filtered
         if (filteredCount > stories.length * 0.5) {
-          console.warn(`⚠️  Over 50% of stories were filtered. Consider lowering sensitivity level.`);
+          console.warn(`Over 50% of stories were filtered. Consider lowering sensitivity level.`);
         }
       }
 
@@ -143,9 +166,7 @@ export class AIContentFilter implements ContentFilter {
     const prompt = this.buildClassificationPrompt(titles);
     
     try {
-      // Use translator to send request to DeepSeek
-      // We access the translator's internal sendToDeepSeek functionality
-      // by using the same API structure it uses
+      // Send classification request via LLM provider
       const response = await this.sendClassificationRequest(prompt);
       
       // Parse and validate response
@@ -165,54 +186,24 @@ export class AIContentFilter implements ContentFilter {
   }
 
   /**
-   * Send classification request to DeepSeek API
-   * This mimics the translator's approach but is adapted for classification
+   * Send classification request to LLM provider
    * @param prompt - The classification prompt
    * @returns The AI's response content
    */
   private async sendClassificationRequest(prompt: string): Promise<string> {
-    // Use the API key provided in constructor
-    const apiKey = this.apiKey;
-    
-    if (!apiKey) {
-      throw new Error('DEEPSEEK_API_KEY not configured');
-    }
+    const provider = this.getProvider();
 
-    const response = await post<{
-      choices: Array<{
-        message: {
-          content: string;
-          role: string;
-        };
-        finish_reason: string;
-      }>;
-    }>(
-      'https://api.deepseek.com/v1/chat/completions',
-      {
-        model: 'deepseek-chat',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.1, // Low temperature for consistent classification
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        timeout: CONTENT_FILTER.TIMEOUT,
-      }
-    );
+    const response = await provider.chatCompletion({
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.1, // Low temperature for consistent classification
+    });
 
-    const content = response.data.choices[0]?.message?.content?.trim();
-    
-    if (!content) {
-      throw new Error('Empty response from AI');
-    }
-
-    return content;
+    return response.content;
   }
 
   /**

@@ -4,7 +4,7 @@
  */
 
 import { fetchTopStoriesByScore, fetchCommentsBatchFromAlgolia, HNStory } from '../api/hackerNews';
-import { translator } from '../services/translator';
+import { translator, CreateProviderOptions } from '../services/translator';
 import { fetchArticlesBatch, ArticleMetadata } from '../services/articleFetcher';
 import { AIContentFilter } from '../services/contentFilter';
 import { generateMarkdownContent, generateFilename, formatDateForDisplay } from '../services/markdownExporter';
@@ -93,10 +93,19 @@ function formatTimestamp(timestamp: number): string {
 }
 
 /**
- * Initialize translator service with API key from environment
+ * Initialize translator service with LLM provider options from environment
  */
-function initializeTranslator(apiKey: string): void {
-  translator.init(apiKey);
+function initializeTranslator(env: Env): void {
+  const providerOptions: CreateProviderOptions = {
+    provider: (env.LLM_PROVIDER?.toLowerCase() || 'deepseek') as 'deepseek' | 'openrouter',
+    deepseekApiKey: env.DEEPSEEK_API_KEY,
+    openrouterApiKey: env.OPENROUTER_API_KEY,
+    model: env.OPENROUTER_MODEL,
+    siteUrl: env.OPENROUTER_SITE_URL,
+    siteName: env.OPENROUTER_SITE_NAME,
+  };
+  
+  translator.init(providerOptions);
 }
 
 /**
@@ -114,8 +123,8 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
     
     logInfo('Daily export started', { date: dateStr, startTime: start, endTime: end });
 
-    // Initialize translator with API key
-    initializeTranslator(env.DEEPSEEK_API_KEY);
+    // Initialize translator with LLM provider options
+    initializeTranslator(env);
     
     // Parse configuration
     const storyLimit = parseInt(env.HN_STORY_LIMIT || '30', 10);
@@ -149,9 +158,18 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
     if (enableContentFilter) {
       logInfo('Applying content filter');
       
-      const contentFilter = new AIContentFilter(translator, env.DEEPSEEK_API_KEY);
+      // Create content filter with the same provider options as translator
+      const contentFilterOptions: CreateProviderOptions = {
+        provider: (env.LLM_PROVIDER?.toLowerCase() || 'deepseek') as 'deepseek' | 'openrouter',
+        deepseekApiKey: env.DEEPSEEK_API_KEY,
+        openrouterApiKey: env.OPENROUTER_API_KEY,
+        model: env.OPENROUTER_MODEL,
+        siteUrl: env.OPENROUTER_SITE_URL,
+        siteName: env.OPENROUTER_SITE_NAME,
+      };
+      const contentFilter = new AIContentFilter(contentFilterOptions);
       
-      apiCalls['deepseek_filter'] = (apiCalls['deepseek_filter'] || 0) + 1;
+      apiCalls['llm_filter'] = (apiCalls['llm_filter'] || 0) + 1;
       filteredStories = await contentFilter.filterStories(stories);
       
       const removedCount = stories.length - filteredStories.length;

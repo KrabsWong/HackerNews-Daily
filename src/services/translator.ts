@@ -1,35 +1,14 @@
 import { HNComment, stripHTML } from '../api/hackerNews';
-import { DEEPSEEK_API, CONTENT_CONFIG, LLM_BATCH_CONFIG } from '../config/constants';
-import { post, FetchError } from '../utils/fetch';
-
-interface DeepSeekMessage {
-  role: 'user' | 'system' | 'assistant';
-  content: string;
-}
-
-interface DeepSeekRequest {
-  model: string;
-  messages: DeepSeekMessage[];
-  temperature?: number;
-}
-
-interface DeepSeekResponse {
-  choices: Array<{
-    message: {
-      content: string;
-      role: string;
-    };
-    finish_reason: string;
-  }>;
-  usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
-}
+import { CONTENT_CONFIG, LLM_BATCH_CONFIG } from '../config/constants';
+import { 
+  LLMProvider, 
+  createLLMProvider, 
+  CreateProviderOptions,
+  FetchError 
+} from './llmProvider';
 
 class TranslationService {
-  private apiKey: string | null = null;
+  private provider: LLMProvider | null = null;
   private initialized = false;
 
   /**
@@ -48,25 +27,30 @@ class TranslationService {
   }
 
   /**
-   * Initialize the translation service with API key from environment
+   * Initialize the translation service with LLM provider
+   * @param apiKeyOrOptions - API key string (for backward compatibility) or provider options
    */
-  init(apiKey?: string): void {
+  init(apiKeyOrOptions?: string | CreateProviderOptions): void {
     if (this.initialized) {
       return;
     }
 
-    // Try parameter first, then fall back to process.env if available (for Node.js environments)
-    this.apiKey = apiKey || (typeof process !== 'undefined' && process.env?.DEEPSEEK_API_KEY) || null;
-    
-    if (!this.apiKey) {
-      throw new Error(
-        'DEEPSEEK_API_KEY is required.\n' +
-        'Please provide it via init(apiKey) or set the DEEPSEEK_API_KEY environment variable.\n' +
-        'Example: DEEPSEEK_API_KEY=your_api_key_here'
-      );
-    }
+    // Handle backward compatibility: if a string is passed, treat it as deepseekApiKey
+    const options: CreateProviderOptions = typeof apiKeyOrOptions === 'string'
+      ? { deepseekApiKey: apiKeyOrOptions }
+      : apiKeyOrOptions || {};
 
+    this.provider = createLLMProvider(options);
     this.initialized = true;
+    
+    console.log(`Translation service initialized with ${this.provider.getName()} provider (model: ${this.provider.getModel()})`);
+  }
+
+  /**
+   * Get the current provider (for testing or advanced usage)
+   */
+  getProvider(): LLMProvider | null {
+    return this.provider;
   }
 
   /**
@@ -74,7 +58,7 @@ class TranslationService {
    * Returns original title if translation fails
    */
   async translateTitle(title: string, retry = true): Promise<string> {
-    if (!this.apiKey) {
+    if (!this.provider) {
       throw new Error('Translation service not initialized');
     }
 
@@ -84,8 +68,7 @@ class TranslationService {
     }
 
     try {
-      const request: DeepSeekRequest = {
-        model: 'deepseek-chat',
+      const response = await this.provider.chatCompletion({
         messages: [
           {
             role: 'user',
@@ -108,20 +91,9 @@ Output only the translated title, no explanations.`
           }
         ],
         temperature: 0.3,
-      };
+      });
 
-      const response = await post<DeepSeekResponse>(
-        `${DEEPSEEK_API.BASE_URL}/chat/completions`,
-        request,
-        {
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-          },
-          timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
-        }
-      );
-
-      const translation = response.data.choices[0]?.message?.content?.trim();
+      const translation = response.content;
       
       if (!translation) {
         console.warn(`Translation returned empty for: ${title.substring(0, 50)}...`);
@@ -131,9 +103,9 @@ Output only the translated title, no explanations.`
       return translation;
     } catch (error) {
       // Retry once on rate limit or temporary errors
-      if (retry && error instanceof FetchError && error.status === 429) {
+      if (retry && error instanceof FetchError && error.status === 429 && this.provider) {
         console.warn('Rate limit hit, retrying after delay...');
-        await new Promise(resolve => setTimeout(resolve, DEEPSEEK_API.RETRY_DELAY));
+        await new Promise(resolve => setTimeout(resolve, this.provider!.getRetryDelay()));
         return this.translateTitle(title, false);
       }
 
@@ -178,9 +150,12 @@ Output only the translated title, no explanations.`
       return description;
     }
 
+    if (!this.provider) {
+      throw new Error('Translation service not initialized');
+    }
+
     try {
-      const request: DeepSeekRequest = {
-        model: 'deepseek-chat',
+      const response = await this.provider.chatCompletion({
         messages: [
           {
             role: 'user',
@@ -188,20 +163,9 @@ Output only the translated title, no explanations.`
           }
         ],
         temperature: 0.3,
-      };
+      });
 
-      const response = await post<DeepSeekResponse>(
-        `${DEEPSEEK_API.BASE_URL}/chat/completions`,
-        request,
-        {
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-          },
-          timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
-        }
-      );
-
-      const translation = response.data.choices[0]?.message?.content?.trim();
+      const translation = response.content;
       
       if (!translation) {
         console.warn(`Description translation returned empty, using fallback`);
@@ -220,7 +184,7 @@ Output only the translated title, no explanations.`
    * Returns null if summarization fails (triggers fallback to meta description)
    */
   async summarizeContent(content: string, maxLength: number, retry = true): Promise<string | null> {
-    if (!this.apiKey) {
+    if (!this.provider) {
       throw new Error('Translation service not initialized');
     }
 
@@ -230,8 +194,7 @@ Output only the translated title, no explanations.`
     }
 
     try {
-      const request: DeepSeekRequest = {
-        model: 'deepseek-chat',
+      const response = await this.provider.chatCompletion({
         messages: [
           {
             role: 'user',
@@ -246,20 +209,9 @@ ${content}`
           }
         ],
         temperature: 0.5,
-      };
+      });
 
-      const response = await post<DeepSeekResponse>(
-        `${DEEPSEEK_API.BASE_URL}/chat/completions`,
-        request,
-        {
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-          },
-          timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
-        }
-      );
-
-      const summary = response.data.choices[0]?.message?.content?.trim();
+      const summary = response.content;
       
       if (!summary) {
         console.warn(`Summarization returned empty`);
@@ -269,9 +221,9 @@ ${content}`
       return summary;
     } catch (error) {
       // Retry once on rate limit or temporary errors
-      if (retry && error instanceof FetchError && error.status === 429) {
+      if (retry && error instanceof FetchError && error.status === 429 && this.provider) {
         console.warn('Rate limit hit during summarization, retrying after delay...');
-        await new Promise(resolve => setTimeout(resolve, DEEPSEEK_API.RETRY_DELAY));
+        await new Promise(resolve => setTimeout(resolve, this.provider!.getRetryDelay()));
         return this.summarizeContent(content, maxLength, false);
       }
 
@@ -287,7 +239,7 @@ ${content}`
    * @returns Chinese summary string or null
    */
   async summarizeComments(comments: HNComment[]): Promise<string | null> {
-    if (!this.apiKey) {
+    if (!this.provider) {
       throw new Error('Translation service not initialized');
     }
 
@@ -312,8 +264,7 @@ ${content}`
         combinedText = combinedText.substring(0, CONTENT_CONFIG.MAX_COMMENTS_LENGTH) + '...';
       }
 
-      const request: DeepSeekRequest = {
-        model: 'deepseek-chat',
+      const response = await this.provider.chatCompletion({
         messages: [
           {
             role: 'user',
@@ -329,20 +280,9 @@ ${combinedText}`
           }
         ],
         temperature: 0.5,
-      };
+      });
 
-      const response = await post<DeepSeekResponse>(
-        `${DEEPSEEK_API.BASE_URL}/chat/completions`,
-        request,
-        {
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-          },
-          timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
-        }
-      );
-
-      const summary = response.data.choices[0]?.message?.content?.trim();
+      const summary = response.content;
       
       if (!summary) {
         console.warn('Comment summarization returned empty');
@@ -426,7 +366,7 @@ ${combinedText}`
    * @returns Array of translated titles in the same order
    */
   async translateTitlesBatch(titles: string[], batchSize: number = 10): Promise<string[]> {
-    if (!this.apiKey) {
+    if (!this.provider) {
       throw new Error('Translation service not initialized');
     }
 
@@ -441,8 +381,7 @@ ${combinedText}`
       const batch = batches[batchIdx];
       
       try {
-        const request: DeepSeekRequest = {
-          model: 'deepseek-chat',
+        const response = await this.provider.chatCompletion({
           messages: [
             {
               role: 'user',
@@ -462,20 +401,9 @@ Output format example: ["First translated title here", "Second translated title 
             }
           ],
           temperature: 0.3,
-        };
+        });
 
-        const response = await post<DeepSeekResponse>(
-          `${DEEPSEEK_API.BASE_URL}/chat/completions`,
-          request,
-          {
-            headers: {
-              'Authorization': `Bearer ${this.apiKey}`,
-            },
-            timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
-          }
-        );
-
-        const content = response.data.choices[0]?.message?.content?.trim();
+        const content = response.content;
         
         if (!content) {
           console.warn(`Batch translation ${batchIdx + 1} returned empty, falling back to individual`);
@@ -539,7 +467,7 @@ Output format example: ["First translated title here", "Second translated title 
     maxLength: number,
     batchSize: number = 10
   ): Promise<(string | null)[]> {
-    if (!this.apiKey) {
+    if (!this.provider) {
       throw new Error('Translation service not initialized');
     }
 
@@ -574,8 +502,7 @@ Output format example: ["First translated title here", "Second translated title 
           content: maxContentLength > 0 ? item.content.substring(0, maxContentLength) : item.content,
         }));
 
-        const request: DeepSeekRequest = {
-          model: 'deepseek-chat',
+        const response = await this.provider.chatCompletion({
           messages: [
             {
               role: 'user',
@@ -594,20 +521,9 @@ ${JSON.stringify(batchInput, null, 2)}
             }
           ],
           temperature: 0.5,
-        };
+        });
 
-        const response = await post<DeepSeekResponse>(
-          `${DEEPSEEK_API.BASE_URL}/chat/completions`,
-          request,
-          {
-            headers: {
-              'Authorization': `Bearer ${this.apiKey}`,
-            },
-            timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
-          }
-        );
-
-        const content = response.data.choices[0]?.message?.content?.trim();
+        const content = response.content;
         
         if (!content) {
           console.warn(`Batch summarization ${batchIdx + 1} returned empty, falling back`);
@@ -667,7 +583,7 @@ ${JSON.stringify(batchInput, null, 2)}
     commentArrays: HNComment[][],
     batchSize: number = 10
   ): Promise<(string | null)[]> {
-    if (!this.apiKey) {
+    if (!this.provider) {
       throw new Error('Translation service not initialized');
     }
 
@@ -707,8 +623,7 @@ ${JSON.stringify(batchInput, null, 2)}
           };
         });
 
-        const request: DeepSeekRequest = {
-          model: 'deepseek-chat',
+        const response = await this.provider.chatCompletion({
           messages: [
             {
               role: 'user',
@@ -727,20 +642,9 @@ ${JSON.stringify(batchInput, null, 2)}
             }
           ],
           temperature: 0.5,
-        };
+        });
 
-        const response = await post<DeepSeekResponse>(
-          `${DEEPSEEK_API.BASE_URL}/chat/completions`,
-          request,
-          {
-            headers: {
-              'Authorization': `Bearer ${this.apiKey}`,
-            },
-            timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
-          }
-        );
-
-        const content = response.data.choices[0]?.message?.content?.trim();
+        const content = response.content;
         
         if (!content) {
           console.warn(`Batch comment summarization ${batchIdx + 1} returned empty`);
@@ -791,3 +695,6 @@ ${JSON.stringify(batchInput, null, 2)}
 
 // Export singleton instance
 export const translator = new TranslationService();
+
+// Re-export types for convenience
+export { CreateProviderOptions } from './llmProvider';

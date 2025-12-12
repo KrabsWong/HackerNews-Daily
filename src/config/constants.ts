@@ -18,16 +18,78 @@ export const HN_API = {
 } as const;
 
 /**
+ * LLM Provider type
+ */
+export type LLMProviderType = 'deepseek' | 'openrouter';
+
+/**
  * DeepSeek AI API configuration
  */
 export const DEEPSEEK_API = {
   /** Base URL for DeepSeek API */
   BASE_URL: 'https://api.deepseek.com/v1',
+  /** Default model for DeepSeek */
+  DEFAULT_MODEL: 'deepseek-chat',
   /** Request timeout in milliseconds (30 seconds for translation/summarization) */
   REQUEST_TIMEOUT: 30000,
   /** Delay before retry on rate limit (1 second) */
   RETRY_DELAY: 1000,
 } as const;
+
+/**
+ * OpenRouter API configuration
+ * OpenRouter provides access to hundreds of AI models through a single API
+ */
+export const OPENROUTER_API = {
+  /** Base URL for OpenRouter API */
+  BASE_URL: 'https://openrouter.ai/api/v1',
+  /** Default model for OpenRouter (DeepSeek V3 via OpenRouter) */
+  DEFAULT_MODEL: 'deepseek/deepseek-chat-v3-0324',
+  /** Request timeout in milliseconds (30 seconds for translation/summarization) */
+  REQUEST_TIMEOUT: 30000,
+  /** Delay before retry on rate limit (1 second) */
+  RETRY_DELAY: 1000,
+  /** 
+   * Get the configured model from environment or use default
+   * Format: provider/model-name (e.g., 'deepseek/deepseek-chat-v3-0324')
+   */
+  get MODEL(): string {
+    return process.env.OPENROUTER_MODEL || this.DEFAULT_MODEL;
+  },
+  /**
+   * Optional site URL for OpenRouter leaderboard attribution
+   */
+  get SITE_URL(): string | undefined {
+    return process.env.OPENROUTER_SITE_URL || undefined;
+  },
+  /**
+   * Optional site name for OpenRouter leaderboard attribution
+   */
+  get SITE_NAME(): string | undefined {
+    return process.env.OPENROUTER_SITE_NAME || undefined;
+  },
+};
+
+/**
+ * LLM Provider configuration
+ * Determines which LLM provider to use for translation and summarization
+ */
+export const LLM_CONFIG = {
+  /**
+   * Get the configured LLM provider
+   * Defaults to 'deepseek' for backward compatibility
+   */
+  get PROVIDER(): LLMProviderType {
+    const provider = process.env.LLM_PROVIDER?.toLowerCase();
+    if (provider === 'openrouter') {
+      return 'openrouter';
+    }
+    if (provider && provider !== 'deepseek') {
+      console.warn(`Invalid LLM_PROVIDER "${provider}", falling back to "deepseek"`);
+    }
+    return 'deepseek';
+  },
+};
 
 /**
  * Algolia HackerNews Search API configuration

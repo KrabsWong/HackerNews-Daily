@@ -16,9 +16,16 @@ import { logInfo, logError } from './logger';
  */
 export interface Env {
   // Secrets (set via wrangler secret put)
-  DEEPSEEK_API_KEY: string;
+  DEEPSEEK_API_KEY?: string;
+  OPENROUTER_API_KEY?: string;
   GITHUB_TOKEN: string;
   CRAWLER_API_URL?: string;
+  
+  // LLM Provider configuration
+  LLM_PROVIDER?: string;  // 'deepseek' | 'openrouter'
+  OPENROUTER_MODEL?: string;
+  OPENROUTER_SITE_URL?: string;
+  OPENROUTER_SITE_NAME?: string;
   
   // Configuration variables (set in wrangler.toml)
   HN_STORY_LIMIT: string;
@@ -40,22 +47,43 @@ async function handleDailyExport(env: Env): Promise<string> {
   try {
     logInfo('=== Daily Export Started ===');
 
-    // Validate required secrets
-    if (!env.DEEPSEEK_API_KEY) {
-      throw new Error('Missing DEEPSEEK_API_KEY secret');
+    // Validate required secrets based on provider
+    const provider = (env.LLM_PROVIDER?.toLowerCase() || 'deepseek') as 'deepseek' | 'openrouter';
+    
+    if (provider === 'openrouter') {
+      if (!env.OPENROUTER_API_KEY) {
+        throw new Error('Missing OPENROUTER_API_KEY secret (required when LLM_PROVIDER=openrouter)');
+      }
+    } else {
+      if (!env.DEEPSEEK_API_KEY) {
+        throw new Error('Missing DEEPSEEK_API_KEY secret');
+      }
     }
+    
     if (!env.GITHUB_TOKEN) {
       throw new Error('Missing GITHUB_TOKEN secret');
     }
 
-    // Set crawler API URL in process.env if provided
+    // Set environment variables for process.env access
+    (process as any).env = (process as any).env || {};
     if (env.CRAWLER_API_URL) {
-      (process as any).env = (process as any).env || {};
       (process as any).env.CRAWLER_API_URL = env.CRAWLER_API_URL;
+    }
+    if (env.LLM_PROVIDER) {
+      (process as any).env.LLM_PROVIDER = env.LLM_PROVIDER;
+    }
+    if (env.OPENROUTER_MODEL) {
+      (process as any).env.OPENROUTER_MODEL = env.OPENROUTER_MODEL;
+    }
+    if (env.OPENROUTER_SITE_URL) {
+      (process as any).env.OPENROUTER_SITE_URL = env.OPENROUTER_SITE_URL;
+    }
+    if (env.OPENROUTER_SITE_NAME) {
+      (process as any).env.OPENROUTER_SITE_NAME = env.OPENROUTER_SITE_NAME;
     }
 
     // Run the export pipeline
-    logInfo('Running export pipeline');
+    logInfo('Running export pipeline', { provider });
     const { markdown, dateStr } = await runDailyExport(env);
 
     // Push to GitHub
