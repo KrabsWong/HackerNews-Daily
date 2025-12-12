@@ -161,9 +161,11 @@ export const CONTENT_CONFIG = {
 export const LLM_BATCH_CONFIG = {
   /** 
    * Default batch size for LLM operations
+   * Set to 1 for single-request mode (one API call per item, best quality)
    * Set to 0 to process all items in a single batch (no splitting)
+   * Set to N>1 for batch mode (N items per API call)
    */
-  DEFAULT_BATCH_SIZE: 0,
+  DEFAULT_BATCH_SIZE: 1,
   /** Minimum batch size (only applies when batch size > 0) */
   MIN_BATCH_SIZE: 5,
   /** 

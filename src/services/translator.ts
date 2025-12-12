@@ -456,8 +456,9 @@ Rules:
 2. Output ONLY the JSON array, no explanations or markdown code blocks
 3. Maintain exact order
 4. Each translation should be accurate and natural Chinese
+5. Do NOT add any numbering or prefix like "Translation 1:", just the translated text
 
-Output format: ["翻译1", "翻译2", ...]`
+Output format example: ["First translated title here", "Second translated title here"]`
             }
           ],
           temperature: 0.3,
@@ -587,7 +588,8 @@ ${JSON.stringify(batchInput, null, 2)}
 - 每个摘要长度约为 ${maxLength} 个字符
 - 抓住文章的核心要点和关键见解
 - 使用清晰、简洁的中文表达
-- 输出格式：["摘要1", "摘要2", ...]
+- 直接输出摘要内容，不要添加"文章1:"、"摘要1:"等任何序号或标记前缀
+- 输出格式示例：["这是第一篇文章的摘要内容...", "这是第二篇文章的摘要内容..."]
 - 只输出 JSON 数组，不要其他说明`
             }
           ],
@@ -719,7 +721,8 @@ ${JSON.stringify(batchInput, null, 2)}
 - 总结长度约为 100 个字符
 - 保留重要的技术术语、库名称、工具名称
 - 捕捉评论中的主要观点和共识
-- 输出格式：["摘要1", "摘要2", ...]
+- 直接输出摘要内容，不要添加"摘要1:"等任何序号或标记前缀
+- 输出格式示例：["评论讨论了某技术的优缺点...", "用户普遍认为..."]
 - 只输出 JSON 数组`
             }
           ],

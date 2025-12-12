@@ -1,8 +1,10 @@
-# batch-translation-service Specification
+# batch-translation-service Specification Delta
 
-## Purpose
-TBD - created by archiving change optimize-worker-subrequests. Update Purpose after archive.
-## Requirements
+## Overview
+修改批量翻译服务的默认配置和 prompt 格式，解决输出带有序号标记的问题，并将默认批量大小改为 1（单独请求模式）。
+
+## MODIFIED Requirements
+
 ### Requirement: 集中化批量配置
 系统 SHALL 通过 `LLM_BATCH_CONFIG` 提供可配置的批量处理参数，**默认使用单请求模式**。
 
@@ -84,4 +86,3 @@ TBD - created by archiving change optimize-worker-subrequests. Update Purpose af
 **Given** `batchSize >= array.length`  
 **When** `chunk()` 方法被调用  
 **Then** 系统 SHALL 返回包含整个数组的单个批次
-
