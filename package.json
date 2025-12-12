@@ -5,7 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "fetch": "ts-node --project tsconfig.node.json src/index.ts",
-    "build": "tsc",
+    "clean": "rm -rf dist",
+    "build": "rm -rf dist && tsc",
     "build:worker": "node esbuild.worker.config.js",
     "build:worker:watch": "node esbuild.worker.config.js --watch",
     "clean:worker": "rm -rf dist/worker",

@@ -40,7 +40,7 @@ The project SHALL include a `wrangler.toml` configuration file defining the Work
 **And** environment selection SHALL be controlled via `wrangler deploy --env staging` command
 
 ### Requirement: Build Script Integration
-The project SHALL include npm scripts for building the Worker bundle using esbuild.
+The project SHALL include npm scripts for building the Worker bundle using esbuild, with clean build support to prevent stale artifacts.
 
 #### Scenario: Build Worker Bundle
 **Given** the project has a `package.json` with scripts section  
@@ -67,7 +67,20 @@ The project SHALL include npm scripts for building the Worker bundle using esbui
 **When** the developer runs `npm run clean:worker`  
 **Then** the system SHALL delete the `dist/worker/` directory  
 **And** the system SHALL log "Worker build artifacts cleaned" message  
-**And** the subsequent build SHALL create output directory if missing
+**And** the subsequent build SHALL create output directory if missing  
+
+#### Scenario: Clean TypeScript Build
+**Given** the developer runs `npm run build`  
+**When** the TypeScript compilation starts  
+**Then** the system SHALL first remove the `dist/` directory to eliminate stale artifacts  
+**And** the system SHALL then run `tsc` to compile all TypeScript files  
+**And** the system SHALL prevent case-sensitivity warnings during deployment (e.g., `hackerNews.js` vs `hackernews/`)  
+
+#### Scenario: Clean All Build Artifacts
+**Given** the developer wants to remove all compiled output  
+**When** the developer runs `npm run clean`  
+**Then** the system SHALL delete the entire `dist/` directory  
+**And** the system SHALL exit silently if the directory does not exist
 
 ### Requirement: Wrangler CLI Workflow
 The project SHALL provide npm scripts wrapping Wrangler CLI commands for common deployment tasks.
