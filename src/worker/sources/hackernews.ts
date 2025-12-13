@@ -14,7 +14,7 @@ import { LLM_BATCH_CONFIG } from '../../config/constants';
 import { ProcessedStory } from '../../types/shared';
 import { getPreviousDayBoundaries, formatTimestamp, formatDateForDisplay } from '../../utils/date';
 import type { Env } from '../index';
-import { ContentSource, SourceContent, SourceConfig } from './index';
+import type { ContentSource, SourceContent, SourceConfig } from '../../types/source';
 
 /**
  * Parse LLM batch size from environment variable

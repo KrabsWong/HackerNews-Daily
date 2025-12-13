@@ -5,12 +5,7 @@
 
 import { GitHubClient } from './client';
 import { logInfo, logWarn, logError } from '../../logger';
-
-interface PushConfig {
-  GITHUB_TOKEN: string;
-  TARGET_REPO: string;
-  TARGET_BRANCH: string;
-}
+import type { PushConfig } from '../../../types/publisher';
 
 /**
  * Push Markdown file to GitHub repository with automatic versioning

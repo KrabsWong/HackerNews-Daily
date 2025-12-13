@@ -1,5 +1,9 @@
 // Note: fs and path imports moved to function scope to prevent bundling issues in Workers
 import { CACHE_CONFIG, ENV_DEFAULTS, CONTENT_FILTER } from '../config/constants';
+import type { CacheConfig, CachedStory, CacheData, CacheResult } from '../types/cache';
+
+// Re-export types for backward compatibility
+export type { CacheConfig, CachedStory, CacheData, CacheResult } from '../types/cache';
 
 // Helper to dynamically import Node.js modules (only used in Node.js environment)
 async function getNodeModules() {
@@ -15,57 +19,6 @@ function getNodeModulesSync() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const path = require('path');
   return { fs, path };
-}
-
-/**
- * Configuration used to generate cache
- * Used to invalidate cache when config changes
- */
-interface CacheConfig {
-  storyLimit: number;
-  timeWindowHours: number;
-  summaryMaxLength: number;
-  contentFilterEnabled: boolean;
-  contentFilterSensitivity: string;
-}
-
-/**
- * Structure of processed story data (matches ProcessedStory in index.ts)
- */
-export interface CachedStory {
-  rank: number;
-  titleChinese: string;
-  titleEnglish: string;
-  score: number;
-  url: string;
-  time: string;
-  timestamp: number; // Unix timestamp for filtering and sorting
-  description: string;
-  commentSummary: string | null;
-}
-
-/**
- * Cache file structure
- */
-export interface CacheData {
-  /** Unix timestamp when cache was created */
-  timestamp: number;
-  /** Configuration used to generate this cache */
-  config: CacheConfig;
-  /** The cached processed stories */
-  stories: CachedStory[];
-}
-
-/**
- * Result of cache check
- */
-export interface CacheResult {
-  /** Whether cache was hit */
-  hit: boolean;
-  /** Cached stories if hit, null otherwise */
-  stories: CachedStory[] | null;
-  /** Reason for cache miss (if any) */
-  reason?: string;
 }
 
 /**

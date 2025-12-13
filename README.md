@@ -72,11 +72,17 @@ cp wrangler.toml.example wrangler.toml
 # 2. Edit wrangler.toml - set LLM_PROVIDER and TARGET_REPO to YOUR values
 nano wrangler.toml
 
-# 3. Set secrets
-wrangler secret put DEEPSEEK_API_KEY  # or OPENROUTER_API_KEY
+# 3. Set secrets based on your LLM_PROVIDER choice:
+#    Option A: If using DeepSeek (LLM_PROVIDER=deepseek)
+wrangler secret put LLM_DEEPSEEK_API_KEY
+
+#    Option B: If using OpenRouter (LLM_PROVIDER=openrouter)
+wrangler secret put LLM_OPENROUTER_API_KEY
+
+# 4. Set required GitHub token (always required)
 wrangler secret put GITHUB_TOKEN
 
-# 4. Deploy
+# 5. Deploy
 npm run deploy:worker
 ```
 
@@ -150,10 +156,11 @@ Configure the tool by editing `.env`:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DEEPSEEK_API_KEY` | Your DeepSeek API key (required if using DeepSeek) | - |
 | `LLM_PROVIDER` | LLM provider: "deepseek" or "openrouter" (optional for CLI, defaults to "deepseek") | deepseek |
-| `OPENROUTER_API_KEY` | Your OpenRouter API key (required if LLM_PROVIDER=openrouter) | - |
-| `OPENROUTER_MODEL` | OpenRouter model to use (optional) | deepseek/deepseek-chat-v3-0324 |
+| `LLM_DEEPSEEK_API_KEY` | Your DeepSeek API key (required if using DeepSeek) | - |
+| `LLM_DEEPSEEK_MODEL` | DeepSeek model to use (optional) | deepseek-chat |
+| `LLM_OPENROUTER_API_KEY` | Your OpenRouter API key (required if LLM_PROVIDER=openrouter) | - |
+| `LLM_OPENROUTER_MODEL` | OpenRouter model to use (optional) | deepseek/deepseek-chat-v3-0324 |
 | `HN_STORY_LIMIT` | Maximum number of stories to fetch (capped at 30) | 30 |
 | `HN_TIME_WINDOW_HOURS` | Only show stories from past N hours | 24 |
 | `SUMMARY_MAX_LENGTH` | Target length for AI-generated summaries (100-500 chars) | 300 |
@@ -170,8 +177,8 @@ Configure the tool by editing `.env`:
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `LLM_PROVIDER` | **REQUIRED**: "deepseek" or "openrouter" | ✅ Yes |
-| `DEEPSEEK_API_KEY` | **REQUIRED** if LLM_PROVIDER=deepseek | Conditional |
-| `OPENROUTER_API_KEY` | **REQUIRED** if LLM_PROVIDER=openrouter | Conditional |
+| `LLM_DEEPSEEK_API_KEY` | **REQUIRED** if LLM_PROVIDER=deepseek | Conditional |
+| `LLM_OPENROUTER_API_KEY` | **REQUIRED** if LLM_PROVIDER=openrouter | Conditional |
 | `GITHUB_TOKEN` | **REQUIRED**: GitHub personal access token with repo scope | ✅ Yes |
 | `TARGET_REPO` | **REQUIRED**: Target repository in format "owner/repo" | ✅ Yes |
 

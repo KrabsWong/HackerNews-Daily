@@ -45,14 +45,16 @@ export interface ChatCompletionResponse {
 /**
  * Environment-like object containing provider configuration
  * Used for both Worker and CLI environments
+ * All LLM-related environment variables use the LLM_ prefix
  */
 export interface ProviderEnv {
   LLM_PROVIDER?: string;
-  DEEPSEEK_API_KEY?: string;
-  OPENROUTER_API_KEY?: string;
-  OPENROUTER_MODEL?: string;
-  OPENROUTER_SITE_URL?: string;
-  OPENROUTER_SITE_NAME?: string;
+  LLM_DEEPSEEK_API_KEY?: string;
+  LLM_DEEPSEEK_MODEL?: string;
+  LLM_OPENROUTER_API_KEY?: string;
+  LLM_OPENROUTER_MODEL?: string;
+  LLM_OPENROUTER_SITE_URL?: string;
+  LLM_OPENROUTER_SITE_NAME?: string;
 }
 
 /**

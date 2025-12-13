@@ -3,12 +3,10 @@
  * Compatible with both Node.js and Cloudflare Workers environments
  */
 
-export interface FetchOptions {
-  timeout?: number;
-  headers?: Record<string, string>;
-  retries?: number; // Number of retry attempts for transient errors (default: 0)
-  retryDelay?: number; // Delay between retries in ms (default: 1000)
-}
+import type { FetchOptions } from '../types/utils';
+
+// Re-export type for backward compatibility
+export type { FetchOptions } from '../types/utils';
 
 export class FetchError extends Error {
   constructor(

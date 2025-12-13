@@ -4,19 +4,7 @@
  */
 
 import { logInfo, logWarn, logError } from '../../logger';
-
-interface GitHubFileResponse {
-  sha: string;
-  content: string;
-  name: string;
-}
-
-interface GitHubCreateFileRequest {
-  message: string;
-  content: string; // Base64 encoded
-  branch: string;
-  sha?: string; // Required for updates
-}
+import type { GitHubFileResponse, GitHubCreateFileRequest } from '../../../types/publisher';
 
 export class GitHubClient {
   private token: string;

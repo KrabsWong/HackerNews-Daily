@@ -76,7 +76,7 @@ export function createLLMProvider(options: CreateProviderOptions): LLMProvider {
  * @example
  * const provider = createLLMProviderFromEnv({
  *   LLM_PROVIDER: 'deepseek',
- *   DEEPSEEK_API_KEY: 'sk-xxx'
+ *   LLM_DEEPSEEK_API_KEY: 'sk-xxx'
  * });
  */
 export function createLLMProviderFromEnv(env: ProviderEnv): LLMProvider {

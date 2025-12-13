@@ -2,15 +2,31 @@
 # Copy this file to .dev.vars and fill in your actual values
 # .dev.vars is git-ignored and will be loaded by `wrangler dev`
 
-# DeepSeek API Key (required)
+# =============================================================================
+# LLM API Keys (choose based on your LLM_PROVIDER setting in wrangler.toml)
+# =============================================================================
+
+# Option A: DeepSeek (if LLM_PROVIDER=deepseek)
 # Get your API key from https://platform.deepseek.com/
-DEEPSEEK_API_KEY=your_deepseek_key_here
+LLM_DEEPSEEK_API_KEY=your_deepseek_key_here
+
+# Option B: OpenRouter (if LLM_PROVIDER=openrouter)
+# Get your API key from https://openrouter.ai/keys
+# LLM_OPENROUTER_API_KEY=your_openrouter_key_here
+
+# =============================================================================
+# Required Secrets
+# =============================================================================
 
 # GitHub Personal Access Token (required)
-# Create a token with 'repo' scope for tldr-hacknews-24 repository
+# Create a token with 'repo' scope for your target repository
 # https://github.com/settings/tokens/new
 GITHUB_TOKEN=your_github_token_here
 
+# =============================================================================
+# Optional Configuration
+# =============================================================================
+
 # Crawler API URL (optional)
 # Fallback content extraction service
-CRAWLER_API_URL=https://your-crawler-api.com
+# CRAWLER_API_URL=https://your-crawler-api.com

@@ -3,17 +3,8 @@
  * Publishes Markdown content to GitHub repository
  */
 
-import { Publisher, PublishContent, PublisherConfig } from '../index';
+import type { Publisher, PublishContent, PublisherConfig, GitHubPublisherConfig } from '../../../types/publisher';
 import { pushToGitHub } from './versioning';
-
-/**
- * GitHub publisher configuration
- */
-export interface GitHubPublisherConfig extends PublisherConfig {
-  GITHUB_TOKEN: string;
-  TARGET_REPO: string;
-  TARGET_BRANCH: string;
-}
 
 /**
  * GitHub Publisher implementation

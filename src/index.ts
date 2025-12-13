@@ -312,11 +312,17 @@ function handleError(error: unknown): void {
     console.error(error.message);
     
     // Provide helpful hints for common errors
-    if (error.message.includes('DEEPSEEK_API_KEY')) {
+    if (error.message.includes('LLM_DEEPSEEK_API_KEY')) {
       console.error('\n💡 Setup instructions:');
       console.error('1. Copy .env.example to .env: cp .env.example .env');
       console.error('2. Get your API key from https://platform.deepseek.com/');
-      console.error('3. Add your key to .env: DEEPSEEK_API_KEY=your_key_here\n');
+      console.error('3. Add your key to .env: LLM_DEEPSEEK_API_KEY=your_key_here\n');
+    } else if (error.message.includes('LLM_OPENROUTER_API_KEY')) {
+      console.error('\n💡 Setup instructions:');
+      console.error('1. Copy .env.example to .env: cp .env.example .env');
+      console.error('2. Get your API key from https://openrouter.ai/keys');
+      console.error('3. Add your key to .env: LLM_OPENROUTER_API_KEY=your_key_here');
+      console.error('4. Set LLM_PROVIDER=openrouter in .env\n');
     } else if (error.message.includes('Failed to fetch') && error.message.includes('Algolia')) {
       console.error('\n💡 Troubleshooting:');
       console.error('- Check your internet connection');

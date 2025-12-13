@@ -3,17 +3,10 @@
  * Logs are output as JSON for easy parsing in Cloudflare dashboard
  */
 
-export interface LogContext {
-  [key: string]: any;
-}
+import type { LogContext, ExportMetrics } from '../types/logger';
 
-export interface ExportMetrics {
-  storiesFetched: number;
-  storiesProcessed: number;
-  storiesFailed: number;
-  duration: number;
-  apiCalls: Record<string, number>;
-}
+// Re-export types for backward compatibility
+export type { LogContext, ExportMetrics } from '../types/logger';
 
 export function logInfo(message: string, context?: LogContext): void {
   console.log(JSON.stringify({

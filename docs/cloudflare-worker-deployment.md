@@ -18,7 +18,9 @@ The Cloudflare Worker provides a serverless replacement for GitHub Actions with 
 2. **Node.js 20+**: Required for local development
 3. **Wrangler CLI**: Cloudflare's deployment tool (installed via npm)
 4. **API Keys**:
-   - DeepSeek API key (get from [platform.deepseek.com](https://platform.deepseek.com/))
+   - **LLM Provider API Key** (one of the following):
+     - DeepSeek API key (get from [platform.deepseek.com](https://platform.deepseek.com/))
+     - OpenRouter API key (get from [openrouter.ai/keys](https://openrouter.ai/keys))
    - GitHub Personal Access Token with `repo` scope ([create here](https://github.com/settings/tokens/new))
    - (Optional) Crawler API URL for content extraction
 
@@ -45,11 +47,16 @@ This opens a browser window to authenticate with your Cloudflare account.
 Set the required secrets (encrypted and never visible in dashboard):
 
 ```bash
-# DeepSeek API Key
-npx wrangler secret put DEEPSEEK_API_KEY
+# LLM API Key (choose based on your LLM_PROVIDER setting in wrangler.toml)
+# Option A: If using DeepSeek (LLM_PROVIDER=deepseek)
+npx wrangler secret put LLM_DEEPSEEK_API_KEY
 # Enter your DeepSeek API key when prompted
 
-# GitHub Personal Access Token
+# Option B: If using OpenRouter (LLM_PROVIDER=openrouter)
+npx wrangler secret put LLM_OPENROUTER_API_KEY
+# Enter your OpenRouter API key when prompted
+
+# GitHub Personal Access Token (always required)
 npx wrangler secret put GITHUB_TOKEN  
 # Enter your GitHub token when prompted
 
@@ -73,6 +80,7 @@ compatibility_date = "2024-12-11"
 HN_STORY_LIMIT = "30"
 SUMMARY_MAX_LENGTH = "300"
 ENABLE_CONTENT_FILTER = "false"
+LLM_PROVIDER = "deepseek"  # or "openrouter"
 TARGET_REPO = "KrabsWong/tldr-hacknews-24"  # Change to your repo
 TARGET_BRANCH = "main"
 
@@ -80,7 +88,9 @@ TARGET_BRANCH = "main"
 crons = ["0 1 * * *"]  # Daily at 01:00 UTC
 ```
 
-**Important**: Update `TARGET_REPO` to match your GitHub repository path.
+**Important**: 
+- Update `TARGET_REPO` to match your GitHub repository path.
+- Set `LLM_PROVIDER` to either "deepseek" or "openrouter" based on which API key you configured.
 
 ## Local Development
 
@@ -95,7 +105,11 @@ cp .dev.vars.example .dev.vars
 Edit `.dev.vars` with your actual API keys (this file is git-ignored):
 
 ```
-DEEPSEEK_API_KEY=your_deepseek_key_here
+# Choose one LLM provider:
+LLM_DEEPSEEK_API_KEY=your_deepseek_key_here
+# OR
+# LLM_OPENROUTER_API_KEY=your_openrouter_key_here
+
 GITHUB_TOKEN=your_github_token_here
 CRAWLER_API_URL=https://your-crawler-api.com
 ```
@@ -194,6 +208,7 @@ Configuration is set in `wrangler.toml` under `[vars]`:
 | `CONTENT_FILTER_SENSITIVITY` | `medium` | Filter sensitivity (low/medium/high) |
 | `TARGET_REPO` | `KrabsWong/tldr-hacknews-24` | GitHub repository path |
 | `TARGET_BRANCH` | `main` | Git branch to push to |
+| `LLM_PROVIDER` | `deepseek` | LLM provider: "deepseek" or "openrouter" |
 
 To change configuration:
 1. Edit `wrangler.toml`
@@ -210,7 +225,7 @@ npx wrangler secret list
 
 **Update a secret**:
 ```bash
-npx wrangler secret put DEEPSEEK_API_KEY
+npx wrangler secret put LLM_DEEPSEEK_API_KEY
 ```
 
 **Delete a secret**:

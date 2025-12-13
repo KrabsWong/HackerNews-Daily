@@ -3,17 +3,10 @@
  * Provides consistent date handling across all execution environments
  */
 
-/**
- * Date boundaries for a day in UTC
- */
-export interface DayBoundaries {
-  /** Start of day timestamp in Unix seconds */
-  start: number;
-  /** End of day timestamp in Unix seconds */
-  end: number;
-  /** Date object for the day (in UTC) */
-  date: Date;
-}
+import type { DayBoundaries } from '../types/utils';
+
+// Re-export type for backward compatibility
+export type { DayBoundaries } from '../types/utils';
 
 /**
  * Get the date boundaries for the previous calendar day (yesterday) in UTC

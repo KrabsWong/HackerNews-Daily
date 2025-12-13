@@ -1,8 +1,7 @@
 /**
- * Publisher Abstraction
+ * Publisher-related type definitions
  * 
- * Defines the interface for all publishing channels (GitHub, Telegram, RSS, etc.)
- * Each publisher is responsible for delivering content to a specific destination
+ * Types for content publishing to various destinations (GitHub, Telegram, RSS, etc.)
  */
 
 /**
@@ -40,4 +39,41 @@ export interface Publisher {
    * @returns Promise that resolves when publishing is complete
    */
   publish(content: PublishContent, config: PublisherConfig): Promise<void>;
+}
+
+/**
+ * GitHub publisher configuration
+ */
+export interface GitHubPublisherConfig extends PublisherConfig {
+  GITHUB_TOKEN: string;
+  TARGET_REPO: string;
+  TARGET_BRANCH: string;
+}
+
+/**
+ * GitHub API file response structure
+ */
+export interface GitHubFileResponse {
+  sha: string;
+  content: string;
+  name: string;
+}
+
+/**
+ * GitHub API create/update file request structure
+ */
+export interface GitHubCreateFileRequest {
+  message: string;
+  content: string; // Base64 encoded
+  branch: string;
+  sha?: string; // Required for updates
+}
+
+/**
+ * Configuration for pushing files to GitHub
+ */
+export interface PushConfig {
+  GITHUB_TOKEN: string;
+  TARGET_REPO: string;
+  TARGET_BRANCH: string;
 }

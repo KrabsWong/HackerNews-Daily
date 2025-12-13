@@ -3,6 +3,15 @@
  * 
  * Centralized utilities for handling LLM provider selection and API key retrieval.
  * Eliminates duplicate switch statements across the codebase.
+ * 
+ * All LLM-related environment variables use the LLM_ prefix:
+ * - LLM_PROVIDER: Provider type (deepseek | openrouter)
+ * - LLM_DEEPSEEK_API_KEY: DeepSeek API key
+ * - LLM_DEEPSEEK_MODEL: DeepSeek model override
+ * - LLM_OPENROUTER_API_KEY: OpenRouter API key
+ * - LLM_OPENROUTER_MODEL: OpenRouter model override
+ * - LLM_OPENROUTER_SITE_URL: OpenRouter site URL for attribution
+ * - LLM_OPENROUTER_SITE_NAME: OpenRouter site name for attribution
  */
 
 import { LLMProviderType } from '../../config/constants';
@@ -46,21 +55,39 @@ export function parseProvider(providerString: string | undefined): LLMProviderTy
 export function getApiKeyForProvider(provider: LLMProviderType, env: ProviderEnv): string {
   switch (provider) {
     case LLMProviderType.DEEPSEEK: {
-      const key = env.DEEPSEEK_API_KEY;
+      const key = env.LLM_DEEPSEEK_API_KEY;
       if (!key) {
-        throw new Error('DEEPSEEK_API_KEY is required when LLM_PROVIDER=deepseek');
+        throw new Error('LLM_DEEPSEEK_API_KEY is required when LLM_PROVIDER=deepseek');
       }
       return key;
     }
     case LLMProviderType.OPENROUTER: {
-      const key = env.OPENROUTER_API_KEY;
+      const key = env.LLM_OPENROUTER_API_KEY;
       if (!key) {
-        throw new Error('OPENROUTER_API_KEY is required when LLM_PROVIDER=openrouter');
+        throw new Error('LLM_OPENROUTER_API_KEY is required when LLM_PROVIDER=openrouter');
       }
       return key;
     }
     default:
       throw new Error(`Unsupported provider: ${provider}`);
+  }
+}
+
+/**
+ * Get model for the specified provider
+ * 
+ * @param provider - The LLM provider type
+ * @param env - Environment containing model configuration
+ * @returns The model name or undefined if using default
+ */
+export function getModelForProvider(provider: LLMProviderType, env: ProviderEnv): string | undefined {
+  switch (provider) {
+    case LLMProviderType.DEEPSEEK:
+      return env.LLM_DEEPSEEK_MODEL;
+    case LLMProviderType.OPENROUTER:
+      return env.LLM_OPENROUTER_MODEL;
+    default:
+      return undefined;
   }
 }
 
@@ -74,13 +101,14 @@ export function getApiKeyForProvider(provider: LLMProviderType, env: ProviderEnv
 export function resolveProviderConfig(env: ProviderEnv): ResolvedProviderConfig {
   const provider = parseProvider(env.LLM_PROVIDER);
   const apiKey = getApiKeyForProvider(provider, env);
+  const model = getModelForProvider(provider, env);
   
   return {
     provider,
     apiKey,
-    model: env.OPENROUTER_MODEL,
-    siteUrl: env.OPENROUTER_SITE_URL,
-    siteName: env.OPENROUTER_SITE_NAME,
+    model,
+    siteUrl: env.LLM_OPENROUTER_SITE_URL,
+    siteName: env.LLM_OPENROUTER_SITE_NAME,
   };
 }
 
@@ -103,7 +131,7 @@ export function resolveProviderConfig(env: ProviderEnv): ResolvedProviderConfig 
  * // CLI usage
  * const options = buildProviderOptions({
  *   LLM_PROVIDER: process.env.LLM_PROVIDER,
- *   DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
+ *   LLM_DEEPSEEK_API_KEY: process.env.LLM_DEEPSEEK_API_KEY,
  *   ...
  * });
  */
@@ -138,10 +166,11 @@ export function buildProviderOptions(env: ProviderEnv): CreateProviderOptions {
 export function buildCliProviderOptions(): CreateProviderOptions {
   return buildProviderOptions({
     LLM_PROVIDER: process.env.LLM_PROVIDER || LLMProviderType.DEEPSEEK,
-    DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
-    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
-    OPENROUTER_MODEL: process.env.OPENROUTER_MODEL,
-    OPENROUTER_SITE_URL: process.env.OPENROUTER_SITE_URL,
-    OPENROUTER_SITE_NAME: process.env.OPENROUTER_SITE_NAME,
+    LLM_DEEPSEEK_API_KEY: process.env.LLM_DEEPSEEK_API_KEY,
+    LLM_DEEPSEEK_MODEL: process.env.LLM_DEEPSEEK_MODEL,
+    LLM_OPENROUTER_API_KEY: process.env.LLM_OPENROUTER_API_KEY,
+    LLM_OPENROUTER_MODEL: process.env.LLM_OPENROUTER_MODEL,
+    LLM_OPENROUTER_SITE_URL: process.env.LLM_OPENROUTER_SITE_URL,
+    LLM_OPENROUTER_SITE_NAME: process.env.LLM_OPENROUTER_SITE_NAME,
   });
 }

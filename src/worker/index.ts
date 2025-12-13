@@ -11,37 +11,10 @@ import { GitHubPublisher } from './publishers/github';
 import { validateWorkerConfig } from './config/validation';
 import { logInfo, logError } from './logger';
 import { LLMProviderType } from '../config/constants';
+import type { Env } from '../types/worker';
 
-/**
- * Environment variables and secrets available to the Worker
- * Configured via wrangler.toml and Cloudflare secrets
- */
-export interface Env {
-  // REQUIRED: Secrets (set via wrangler secret put)
-  GITHUB_TOKEN: string;
-  LLM_PROVIDER: string;  // Will be validated as LLMProviderType
-  TARGET_REPO: string;
-  
-  // Provider-specific API keys (one required based on LLM_PROVIDER)
-  DEEPSEEK_API_KEY?: string;
-  OPENROUTER_API_KEY?: string;
-  
-  // Optional configuration
-  CRAWLER_API_URL?: string;
-  OPENROUTER_MODEL?: string;
-  OPENROUTER_SITE_URL?: string;
-  OPENROUTER_SITE_NAME?: string;
-  
-  // Configuration variables (set in wrangler.toml)
-  HN_STORY_LIMIT: string;
-  HN_TIME_WINDOW_HOURS: string;
-  SUMMARY_MAX_LENGTH: string;
-  ENABLE_CONTENT_FILTER: string;
-  CONTENT_FILTER_SENSITIVITY: string;
-  CACHE_ENABLED: string;
-  TARGET_BRANCH: string;
-  LLM_BATCH_SIZE: string;
-}
+// Re-export Env type for backward compatibility
+export type { Env } from '../types/worker';
 
 /**
  * Handle the daily export process
@@ -62,14 +35,17 @@ async function handleDailyExport(env: Env): Promise<string> {
     if (env.LLM_PROVIDER) {
       (process as any).env.LLM_PROVIDER = env.LLM_PROVIDER;
     }
-    if (env.OPENROUTER_MODEL) {
-      (process as any).env.OPENROUTER_MODEL = env.OPENROUTER_MODEL;
+    if (env.LLM_DEEPSEEK_MODEL) {
+      (process as any).env.LLM_DEEPSEEK_MODEL = env.LLM_DEEPSEEK_MODEL;
     }
-    if (env.OPENROUTER_SITE_URL) {
-      (process as any).env.OPENROUTER_SITE_URL = env.OPENROUTER_SITE_URL;
+    if (env.LLM_OPENROUTER_MODEL) {
+      (process as any).env.LLM_OPENROUTER_MODEL = env.LLM_OPENROUTER_MODEL;
     }
-    if (env.OPENROUTER_SITE_NAME) {
-      (process as any).env.OPENROUTER_SITE_NAME = env.OPENROUTER_SITE_NAME;
+    if (env.LLM_OPENROUTER_SITE_URL) {
+      (process as any).env.LLM_OPENROUTER_SITE_URL = env.LLM_OPENROUTER_SITE_URL;
+    }
+    if (env.LLM_OPENROUTER_SITE_NAME) {
+      (process as any).env.LLM_OPENROUTER_SITE_NAME = env.LLM_OPENROUTER_SITE_NAME;
     }
 
     // Initialize source and publisher

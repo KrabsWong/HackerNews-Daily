@@ -37,6 +37,12 @@ export const DEEPSEEK_API = {
   REQUEST_TIMEOUT: 30000,
   /** Delay before retry on rate limit (1 second) */
   RETRY_DELAY: 1000,
+  /**
+   * Get the configured model from environment or use default
+   */
+  get MODEL(): string {
+    return process.env.LLM_DEEPSEEK_MODEL || this.DEFAULT_MODEL;
+  },
 } as const;
 
 /**
@@ -57,19 +63,19 @@ export const OPENROUTER_API = {
    * Format: provider/model-name (e.g., 'deepseek/deepseek-chat-v3-0324')
    */
   get MODEL(): string {
-    return process.env.OPENROUTER_MODEL || this.DEFAULT_MODEL;
+    return process.env.LLM_OPENROUTER_MODEL || this.DEFAULT_MODEL;
   },
   /**
    * Optional site URL for OpenRouter leaderboard attribution
    */
   get SITE_URL(): string | undefined {
-    return process.env.OPENROUTER_SITE_URL || undefined;
+    return process.env.LLM_OPENROUTER_SITE_URL || undefined;
   },
   /**
    * Optional site name for OpenRouter leaderboard attribution
    */
   get SITE_NAME(): string | undefined {
-    return process.env.OPENROUTER_SITE_NAME || undefined;
+    return process.env.LLM_OPENROUTER_SITE_NAME || undefined;
   },
 };
 

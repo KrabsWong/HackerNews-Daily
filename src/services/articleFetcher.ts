@@ -1,11 +1,9 @@
 import { CONTENT_CONFIG, CRAWLER_API } from '../config/constants';
 import { post, FetchError } from '../utils/fetch';
+import type { ArticleMetadata } from '../types/content';
 
-export interface ArticleMetadata {
-  url: string;
-  description: string | null;
-  fullContent: string | null;
-}
+// Re-export type for backward compatibility
+export type { ArticleMetadata } from '../types/content';
 
 /**
  * Truncate content to prevent API token limit issues

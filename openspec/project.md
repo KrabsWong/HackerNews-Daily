@@ -27,6 +27,25 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
 - **Error Handling**: 使用 try-catch 并返回 null 或空数组，避免抛出异常中断流程
 - **Graceful Degradation**: 单个请求失败不应阻断整体流程（如内容提取失败回退到 meta description）
 
+### Type Organization (IMPORTANT)
+- **Location**: 所有可导出的 `type` 和 `interface` 定义**必须**放在 `src/types/` 目录下
+- **Prohibition**: 禁止在业务代码文件（services/, worker/, utils/）中定义可导出的 interface
+- **Exception**: 仅供文件内部使用的非导出类型可以在业务文件中定义
+- **Structure**: 按功能领域组织类型文件：
+  - `types/api.ts` - HackerNews API 相关类型
+  - `types/cache.ts` - 缓存相关类型
+  - `types/content.ts` - 内容过滤/文章相关类型
+  - `types/llm.ts` - LLM provider 类型
+  - `types/logger.ts` - 日志相关类型
+  - `types/publisher.ts` - 发布器相关类型
+  - `types/shared.ts` - 共享类型
+  - `types/source.ts` - 内容源相关类型
+  - `types/task.ts` - 任务相关类型
+  - `types/utils.ts` - 工具类型
+  - `types/worker.ts` - Worker 环境类型
+  - `types/index.ts` - 统一导出入口
+- **Import**: 业务代码应从 `types/` 目录导入类型，可保留 re-export 以兼容旧代码
+
 ### Architecture Patterns
 - **Directory Structure**:
   ```
@@ -50,10 +69,19 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
   │   ├── contentFilter.ts   # 内容过滤
   │   ├── llmProvider.ts     # LLM 提供商抽象
   │   └── markdownExporter.ts
-  ├── types/                 # 类型定义
+  ├── types/                 # 类型定义 (所有可导出类型必须在此目录)
+  │   ├── index.ts           # 统一导出入口
   │   ├── api.ts             # API 相关类型
+  │   ├── cache.ts           # 缓存相关类型
+  │   ├── content.ts         # 内容过滤/文章相关类型
+  │   ├── llm.ts             # LLM provider 类型
+  │   ├── logger.ts          # 日志相关类型
+  │   ├── publisher.ts       # 发布器相关类型
   │   ├── shared.ts          # 共享类型
-  │   └── task.ts            # 任务类型
+  │   ├── source.ts          # 内容源相关类型
+  │   ├── task.ts            # 任务类型
+  │   ├── utils.ts           # 工具类型
+  │   └── worker.ts          # Worker 环境类型
   ├── utils/                 # 工具函数
   │   ├── array.ts           # 数组工具
   │   ├── date.ts            # 日期工具
@@ -63,13 +91,10 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
   ├── worker/                # Cloudflare Worker (v4.0+ 新架构)
   │   ├── index.ts           # Worker 入口
   │   ├── config/            # 配置验证
-  │   │   ├── validation.ts  # 配置验证逻辑
-  │   │   └── types.ts       # Worker 类型定义
-  │   ├── sources/           # 内容源抽象
-  │   │   ├── index.ts       # ContentSource 接口
+  │   │   └── validation.ts  # 配置验证逻辑
+  │   ├── sources/           # 内容源实现
   │   │   └── hackernews.ts  # HackerNews 源实现
   │   ├── publishers/        # 发布渠道抽象
-  │   │   ├── index.ts       # Publisher 接口
   │   │   └── github/        # GitHub 发布器
   │   │       ├── index.ts   # GitHubPublisher 实现
   │   │       ├── client.ts  # GitHub API 客户端
@@ -216,9 +241,13 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
 主要环境变量（详见 `.env.example`）:
 
 ### CLI 配置
-- `DEEPSEEK_API_KEY`: DeepSeek API 密钥（如使用 DeepSeek）
 - `LLM_PROVIDER`: LLM 提供商 (deepseek | openrouter, CLI 默认 deepseek)
-- `OPENROUTER_API_KEY`: OpenRouter API 密钥（如 LLM_PROVIDER=openrouter）
+- `LLM_DEEPSEEK_API_KEY`: DeepSeek API 密钥（如使用 DeepSeek）
+- `LLM_DEEPSEEK_MODEL`: DeepSeek 模型（可选，默认 deepseek-chat）
+- `LLM_OPENROUTER_API_KEY`: OpenRouter API 密钥（如 LLM_PROVIDER=openrouter）
+- `LLM_OPENROUTER_MODEL`: OpenRouter 模型（可选）
+- `LLM_OPENROUTER_SITE_URL`: OpenRouter 站点 URL（可选）
+- `LLM_OPENROUTER_SITE_NAME`: OpenRouter 站点名称（可选）
 - `HN_STORY_LIMIT`: 最大故事数（默认 30）
 - `HN_TIME_WINDOW_HOURS`: 时间窗口（默认 24 小时）
 - `ENABLE_CONTENT_FILTER`: 启用 AI 内容过滤（默认 false）
@@ -230,8 +259,14 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
 - `LLM_PROVIDER`: **必需** (deepseek | openrouter)
 - `TARGET_REPO`: **必需** (格式: "owner/repo")
 - `GITHUB_TOKEN`: **必需** (GitHub personal access token)
-- `DEEPSEEK_API_KEY`: 条件必需 (当 LLM_PROVIDER=deepseek)
-- `OPENROUTER_API_KEY`: 条件必需 (当 LLM_PROVIDER=openrouter)
+- `LLM_DEEPSEEK_API_KEY`: 条件必需 (当 LLM_PROVIDER=deepseek)
+- `LLM_OPENROUTER_API_KEY`: 条件必需 (当 LLM_PROVIDER=openrouter)
+
+**可选 LLM 配置**:
+- `LLM_DEEPSEEK_MODEL`: DeepSeek 模型覆盖
+- `LLM_OPENROUTER_MODEL`: OpenRouter 模型覆盖
+- `LLM_OPENROUTER_SITE_URL`: OpenRouter 站点 URL
+- `LLM_OPENROUTER_SITE_NAME`: OpenRouter 站点名称
 
 **配置验证**: Worker 启动时会验证所有必需配置，提供清晰的错误消息
 

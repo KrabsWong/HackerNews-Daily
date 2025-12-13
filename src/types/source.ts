@@ -1,8 +1,7 @@
 /**
- * Content Source Abstraction
+ * Content Source type definitions
  * 
- * Defines the interface for all content sources (HackerNews, Reddit, etc.)
- * Each source is responsible for fetching and processing content from a specific platform
+ * Types for content sources (HackerNews, Reddit, etc.)
  */
 
 /**
