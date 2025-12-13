@@ -21,6 +21,7 @@ wrangler.toml
 hacknews-export/
 
 # Logs
+logs/
 *.log
 npm-debug.log*
 

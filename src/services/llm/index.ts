@@ -1,13 +1,13 @@
 /**
  * LLM Provider Module
  * 
- * Provides a unified interface for different LLM providers (DeepSeek, OpenRouter).
+ * Provides a unified interface for different LLM providers (DeepSeek, OpenRouter, Zhipu).
  * This is the main entry point for all LLM-related functionality.
  */
 
-import { DEEPSEEK_API, OPENROUTER_API, LLM_CONFIG, LLMProviderType } from '../../config/constants';
+import { DEEPSEEK_API, OPENROUTER_API, ZHIPU_API, LLM_CONFIG, LLMProviderType } from '../../config/constants';
 import { FetchError } from '../../utils/fetch';
-import { DeepSeekProvider, OpenRouterProvider } from './providers';
+import { DeepSeekProvider, OpenRouterProvider, ZhipuProvider } from './providers';
 import { resolveProviderConfig } from './utils';
 import type {
   LLMProvider,
@@ -50,6 +50,12 @@ export function createLLMProvider(options: CreateProviderOptions): LLMProvider {
         config.model ?? OPENROUTER_API.MODEL,
         config.siteUrl,
         config.siteName
+      );
+      
+    case LLMProviderType.ZHIPU:
+      return new ZhipuProvider(
+        config.apiKey,
+        config.model ?? ZHIPU_API.DEFAULT_MODEL
       );
       
     case LLMProviderType.DEEPSEEK:
@@ -107,7 +113,7 @@ export {
 } from './utils';
 
 // Re-export provider classes for advanced usage
-export { DeepSeekProvider, OpenRouterProvider } from './providers';
+export { DeepSeekProvider, OpenRouterProvider, ZhipuProvider } from './providers';
 
 // Re-export types from centralized location
 export type {

@@ -8,7 +8,7 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
 - **Language**: TypeScript 5.3+ (strict mode)
 - **Build**: tsc (CLI), esbuild (Worker)
 - **Content Extraction**: Mozilla Readability, Crawler API
-- **LLM Provider**: DeepSeek API / OpenRouter (翻译、摘要、内容过滤)
+- **LLM Provider**: DeepSeek API / OpenRouter / Zhipu AI (翻译、摘要、内容过滤)
 - **HTTP Client**: Native fetch (utils/fetch.ts 封装)
 - **HTML Parsing**: Cheerio, linkedom, @mozilla/readability
 - **Environment**: dotenv (CLI), Cloudflare secrets (Worker)
@@ -231,23 +231,25 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
 ## External Dependencies
 - **HackerNews Firebase API**: 获取 best stories ID 和评论详情
 - **Algolia HN Search API**: 批量获取 story 详情和日期过滤
-- **DeepSeek LLM**: 
-  - 翻译（标题、摘要、评论要点）
-  - AI 摘要生成（文章内容、评论）
-  - 内容过滤（可选，SAFE/SENSITIVE 分类）
+- **LLM Providers**: 
+  - DeepSeek: 翻译、AI 摘要生成、内容过滤
+  - OpenRouter: 翻译、AI 摘要生成、内容过滤
+  - Zhipu AI: 翻译、AI 摘要生成、内容过滤 (glm-4.5-flash 并发限制 2)
 - **Mozilla Readability**: 文章正文智能提取
 
 ## Configuration
 主要环境变量（详见 `.env.example`）:
 
 ### CLI 配置
-- `LLM_PROVIDER`: LLM 提供商 (deepseek | openrouter, CLI 默认 deepseek)
+- `LLM_PROVIDER`: LLM 提供商 (deepseek | openrouter | zhipu, CLI 默认 deepseek)
 - `LLM_DEEPSEEK_API_KEY`: DeepSeek API 密钥（如使用 DeepSeek）
 - `LLM_DEEPSEEK_MODEL`: DeepSeek 模型（可选，默认 deepseek-chat）
 - `LLM_OPENROUTER_API_KEY`: OpenRouter API 密钥（如 LLM_PROVIDER=openrouter）
 - `LLM_OPENROUTER_MODEL`: OpenRouter 模型（可选）
 - `LLM_OPENROUTER_SITE_URL`: OpenRouter 站点 URL（可选）
 - `LLM_OPENROUTER_SITE_NAME`: OpenRouter 站点名称（可选）
+- `LLM_ZHIPU_API_KEY`: Zhipu AI API 密钥（如 LLM_PROVIDER=zhipu）
+- `LLM_ZHIPU_MODEL`: Zhipu AI 模型（可选，默认 glm-4.5-flash，并发限制 2）
 - `HN_STORY_LIMIT`: 最大故事数（默认 30）
 - `HN_TIME_WINDOW_HOURS`: 时间窗口（默认 24 小时）
 - `ENABLE_CONTENT_FILTER`: 启用 AI 内容过滤（默认 false）
@@ -256,17 +258,19 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
 
 ### Worker 配置 (v4.0+)
 **必需变量** (无默认值，缺失时 Worker 启动失败):
-- `LLM_PROVIDER`: **必需** (deepseek | openrouter)
+- `LLM_PROVIDER`: **必需** (deepseek | openrouter | zhipu)
 - `TARGET_REPO`: **必需** (格式: "owner/repo")
 - `GITHUB_TOKEN`: **必需** (GitHub personal access token)
 - `LLM_DEEPSEEK_API_KEY`: 条件必需 (当 LLM_PROVIDER=deepseek)
 - `LLM_OPENROUTER_API_KEY`: 条件必需 (当 LLM_PROVIDER=openrouter)
+- `LLM_ZHIPU_API_KEY`: 条件必需 (当 LLM_PROVIDER=zhipu)
 
 **可选 LLM 配置**:
 - `LLM_DEEPSEEK_MODEL`: DeepSeek 模型覆盖
 - `LLM_OPENROUTER_MODEL`: OpenRouter 模型覆盖
 - `LLM_OPENROUTER_SITE_URL`: OpenRouter 站点 URL
 - `LLM_OPENROUTER_SITE_NAME`: OpenRouter 站点名称
+- `LLM_ZHIPU_MODEL`: Zhipu AI 模型覆盖 (默认 glm-4.5-flash)
 
 **配置验证**: Worker 启动时会验证所有必需配置，提供清晰的错误消息
 

@@ -19,6 +19,7 @@ import {
 } from './services/markdownExporter';
 import { ProcessedStory } from './types/shared';
 import { getPreviousDayBoundaries, formatTimestamp, filterByDateRange, formatDateForDisplay } from './utils/date';
+import { logger } from './utils/logger';
 
 /**
  * Parse command-line arguments
@@ -39,13 +40,13 @@ function parseArgs(): { noCache: boolean; exportDailyMode: boolean } {
 function validateStoryLimit(requested: number): number {
   // Handle invalid inputs (NaN, negative, zero)
   if (isNaN(requested) || requested <= 0) {
-    console.warn(`⚠️  Invalid story limit (${requested}). Using default of ${STORY_LIMITS.MAX_STORY_LIMIT} stories.`);
+    logger.warn(`Invalid story limit (${requested}). Using default of ${STORY_LIMITS.MAX_STORY_LIMIT} stories.`);
     return STORY_LIMITS.MAX_STORY_LIMIT;
   }
   
   // Check if requested limit exceeds warning threshold
   if (requested >= STORY_LIMITS.WARN_THRESHOLD) {
-    console.warn(`⚠️  Requested story limit (${requested}) exceeds maximum supported limit. Using ${STORY_LIMITS.MAX_STORY_LIMIT} stories instead.`);
+    logger.warn(`Requested story limit (${requested}) exceeds maximum supported limit. Using ${STORY_LIMITS.MAX_STORY_LIMIT} stories instead.`);
     return STORY_LIMITS.MAX_STORY_LIMIT;
   }
   
@@ -61,19 +62,19 @@ function validateStoryLimit(requested: number): number {
 function validateSummaryLength(requested: number): number {
   // Handle invalid inputs (NaN, negative, zero)
   if (isNaN(requested) || requested <= 0) {
-    console.warn(`⚠️  Invalid SUMMARY_MAX_LENGTH (${requested}). Using default of ${SUMMARY_CONFIG.DEFAULT_LENGTH} characters.`);
+    logger.warn(`Invalid SUMMARY_MAX_LENGTH (${requested}). Using default of ${SUMMARY_CONFIG.DEFAULT_LENGTH} characters.`);
     return SUMMARY_CONFIG.DEFAULT_LENGTH;
   }
   
   // Check if too short
   if (requested < SUMMARY_CONFIG.MIN_LENGTH) {
-    console.warn(`⚠️  SUMMARY_MAX_LENGTH too short (${requested}). Using minimum of ${SUMMARY_CONFIG.MIN_LENGTH} characters.`);
+    logger.warn(`SUMMARY_MAX_LENGTH too short (${requested}). Using minimum of ${SUMMARY_CONFIG.MIN_LENGTH} characters.`);
     return SUMMARY_CONFIG.MIN_LENGTH;
   }
   
   // Check if too long
   if (requested > SUMMARY_CONFIG.MAX_LENGTH) {
-    console.warn(`⚠️  SUMMARY_MAX_LENGTH too large (${requested}). Capping at ${SUMMARY_CONFIG.MAX_LENGTH} characters.`);
+    logger.warn(`SUMMARY_MAX_LENGTH too large (${requested}). Capping at ${SUMMARY_CONFIG.MAX_LENGTH} characters.`);
     return SUMMARY_CONFIG.MAX_LENGTH;
   }
   
@@ -85,14 +86,23 @@ function validateSummaryLength(requested: number): number {
  * Main CLI function
  */
 async function main(): Promise<void> {
+  // Initialize file logging
+  logger.initFileLogging();
+  logger.setMinLevel('debug'); // Log everything to file
+  
+  const startTime = Date.now();
+  
   try {
     // Parse command-line arguments
     const { noCache, exportDailyMode } = parseArgs();
     
+    logger.info('HackerNews Daily - Chinese Translation started');
+    logger.debug('Command line arguments', { noCache, exportDailyMode });
     console.log('\n🔍 HackerNews Daily - Chinese Translation\n');
     
     if (exportDailyMode) {
       console.log('📄 Export mode enabled - exporting yesterday\'s articles\n');
+      logger.info('Export mode enabled');
     }
     
     // Get configuration from environment
@@ -101,6 +111,15 @@ async function main(): Promise<void> {
     const timeWindowHours = parseInt(process.env.HN_TIME_WINDOW_HOURS || String(ENV_DEFAULTS.HN_TIME_WINDOW_HOURS), 10);
     const requestedSummaryLength = parseInt(process.env.SUMMARY_MAX_LENGTH || String(ENV_DEFAULTS.SUMMARY_MAX_LENGTH), 10);
     const summaryMaxLength = validateSummaryLength(requestedSummaryLength);
+    
+    logger.debug('Configuration loaded', {
+      storyLimit,
+      timeWindowHours,
+      summaryMaxLength,
+      contentFilterEnabled: CONTENT_FILTER.ENABLED,
+      contentFilterSensitivity: CONTENT_FILTER.SENSITIVITY,
+      llmProvider: process.env.LLM_PROVIDER || 'deepseek (default)',
+    });
     
     // Cache configuration
     const cacheConfig = {
@@ -119,20 +138,24 @@ async function main(): Promise<void> {
       
       if (cacheResult.hit && cacheResult.stories) {
         // Use cached data
+        logger.info('Cache hit - using cached data', { storyCount: cacheResult.stories.length });
         processedStories = cacheResult.stories;
       } else {
         // Cache miss - fetch fresh data
         if (cacheResult.reason) {
+          logger.info('Cache miss', { reason: cacheResult.reason });
           console.log(`📭 ${cacheResult.reason}`);
         }
         processedStories = await fetchFreshData(storyLimit, timeWindowHours, summaryMaxLength);
         
         // Save to cache
         writeCache(processedStories, cacheConfig);
+        logger.debug('Cache updated', { storyCount: processedStories.length });
       }
     } else {
       // Cache disabled or --no-cache flag
       if (noCache) {
+        logger.info('Cache bypassed (--no-cache flag)');
         console.log('🔄 Cache bypassed (--no-cache flag)\n');
       }
       processedStories = await fetchFreshData(storyLimit, timeWindowHours, summaryMaxLength);
@@ -140,6 +163,7 @@ async function main(): Promise<void> {
       // Save to cache (if enabled)
       if (isCacheEnabled()) {
         writeCache(processedStories, cacheConfig);
+        logger.debug('Cache updated', { storyCount: processedStories.length });
       }
     }
     
@@ -149,8 +173,16 @@ async function main(): Promise<void> {
       const { start, end, date } = getPreviousDayBoundaries();
       const filteredStories = filterByDateRange(processedStories, start, end);
       
+      logger.debug('Export filtering', { 
+        startDate: new Date(start * 1000).toISOString(),
+        endDate: new Date(end * 1000).toISOString(),
+        filteredCount: filteredStories.length,
+        totalCount: processedStories.length 
+      });
+      
       if (filteredStories.length === 0) {
         const dateStr = formatDateForDisplay(date);
+        logger.warn('No stories found for export date', { date: dateStr });
         console.log(`\n⚠️  No stories found for ${dateStr}\n`);
         return;
       }
@@ -178,21 +210,55 @@ async function main(): Promise<void> {
       await writeMarkdownFile(markdownContent, filename, exportDir);
       
       const filePath = `${exportDir}/${filename}`;
+      logger.info('Export completed successfully', { filePath, storyCount: rerankedStories.length });
       console.log(`\n✅ Successfully exported ${rerankedStories.length} stories to ${filePath}\n`);
     } else {
       // CLI mode - display in terminal
       console.log('\nRendering results...\n');
       displayCards(processedStories);
+      logger.info('CLI display completed', { storyCount: processedStories.length });
       console.log(`\n✅ Successfully displayed ${processedStories.length} stories\n`);
     }
+    
+    // Write summary to log
+    const duration = Date.now() - startTime;
+    logger.summary({
+      status: 'success',
+      duration: `${duration}ms`,
+      storiesProcessed: processedStories.length,
+      mode: exportDailyMode ? 'export' : 'cli',
+    });
+    
+    // Show log file location
+    const logFile = logger.getLogFilePath();
+    if (logFile) {
+      console.log(`📝 Detailed logs saved to: ${logFile}\n`);
+    }
+    
   } catch (error) {
+    logger.error('Fatal error in main', error);
     handleError(error);
+    
+    // Write error summary to log
+    const duration = Date.now() - startTime;
+    logger.summary({
+      status: 'error',
+      duration: `${duration}ms`,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    
+    // Show log file location even on error
+    const logFile = logger.getLogFilePath();
+    if (logFile) {
+      console.log(`\n📝 Detailed logs saved to: ${logFile}\n`);
+    }
+    
     process.exit(1);
   }
 }
 
 /**
- * Fetch fresh data from APIs (HackerNews + DeepSeek)
+ * Fetch fresh data from APIs (HackerNews + LLM Provider)
  */
 async function fetchFreshData(
   storyLimit: number,
@@ -200,20 +266,35 @@ async function fetchFreshData(
   summaryMaxLength: number
 ): Promise<ProcessedStory[]> {
   // Validate configuration and build provider options
+  logger.step('Validating configuration');
   console.log('Validating configuration...');
   const providerOptions = buildCliProviderOptions();
   translator.init(providerOptions);
+  
+  logger.debug('Provider initialized', {
+    provider: providerOptions.provider,
+    model: providerOptions.config.model || 'default',
+  });
   
   // Initialize content filter
   const contentFilter = new AIContentFilter(providerOptions);
   
   // Display fetch parameters
+  logger.step('Fetching stories from HackerNews', { storyLimit, timeWindowHours });
   console.log(`Fetching up to ${storyLimit} stories from the past ${timeWindowHours} hours...`);
   
   // Fetch stories from HackerNews
+  const fetchStartTime = Date.now();
   const stories = await fetchTopStories(storyLimit, timeWindowHours);
+  const fetchDuration = Date.now() - fetchStartTime;
+  
+  logger.debug('Stories fetched from HackerNews', { 
+    count: stories.length, 
+    duration: `${fetchDuration}ms` 
+  });
   
   if (stories.length === 0) {
+    logger.warn('No stories found in time window');
     console.log('\n⚠️  No stories found in the specified time window.');
     console.log('Try increasing HN_TIME_WINDOW_HOURS or HN_STORY_LIMIT in your .env file.');
     return [];
@@ -221,6 +302,7 @@ async function fetchFreshData(
   
   // Check if result count is significantly lower than requested
   if (stories.length < storyLimit * 0.5) {
+    logger.warn('Story count lower than expected', { found: stories.length, requested: storyLimit });
     console.log(`\n⚠️  Only ${stories.length} stories found (requested ${storyLimit}).`);
     console.log(`Try increasing HN_TIME_WINDOW_HOURS in your .env file for more results.\n`);
   }
@@ -228,10 +310,20 @@ async function fetchFreshData(
   // Apply content filter (if enabled)
   let filteredStories = stories;
   if (contentFilter.isEnabled()) {
+    logger.step('Applying AI content filter');
     console.log('\nApplying AI content filter...');
+    
+    const filterStartTime = Date.now();
     filteredStories = await contentFilter.filterStories(stories);
+    const filterDuration = Date.now() - filterStartTime;
     
     const filteredCount = stories.length - filteredStories.length;
+    logger.debug('Content filter applied', { 
+      filtered: filteredCount, 
+      remaining: filteredStories.length,
+      duration: `${filterDuration}ms`
+    });
+    
     if (filteredCount > 0) {
       console.log(`Filtered ${filteredCount} stories based on content policy`);
     }
@@ -241,28 +333,69 @@ async function fetchFreshData(
   const storiesToProcess = filteredStories;
   
   // Translate titles
+  logger.step('Translating titles', { count: storiesToProcess.length });
   console.log('\nTranslating titles to Chinese...');
+  
+  const titleStartTime = Date.now();
   const titles = storiesToProcess.map(s => s.title);
   const translatedTitles = await translator.translateBatch(titles);
+  const titleDuration = Date.now() - titleStartTime;
+  
+  logger.debug('Titles translated', { count: titles.length, duration: `${titleDuration}ms` });
   
   // Fetch article details (includes full content extraction)
+  logger.step('Fetching article content', { count: storiesToProcess.length });
   console.log('\nFetching and extracting article content...');
+  
+  const articleStartTime = Date.now();
   const urls = storiesToProcess.map(s => s.url || `https://news.ycombinator.com/item?id=${s.id}`);
   const articleMetadata = await fetchArticlesBatch(urls);
+  const articleDuration = Date.now() - articleStartTime;
+  
+  logger.debug('Article content fetched', { 
+    count: articleMetadata.length, 
+    duration: `${articleDuration}ms`,
+    withContent: articleMetadata.filter(m => m.fullContent).length,
+  });
   
   // Generate AI summaries or translate descriptions
+  logger.step('Generating AI summaries', { count: storiesToProcess.length, maxLength: summaryMaxLength });
   console.log('\nGenerating AI-powered summaries...');
+  
+  const summaryStartTime = Date.now();
   const fullContents = articleMetadata.map(meta => meta.fullContent);
   const metaDescriptions = articleMetadata.map(meta => meta.description);
   const summaries = await translator.summarizeBatch(fullContents, metaDescriptions, summaryMaxLength);
+  const summaryDuration = Date.now() - summaryStartTime;
+  
+  logger.debug('Summaries generated', { count: summaries.length, duration: `${summaryDuration}ms` });
   
   // Fetch top comments for each story using Algolia (optimized)
+  logger.step('Fetching comments', { count: storiesToProcess.length });
   console.log('\nFetching top comments for each story...');
+  
+  const commentFetchStartTime = Date.now();
   const commentArrays = await fetchCommentsBatchFromAlgolia(storiesToProcess, 10);
+  const commentFetchDuration = Date.now() - commentFetchStartTime;
+  
+  logger.debug('Comments fetched', { 
+    stories: commentArrays.length, 
+    duration: `${commentFetchDuration}ms`,
+    totalComments: commentArrays.reduce((sum, arr) => sum + arr.length, 0),
+  });
   
   // Summarize comments
+  logger.step('Summarizing comments', { count: commentArrays.length });
   console.log('\nSummarizing comments...');
+  
+  const commentSummaryStartTime = Date.now();
   const commentSummaries = await translator.summarizeCommentsBatch(commentArrays);
+  const commentSummaryDuration = Date.now() - commentSummaryStartTime;
+  
+  logger.debug('Comment summaries generated', { 
+    count: commentSummaries.filter(s => s).length, 
+    duration: `${commentSummaryDuration}ms` 
+  });
   
   // Process stories with translations
   const processedStories: ProcessedStory[] = storiesToProcess.map((story, index) => ({
@@ -276,6 +409,11 @@ async function fetchFreshData(
     description: summaries[index],
     commentSummary: commentSummaries[index],
   }));
+  
+  logger.info('Data processing completed', { 
+    totalStories: processedStories.length,
+    withCommentSummary: processedStories.filter(s => s.commentSummary).length,
+  });
   
   return processedStories;
 }
@@ -310,6 +448,7 @@ function handleError(error: unknown): void {
   
   if (error instanceof Error) {
     console.error(error.message);
+    logger.error('Error details', error);
     
     // Provide helpful hints for common errors
     if (error.message.includes('LLM_DEEPSEEK_API_KEY')) {
@@ -323,6 +462,12 @@ function handleError(error: unknown): void {
       console.error('2. Get your API key from https://openrouter.ai/keys');
       console.error('3. Add your key to .env: LLM_OPENROUTER_API_KEY=your_key_here');
       console.error('4. Set LLM_PROVIDER=openrouter in .env\n');
+    } else if (error.message.includes('LLM_ZHIPU_API_KEY')) {
+      console.error('\n💡 Setup instructions:');
+      console.error('1. Copy .env.example to .env: cp .env.example .env');
+      console.error('2. Get your API key from https://open.bigmodel.cn/');
+      console.error('3. Add your key to .env: LLM_ZHIPU_API_KEY=your_key_here');
+      console.error('4. Set LLM_PROVIDER=zhipu in .env\n');
     } else if (error.message.includes('Failed to fetch') && error.message.includes('Algolia')) {
       console.error('\n💡 Troubleshooting:');
       console.error('- Check your internet connection');
@@ -333,6 +478,12 @@ function handleError(error: unknown): void {
       console.error('- Algolia API rate limit exceeded');
       console.error('- Wait a few minutes before trying again');
       console.error('- Consider reducing HN_STORY_LIMIT in your .env file\n');
+    } else if (error.message.includes('timeout') || error.message.includes('Timeout')) {
+      console.error('\n💡 Timeout error:');
+      console.error('- The API request took too long to respond');
+      console.error('- Check your network connection');
+      console.error('- The LLM provider may be experiencing high load');
+      console.error('- Try again in a few moments\n');
     } else if (error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED')) {
       console.error('\n💡 Network error: Please check your internet connection\n');
     } else if (error.message.includes('Permission denied') || error.message.includes('EACCES')) {

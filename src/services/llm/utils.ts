@@ -5,13 +5,15 @@
  * Eliminates duplicate switch statements across the codebase.
  * 
  * All LLM-related environment variables use the LLM_ prefix:
- * - LLM_PROVIDER: Provider type (deepseek | openrouter)
+ * - LLM_PROVIDER: Provider type (deepseek | openrouter | zhipu)
  * - LLM_DEEPSEEK_API_KEY: DeepSeek API key
  * - LLM_DEEPSEEK_MODEL: DeepSeek model override
  * - LLM_OPENROUTER_API_KEY: OpenRouter API key
  * - LLM_OPENROUTER_MODEL: OpenRouter model override
  * - LLM_OPENROUTER_SITE_URL: OpenRouter site URL for attribution
  * - LLM_OPENROUTER_SITE_NAME: OpenRouter site name for attribution
+ * - LLM_ZHIPU_API_KEY: Zhipu AI API key
+ * - LLM_ZHIPU_MODEL: Zhipu model override (default: glm-4.5-flash)
  */
 
 import { LLMProviderType } from '../../config/constants';
@@ -29,7 +31,7 @@ export type { ProviderEnv, ResolvedProviderConfig, CreateProviderOptions };
  */
 export function parseProvider(providerString: string | undefined): LLMProviderType {
   if (!providerString) {
-    throw new Error('LLM_PROVIDER is required (set to "deepseek" or "openrouter")');
+    throw new Error('LLM_PROVIDER is required (set to "deepseek", "openrouter", or "zhipu")');
   }
   
   const normalized = providerString.toLowerCase();
@@ -39,8 +41,10 @@ export function parseProvider(providerString: string | undefined): LLMProviderTy
       return LLMProviderType.DEEPSEEK;
     case LLMProviderType.OPENROUTER:
       return LLMProviderType.OPENROUTER;
+    case LLMProviderType.ZHIPU:
+      return LLMProviderType.ZHIPU;
     default:
-      throw new Error(`Invalid LLM_PROVIDER "${providerString}". Must be "deepseek" or "openrouter"`);
+      throw new Error(`Invalid LLM_PROVIDER "${providerString}". Must be "deepseek", "openrouter", or "zhipu"`);
   }
 }
 
@@ -68,6 +72,13 @@ export function getApiKeyForProvider(provider: LLMProviderType, env: ProviderEnv
       }
       return key;
     }
+    case LLMProviderType.ZHIPU: {
+      const key = env.LLM_ZHIPU_API_KEY;
+      if (!key) {
+        throw new Error('LLM_ZHIPU_API_KEY is required when LLM_PROVIDER=zhipu');
+      }
+      return key;
+    }
     default:
       throw new Error(`Unsupported provider: ${provider}`);
   }
@@ -86,6 +97,8 @@ export function getModelForProvider(provider: LLMProviderType, env: ProviderEnv)
       return env.LLM_DEEPSEEK_MODEL;
     case LLMProviderType.OPENROUTER:
       return env.LLM_OPENROUTER_MODEL;
+    case LLMProviderType.ZHIPU:
+      return env.LLM_ZHIPU_MODEL;
     default:
       return undefined;
   }
@@ -172,5 +185,7 @@ export function buildCliProviderOptions(): CreateProviderOptions {
     LLM_OPENROUTER_MODEL: process.env.LLM_OPENROUTER_MODEL,
     LLM_OPENROUTER_SITE_URL: process.env.LLM_OPENROUTER_SITE_URL,
     LLM_OPENROUTER_SITE_NAME: process.env.LLM_OPENROUTER_SITE_NAME,
+    LLM_ZHIPU_API_KEY: process.env.LLM_ZHIPU_API_KEY,
+    LLM_ZHIPU_MODEL: process.env.LLM_ZHIPU_MODEL,
   });
 }

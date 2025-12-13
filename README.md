@@ -4,13 +4,120 @@
 
 A CLI tool that fetches top-rated stories from HackerNews's curated "best" list, extracts full article content via Crawler API, generates AI-powered summaries, fetches and summarizes top comments, and translates everything to Chinese using configurable LLM providers. Supports CLI display and daily Markdown exports with optional AI-based content filtering. Automated deployment via Cloudflare Workers.
 
+## System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           HackerNews Daily                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────┐     ┌──────────────┐     ┌──────────────────────────────┐ │
+│  │   CLI Mode   │     │ Worker Mode  │     │        Entry Points          │ │
+│  │ (npm run     │     │ (Cloudflare  │     │                              │ │
+│  │   fetch)     │     │   Workers)   │     │  src/index.ts (CLI)          │ │
+│  └──────┬───────┘     └──────┬───────┘     │  src/worker/index.ts (Worker)│ │
+│         │                    │             └──────────────────────────────┘ │
+│         └────────┬───────────┘                                              │
+│                  ▼                                                          │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                        Core Services                                   │  │
+│  ├───────────────────────────────────────────────────────────────────────┤  │
+│  │                                                                        │  │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐  │  │
+│  │  │ Translation │  │  Article    │  │   Content   │  │    Cache     │  │  │
+│  │  │  Service    │  │  Fetcher    │  │   Filter    │  │   Service    │  │  │
+│  │  │             │  │             │  │  (Optional) │  │  (CLI only)  │  │  │
+│  │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────────────┘  │  │
+│  │         │                │                │                            │  │
+│  └─────────┼────────────────┼────────────────┼────────────────────────────┘  │
+│            │                │                │                               │
+│            ▼                ▼                ▼                               │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                      LLM Provider Abstraction                          │  │
+│  ├───────────────────────────────────────────────────────────────────────┤  │
+│  │                                                                        │  │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                    │  │
+│  │  │  DeepSeek   │  │ OpenRouter  │  │  Zhipu AI   │                    │  │
+│  │  │  Provider   │  │  Provider   │  │  Provider   │                    │  │
+│  │  │             │  │             │  │ (GLM-4.5)   │                    │  │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘                    │  │
+│  │                                                                        │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                        External APIs                                   │  │
+│  ├───────────────────────────────────────────────────────────────────────┤  │
+│  │                                                                        │  │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐  │  │
+│  │  │  Firebase   │  │  Algolia    │  │  Crawler    │  │   GitHub     │  │  │
+│  │  │  HN API     │  │  HN API     │  │    API      │  │    API       │  │  │
+│  │  │ (Story IDs) │  │ (Details)   │  │ (Content)   │  │ (Publishing) │  │  │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  └──────────────┘  │  │
+│  │                                                                        │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                          Output                                        │  │
+│  ├───────────────────────────────────────────────────────────────────────┤  │
+│  │                                                                        │  │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐  │  │
+│  │  │   Console   │  │  Markdown   │  │   GitHub    │  │    Logs      │  │  │
+│  │  │   Display   │  │   Export    │  │    Repo     │  │   (logs/)    │  │  │
+│  │  │  (CLI mode) │  │  (--export) │  │  (Worker)   │  │              │  │  │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  └──────────────┘  │  │
+│  │                                                                        │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Data Flow:
+──────────
+1. Fetch best story IDs from Firebase API
+2. Batch fetch story details from Algolia API  
+3. Extract article content (Crawler API / Readability)
+4. Translate titles via LLM Provider
+5. Generate AI summaries via LLM Provider
+6. Fetch & summarize comments via Algolia + LLM
+7. Output to console / markdown / GitHub
+```
+
+### Directory Structure
+
+```
+src/
+├── api/                      # External API integrations
+│   └── hackernews/           # HackerNews APIs (Firebase + Algolia)
+├── config/
+│   └── constants.ts          # Configuration constants & enums
+├── services/
+│   ├── llm/                  # LLM provider abstraction
+│   │   ├── providers.ts      # DeepSeek, OpenRouter, Zhipu implementations
+│   │   ├── utils.ts          # Provider utilities
+│   │   └── index.ts          # Factory & exports
+│   ├── translator/           # Translation & summarization
+│   ├── articleFetcher.ts     # Article content extraction
+│   ├── contentFilter.ts      # AI content filtering
+│   ├── cache.ts              # Local file caching
+│   └── markdownExporter.ts   # Markdown generation
+├── types/                    # TypeScript type definitions
+├── utils/                    # Utility functions
+│   ├── fetch.ts              # HTTP client wrapper
+│   ├── logger.ts             # CLI file logging
+│   └── ...
+├── worker/                   # Cloudflare Worker
+│   ├── sources/              # Content source abstraction
+│   ├── publishers/           # Publishing abstraction (GitHub)
+│   └── config/               # Worker configuration
+└── index.ts                  # CLI entry point
+```
+
 ## Features
 
 - 🎯 Fetches stories from HackerNews's curated "best" list via hybrid Firebase + Algolia API strategy
 - 📄 Extracts full article content via Crawler API (headless browser for rich content)
 - 🤖 Generates AI-powered summaries (configurable 100-500 characters, default 300) from full article text
 - 💬 Fetches top 10 comments and generates concise AI summaries (~100 characters, requires 3+ comments)
-- 🌏 Translates titles, article summaries, and comment summaries to Chinese using configurable LLM providers (DeepSeek or OpenRouter)
+- 🌏 Translates titles, article summaries, and comment summaries to Chinese using configurable LLM providers (DeepSeek, OpenRouter, or Zhipu AI)
 - 🛡️ **AI Content Filter**: Optional filtering of sensitive content with three sensitivity levels (low/medium/high, disabled by default)
 - 📊 **CLI Mode**: Clean card-based display with timestamps and scores
 - 📝 **Daily Export Mode**: Export previous day's articles to Jekyll-compatible Markdown files
@@ -23,10 +130,10 @@ A CLI tool that fetches top-rated stories from HackerNews's curated "best" list,
 ## Prerequisites
 
 - Node.js 20+
-- **Required for CLI**: DeepSeek API key ([Get one here](https://platform.deepseek.com/)) or OpenRouter API key
+- **Required for CLI**: DeepSeek API key ([Get one here](https://platform.deepseek.com/)), OpenRouter API key, or Zhipu AI API key
 - **Required for Worker deployment**: 
-  - LLM provider configuration (`LLM_PROVIDER`: "deepseek" or "openrouter")
-  - Corresponding API key (DEEPSEEK_API_KEY or OPENROUTER_API_KEY)
+  - LLM provider configuration (`LLM_PROVIDER`: "deepseek", "openrouter", or "zhipu")
+  - Corresponding API key (LLM_DEEPSEEK_API_KEY, LLM_OPENROUTER_API_KEY, or LLM_ZHIPU_API_KEY)
   - GitHub personal access token for publishing
   - Target repository configuration
 
@@ -78,6 +185,9 @@ wrangler secret put LLM_DEEPSEEK_API_KEY
 
 #    Option B: If using OpenRouter (LLM_PROVIDER=openrouter)
 wrangler secret put LLM_OPENROUTER_API_KEY
+
+#    Option C: If using Zhipu AI (LLM_PROVIDER=zhipu)
+wrangler secret put LLM_ZHIPU_API_KEY
 
 # 4. Set required GitHub token (always required)
 wrangler secret put GITHUB_TOKEN
@@ -148,6 +258,23 @@ The tool fetches the top 10 comments for each story (ranked by HackerNews algori
 - Mention controversial opinions when present
 - Only appear if a story has at least 3 comments
 
+### Logging
+
+When running `npm run fetch`, detailed logs are automatically saved to the `logs/` directory:
+
+```bash
+logs/
+└── 2024-12-13_15-30-45.log    # Timestamped log file
+```
+
+Log files include:
+- All processing steps with timestamps
+- API call details and durations  
+- Error stack traces for debugging
+- Configuration and performance metrics
+
+This is useful for diagnosing issues like API timeouts or content extraction failures.
+
 ## Configuration
 
 Configure the tool by editing `.env`:
@@ -156,11 +283,13 @@ Configure the tool by editing `.env`:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `LLM_PROVIDER` | LLM provider: "deepseek" or "openrouter" (optional for CLI, defaults to "deepseek") | deepseek |
+| `LLM_PROVIDER` | LLM provider: "deepseek", "openrouter", or "zhipu" (optional for CLI, defaults to "deepseek") | deepseek |
 | `LLM_DEEPSEEK_API_KEY` | Your DeepSeek API key (required if using DeepSeek) | - |
 | `LLM_DEEPSEEK_MODEL` | DeepSeek model to use (optional) | deepseek-chat |
 | `LLM_OPENROUTER_API_KEY` | Your OpenRouter API key (required if LLM_PROVIDER=openrouter) | - |
 | `LLM_OPENROUTER_MODEL` | OpenRouter model to use (optional) | deepseek/deepseek-chat-v3-0324 |
+| `LLM_ZHIPU_API_KEY` | Your Zhipu AI API key (required if LLM_PROVIDER=zhipu) | - |
+| `LLM_ZHIPU_MODEL` | Zhipu AI model to use (optional). Note: glm-4.5-flash has concurrency limit of 2 | glm-4.5-flash |
 | `HN_STORY_LIMIT` | Maximum number of stories to fetch (capped at 30) | 30 |
 | `HN_TIME_WINDOW_HOURS` | Only show stories from past N hours | 24 |
 | `SUMMARY_MAX_LENGTH` | Target length for AI-generated summaries (100-500 chars) | 300 |
@@ -176,11 +305,12 @@ Configure the tool by editing `.env`:
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `LLM_PROVIDER` | **REQUIRED**: "deepseek" or "openrouter" | ✅ Yes |
+| `LLM_PROVIDER` | **REQUIRED**: "deepseek", "openrouter", or "zhipu" | Yes |
 | `LLM_DEEPSEEK_API_KEY` | **REQUIRED** if LLM_PROVIDER=deepseek | Conditional |
 | `LLM_OPENROUTER_API_KEY` | **REQUIRED** if LLM_PROVIDER=openrouter | Conditional |
-| `GITHUB_TOKEN` | **REQUIRED**: GitHub personal access token with repo scope | ✅ Yes |
-| `TARGET_REPO` | **REQUIRED**: Target repository in format "owner/repo" | ✅ Yes |
+| `LLM_ZHIPU_API_KEY` | **REQUIRED** if LLM_PROVIDER=zhipu | Conditional |
+| `GITHUB_TOKEN` | **REQUIRED**: GitHub personal access token with repo scope | Yes |
+| `TARGET_REPO` | **REQUIRED**: Target repository in format "owner/repo" | Yes |
 
 See [Migration Guide](./docs/migration-v3-to-v4.md) for details on upgrading from v3.x.
 

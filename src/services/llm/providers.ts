@@ -4,7 +4,7 @@
  * Concrete implementations of the LLMProvider interface for different providers
  */
 
-import { DEEPSEEK_API, OPENROUTER_API } from '../../config/constants';
+import { DEEPSEEK_API, OPENROUTER_API, ZHIPU_API } from '../../config/constants';
 import { post } from '../../utils/fetch';
 import type {
   LLMProvider,
@@ -131,6 +131,65 @@ export class OpenRouterProvider implements LLMProvider {
     
     if (!content) {
       throw new Error('Empty response from OpenRouter API');
+    }
+
+    return {
+      content,
+      usage: response.data.usage,
+    };
+  }
+}
+
+// =============================================================================
+// Zhipu AI Provider
+// =============================================================================
+
+/**
+ * Zhipu AI Provider
+ * Uses GLM series models with OpenAI-compatible API
+ * Note: glm-4.5-flash has a concurrency limit of 2
+ */
+export class ZhipuProvider implements LLMProvider {
+  private apiKey: string;
+  private model: string;
+
+  constructor(apiKey: string, model: string = ZHIPU_API.DEFAULT_MODEL) {
+    this.apiKey = apiKey;
+    this.model = model;
+  }
+
+  getName(): string {
+    return 'zhipu';
+  }
+
+  getModel(): string {
+    return this.model;
+  }
+
+  getRetryDelay(): number {
+    return ZHIPU_API.RETRY_DELAY;
+  }
+
+  async chatCompletion(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {
+    const response = await post<OpenAIStyleResponse>(
+      `${ZHIPU_API.BASE_URL}/chat/completions`,
+      {
+        model: this.model,
+        messages: request.messages,
+        temperature: request.temperature,
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        timeout: ZHIPU_API.REQUEST_TIMEOUT,
+      }
+    );
+
+    const content = response.data.choices[0]?.message?.content?.trim();
+    
+    if (!content) {
+      throw new Error('Empty response from Zhipu API');
     }
 
     return {

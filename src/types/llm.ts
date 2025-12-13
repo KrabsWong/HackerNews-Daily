@@ -55,6 +55,8 @@ export interface ProviderEnv {
   LLM_OPENROUTER_MODEL?: string;
   LLM_OPENROUTER_SITE_URL?: string;
   LLM_OPENROUTER_SITE_NAME?: string;
+  LLM_ZHIPU_API_KEY?: string;
+  LLM_ZHIPU_MODEL?: string;
 }
 
 /**
