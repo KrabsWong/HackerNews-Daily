@@ -4,9 +4,6 @@
   "description": "Fetch and translate HackerNews top stories to Chinese",
   "main": "dist/index.js",
   "scripts": {
-    "fetch": "ts-node --project tsconfig.node.json src/index.ts",
-    "clean": "rm -rf dist",
-    "build": "rm -rf dist && tsc",
     "build:worker": "node esbuild.worker.config.js",
     "build:worker:watch": "node esbuild.worker.config.js --watch",
     "clean:worker": "rm -rf dist/worker",
@@ -14,12 +11,11 @@
     "deploy:worker": "npm run build:worker && wrangler deploy",
     "deploy:worker:staging": "npm run build:worker && wrangler deploy --env staging",
     "logs:worker": "wrangler tail",
-    "validate:worker": "wrangler validate",
-    "start": "node dist/index.js"
+    "validate:worker": "wrangler validate"
   },
   "keywords": [
     "hackernews",
-    "cli",
+    "cloudflare-workers",
     "translation",
     "chinese"
   ],

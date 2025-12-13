@@ -4,6 +4,8 @@
  * Types for content sources (HackerNews, Reddit, etc.)
  */
 
+import type { ProcessedStory } from './shared';
+
 /**
  * Configuration options passed to content sources
  * Sources can define their own specific configuration schemas
@@ -20,6 +22,8 @@ export interface SourceContent {
   markdown: string;
   /** Date string in YYYY-MM-DD format */
   dateStr: string;
+  /** Processed stories for publishers that need structured data (e.g., Telegram) */
+  stories: ProcessedStory[];
   /** Source-specific metadata (e.g., story count, API calls, processing time) */
   metadata: Record<string, any>;
 }

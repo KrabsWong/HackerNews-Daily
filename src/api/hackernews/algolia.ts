@@ -6,6 +6,7 @@
 import { ALGOLIA_HN_API } from '../../config/constants';
 import { get, FetchError } from '../../utils/fetch';
 import { Result, Ok, Err, fromPromise } from '../../utils/result';
+import { getErrorMessage } from '../../worker/logger';
 import { 
   HNStory, 
   HNComment, 
@@ -246,8 +247,8 @@ export async function fetchStoriesFromAlgoliaByIds(ids: number[]): Promise<{
     if (result.ok) {
       allStories.push(...result.value);
     } else {
-      errors.push(new Error(`Batch ${batchNum} failed: ${result.error.message}`));
-      console.warn(`Failed to fetch batch ${batchNum}: ${result.error.message}`);
+      errors.push(new Error(`Batch ${batchNum} failed: ${getErrorMessage(result.error)}`));
+      console.warn(`Failed to fetch batch ${batchNum}: ${getErrorMessage(result.error)}`);
     }
   }
 
@@ -307,7 +308,7 @@ export async function fetchCommentsFromAlgolia(storyId: number, limit: number = 
   const result = await fetchCommentsFromAlgoliaSafe(storyId, limit);
 
   if (!result.ok) {
-    console.warn(`Failed to fetch comments from Algolia for story ${storyId}: ${result.error.message}`);
+    console.warn(`Failed to fetch comments from Algolia for story ${storyId}: ${getErrorMessage(result.error)}`);
     return [];
   }
 

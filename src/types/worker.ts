@@ -12,10 +12,13 @@
  * All LLM-related environment variables use the LLM_ prefix
  */
 export interface Env {
-  // REQUIRED: Secrets (set via wrangler secret put)
-  GITHUB_TOKEN: string;
+  // GitHub publisher configuration (optional, enabled by default)
+  GITHUB_ENABLED?: string;        // "false" to disable GitHub publishing (default: "true")
+  GITHUB_TOKEN?: string;          // Required if GITHUB_ENABLED is not "false"
+  TARGET_REPO?: string;           // Required if GITHUB_ENABLED is not "false"
+  
+  // LLM configuration (required)
   LLM_PROVIDER: string;  // Will be validated as LLMProviderType
-  TARGET_REPO: string;
   
   // Provider-specific API keys (one required based on LLM_PROVIDER)
   LLM_DEEPSEEK_API_KEY?: string;
@@ -29,6 +32,11 @@ export interface Env {
   
   // Optional configuration
   CRAWLER_API_URL?: string;
+  
+  // Telegram publisher configuration (optional)
+  TELEGRAM_ENABLED?: string;      // "true" to enable Telegram publishing
+  TELEGRAM_BOT_TOKEN?: string;    // Bot token from @BotFather
+  TELEGRAM_CHANNEL_ID?: string;   // Channel ID (@channel_name or -100xxx)
   
   // Configuration variables (set in wrangler.toml)
   HN_STORY_LIMIT: string;

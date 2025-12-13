@@ -2,6 +2,7 @@ import { HNStory } from '../types/api';
 import { CONTENT_FILTER, SensitivityLevel } from '../config/constants';
 import { LLMProvider, createLLMProvider, CreateProviderOptions } from './llm';
 import type { FilterClassification, ContentFilter } from '../types/content';
+import { getErrorMessage } from '../worker/logger';
 
 // Re-export types for backward compatibility
 export type { FilterClassification, ContentFilter } from '../types/content';
@@ -93,8 +94,8 @@ export class AIContentFilter implements ContentFilter {
     } catch (error) {
       // Fallback: return all stories on error (fail-open behavior)
       if (CONTENT_FILTER.FALLBACK_ON_ERROR) {
-        console.warn('Content filter failed, allowing all stories through:', 
-          error instanceof Error ? error.message : 'Unknown error');
+      console.warn('Content filter failed, allowing all stories through:', 
+        getErrorMessage(error));
         return stories;
       } else {
         throw error;
@@ -127,7 +128,7 @@ export class AIContentFilter implements ContentFilter {
       return classifications;
     } catch (error) {
       console.error('AI classification failed:', 
-        error instanceof Error ? error.message : 'Unknown error');
+        getErrorMessage(error));
       throw error;
     }
   }
@@ -238,7 +239,7 @@ JSON Response:`;
       return classifications;
     } catch (error) {
       console.error('Failed to parse AI classification response:', 
-        error instanceof Error ? error.message : 'Unknown error');
+        getErrorMessage(error));
       throw new Error('Invalid classification response format');
     }
   }

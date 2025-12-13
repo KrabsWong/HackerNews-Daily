@@ -8,8 +8,9 @@
 
 import { HackerNewsSource } from './sources/hackernews';
 import { GitHubPublisher } from './publishers/github';
-import { validateWorkerConfig } from './config/validation';
-import { logInfo, logError } from './logger';
+import { TelegramPublisher } from './publishers/telegram';
+import { validateWorkerConfig, isGitHubConfigValid, validateGitHubConfig, isTelegramConfigValid, validateTelegramConfig } from './config/validation';
+import { logInfo, logError, logWarn } from './logger';
 import { LLMProviderType } from '../config/constants';
 import type { Env } from '../types/worker';
 
@@ -48,23 +49,72 @@ async function handleDailyExport(env: Env): Promise<string> {
       (process as any).env.LLM_OPENROUTER_SITE_NAME = env.LLM_OPENROUTER_SITE_NAME;
     }
 
-    // Initialize source and publisher
+    // Initialize source
     const source = new HackerNewsSource();
-    const publisher = new GitHubPublisher();
     
     // Fetch content from source
     logInfo('Fetching content from source', { source: source.name });
     const content = await source.fetchContent(new Date(), env);
     
-    // Publish to destination
-    logInfo('Publishing content', { publisher: publisher.name, repo: env.TARGET_REPO });
-    await publisher.publish(content, {
-      GITHUB_TOKEN: env.GITHUB_TOKEN,
-      TARGET_REPO: env.TARGET_REPO,
-      TARGET_BRANCH: env.TARGET_BRANCH || 'main',
-    });
+    // Track publishing results
+    const publishResults: string[] = [];
+    
+    // Publish to GitHub (optional, enabled by default)
+    const githubWarnings = validateGitHubConfig(env);
+    for (const warning of githubWarnings) {
+      logWarn(warning);
+    }
+    
+    if (isGitHubConfigValid(env)) {
+      try {
+        const githubPublisher = new GitHubPublisher();
+        logInfo('Publishing content to GitHub', { 
+          publisher: githubPublisher.name, 
+          repo: env.TARGET_REPO 
+        });
+        await githubPublisher.publish(content, {
+          GITHUB_TOKEN: env.GITHUB_TOKEN!,
+          TARGET_REPO: env.TARGET_REPO!,
+          TARGET_BRANCH: env.TARGET_BRANCH || 'main',
+        });
+        logInfo('GitHub publishing completed successfully');
+        publishResults.push('GitHub');
+      } catch (error) {
+        logError('GitHub publishing failed', error);
+        throw error; // Re-throw GitHub errors as they are critical when enabled
+      }
+    } else {
+      logInfo('GitHub publishing is disabled');
+    }
 
-    const successMessage = `Export completed successfully for ${content.dateStr}`;
+    // Publish to Telegram (optional)
+    const telegramWarnings = validateTelegramConfig(env);
+    for (const warning of telegramWarnings) {
+      logWarn(warning);
+    }
+    
+    if (isTelegramConfigValid(env)) {
+      try {
+        const telegramPublisher = new TelegramPublisher();
+        logInfo('Publishing content to Telegram', { 
+          publisher: telegramPublisher.name, 
+          channelId: env.TELEGRAM_CHANNEL_ID 
+        });
+        await telegramPublisher.publish(content, {
+          TELEGRAM_BOT_TOKEN: env.TELEGRAM_BOT_TOKEN!,
+          TELEGRAM_CHANNEL_ID: env.TELEGRAM_CHANNEL_ID!,
+        });
+        logInfo('Telegram publishing completed successfully');
+        publishResults.push('Telegram');
+      } catch (error) {
+        // Log error but don't fail the export - Telegram is optional
+        logError('Telegram publishing failed (export continues)', error);
+      }
+    } else {
+      logInfo('Telegram publishing is disabled');
+    }
+
+    const successMessage = `Export completed successfully for ${content.dateStr} (published to: ${publishResults.join(', ') || 'none'})`;
     logInfo('=== Daily Export Completed ===', { dateStr: content.dateStr });
     
     return successMessage;

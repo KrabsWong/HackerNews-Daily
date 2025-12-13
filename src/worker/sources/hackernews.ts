@@ -50,9 +50,9 @@ function initializeTranslator(env: Env): void {
 
 /**
  * Run the daily export pipeline
- * Returns the generated Markdown content
+ * Returns the generated Markdown content and processed stories
  */
-export async function runDailyExport(env: Env): Promise<{ markdown: string; dateStr: string }> {
+export async function runDailyExport(env: Env): Promise<{ markdown: string; dateStr: string; stories: ProcessedStory[] }> {
   const startTime = Date.now();
   const apiCalls: Record<string, number> = {};
 
@@ -249,7 +249,7 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
       duration: `${(duration / 1000).toFixed(1)}s`
     });
 
-    return { markdown, dateStr };
+    return { markdown, dateStr, stories: processedStories };
   } catch (error) {
     const duration = Date.now() - startTime;
     logError('Daily export failed', error, { duration });
@@ -285,6 +285,7 @@ export class HackerNewsSource implements ContentSource {
     return {
       markdown: result.markdown,
       dateStr: result.dateStr,
+      stories: result.stories,
       metadata: {
         source: 'hackernews',
         date: result.dateStr,

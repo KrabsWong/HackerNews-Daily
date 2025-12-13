@@ -19,11 +19,6 @@ esbuild.build({
   treeShaking: true,
   sourcemap: false,
   external: [],
-  // Mark Node.js built-ins as external (will be tree-shaken if not used)
-  alias: {
-    'fs/promises': './src/worker/stubs/fs.ts',
-    'path': './src/worker/stubs/path.ts',
-  },
   define: {
     'process.env.NODE_ENV': '"production"',
   },

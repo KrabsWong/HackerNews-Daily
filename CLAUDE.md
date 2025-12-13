@@ -4,58 +4,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HackerNews Daily is a dual-mode application that:
-1. **CLI Tool**: Fetches HackerNews "best" stories, extracts content, generates AI summaries, translates to Chinese, and displays in terminal
-2. **Cloudflare Worker**: Serverless deployment for automated daily exports to GitHub repositories
+HackerNews Daily is a Cloudflare Worker that fetches HackerNews "best" stories, extracts content, generates AI summaries, translates to Chinese, and publishes to GitHub and/or Telegram.
 
-The system fetches top-rated stories from HackerNews's curated "best" list, extracts full article content via Crawler API, generates AI-powered summaries, fetches and summarizes top comments, and translates everything to Chinese using configurable LLM providers (DeepSeek or OpenRouter).
+The system fetches top-rated stories from HackerNews's curated "best" list, extracts full article content via Crawler API, generates AI-powered summaries, fetches and summarizes top comments, and translates everything to Chinese using configurable LLM providers (DeepSeek, OpenRouter, or Zhipu AI).
 
 ## Architecture
 
-### Dual Runtime Environment
-- **Node.js 20+** for CLI execution (`src/index.ts`)
+### Runtime Environment
 - **Cloudflare Workers** for serverless deployment (`src/worker/index.ts`)
-- Shared code in `src/api/`, `src/services/`, `src/utils/`, `src/types/`
+- Core logic in `src/api/`, `src/services/`, `src/utils/`, `src/types/`
 
 ### Key Architectural Patterns
 1. **Hybrid API Strategy**: Firebase API for real-time best story IDs + Algolia Search API for efficient batch operations
-2. **Graceful Degradation**: Multiple fallback levels (content → meta description → original text)
-3. **Unified Data Types**: Shared `ProcessedStory` type between CLI and Worker
+2. **Graceful Degradation**: Multiple fallback levels (content -> meta description -> original text)
+3. **Unified Data Types**: Shared `ProcessedStory` type across services
 4. **Configuration Centralization**: All constants in `config/constants.ts`
+5. **Publisher Abstraction**: Multiple publishers (GitHub, Telegram) with conditional enabling
 
 ### Data Flow
 ```
-Firebase (Best IDs) → Algolia (Details) → Date/Score Filter
-  → Content Filter (optional) → Article Extraction → AI Summary
-  → Comment Fetch → Comment Summary → Translation → Cache → Output
+Firebase (Best IDs) -> Algolia (Details) -> Date/Score Filter
+  -> Content Filter (optional) -> Article Extraction -> AI Summary
+  -> Comment Fetch -> Comment Summary -> Translation -> Publishers
 ```
 
 ## Development Commands
 
-### Local Development (CLI Mode)
+### Cloudflare Worker Development
 ```bash
 # Install dependencies
 npm install
 
-# Run CLI tool (fetch and display stories)
-npm run fetch
-
-# Export yesterday's articles to Markdown file
-npm run fetch -- --export-daily
-
-# Force refresh (bypass cache)
-npm run fetch -- --no-cache
-npm run fetch -- --refresh
-
-# Build TypeScript for CLI
-npm run build
-
-# Clean build artifacts
-npm run clean
-```
-
-### Cloudflare Worker Development
-```bash
 # Build Worker bundle
 npm run build:worker
 
@@ -64,6 +43,9 @@ npm run build:worker:watch
 
 # Start local Worker development server
 npm run dev:worker
+
+# Trigger export manually (in another terminal)
+curl -X POST http://localhost:8787/trigger-export-sync
 
 # Deploy to production
 npm run deploy:worker
@@ -87,8 +69,10 @@ npx wrangler tail --format pretty
 npx wrangler tail --status error
 
 # Set secrets (API keys)
-npx wrangler secret put DEEPSEEK_API_KEY
+npx wrangler secret put LLM_DEEPSEEK_API_KEY
 npx wrangler secret put GITHUB_TOKEN
+npx wrangler secret put TELEGRAM_BOT_TOKEN
+npx wrangler secret put TELEGRAM_CHANNEL_ID
 
 # Check authentication status
 npx wrangler whoami
@@ -96,17 +80,23 @@ npx wrangler whoami
 
 ## Configuration
 
-### Environment Variables
-**Required for local development (`.env`):**
-- `DEEPSEEK_API_KEY`: DeepSeek API key (required)
-- `GITHUB_TOKEN`: GitHub Personal Access Token (for pushing exports)
+### Environment Variables (`.dev.vars` for local development)
+**Required:**
+- `LLM_PROVIDER`: "deepseek", "openrouter", or "zhipu"
+- `LLM_DEEPSEEK_API_KEY` / `LLM_OPENROUTER_API_KEY` / `LLM_ZHIPU_API_KEY`: Corresponding API key
+
+**Publisher Configuration (at least one required):**
+- `GITHUB_ENABLED`: "true" (default) or "false"
+- `GITHUB_TOKEN`: GitHub Personal Access Token (if GitHub enabled)
+- `TARGET_REPO`: Target repository "owner/repo" (if GitHub enabled)
+- `TELEGRAM_ENABLED`: "true" to enable Telegram
+- `TELEGRAM_BOT_TOKEN`: Telegram bot token (if Telegram enabled)
+- `TELEGRAM_CHANNEL_ID`: Telegram channel ID (if Telegram enabled)
 
 **Optional configuration:**
 - `HN_STORY_LIMIT`: Maximum stories to fetch (default: 30, max: 30)
 - `HN_TIME_WINDOW_HOURS`: Time window for stories (default: 24)
 - `SUMMARY_MAX_LENGTH`: Target length for AI summaries (100-500 chars, default: 300)
-- `CACHE_ENABLED`: Enable local caching ("true" or "false", default: true)
-- `CACHE_TTL_MINUTES`: Cache validity duration (default: 30)
 - `ENABLE_CONTENT_FILTER`: Enable AI-based content filtering (default: false)
 - `CONTENT_FILTER_SENSITIVITY`: "low", "medium", or "high" (default: medium)
 - `CRAWLER_API_URL`: Crawler API base URL for fallback content extraction
@@ -121,7 +111,6 @@ npx wrangler whoami
 
 ```
 src/
-├── index.ts                 # CLI entry point
 ├── api/
 │   ├── hackernews/         # HackerNews API modules
 │   │   ├── algolia.ts      # Algolia Search API (batch operations)
@@ -137,27 +126,29 @@ src/
 │   │   ├── summary.ts      # Summary translation
 │   │   └── title.ts        # Title translation
 │   ├── articleFetcher.ts   # Article content extraction
-│   ├── cache.ts           # TTL-based file caching
-│   ├── contentFilter.ts   # AI-based content filtering
-│   ├── llmProvider.ts     # LLM provider abstraction (DeepSeek/OpenRouter)
+│   ├── contentFilter.ts    # AI-based content filtering
 │   └── markdownExporter.ts # Markdown generation for exports
 ├── types/                  # TypeScript type definitions
-│   ├── api.ts             # API response types
-│   ├── shared.ts          # Shared data types (ProcessedStory, etc.)
-│   └── task.ts            # Task and pipeline types
-├── utils/                 # Utility functions
-│   ├── array.ts           # Array utilities
-│   ├── date.ts            # Date/time utilities (UTC-focused)
-│   ├── fetch.ts           # HTTP request wrapper with retry logic
-│   ├── html.ts            # HTML processing utilities
-│   └── result.ts          # Result type for error handling
-└── worker/                # Cloudflare Worker implementation
-    ├── index.ts           # Worker entry point and HTTP handlers
-    ├── exportHandler.ts   # Daily export pipeline
-    ├── githubClient.ts    # GitHub API client
-    ├── githubPush.ts      # Git operations for pushing to repositories
-    ├── logger.ts          # Structured logging for Worker
-    └── stubs/             # Node.js polyfills for Worker environment
+│   ├── api.ts              # API response types
+│   ├── shared.ts           # Shared data types (ProcessedStory, etc.)
+│   ├── publisher.ts        # Publisher types (GitHub, Telegram)
+│   └── worker.ts           # Worker environment types
+├── utils/                  # Utility functions
+│   ├── array.ts            # Array utilities
+│   ├── date.ts             # Date/time utilities (UTC-focused)
+│   ├── fetch.ts            # HTTP request wrapper with retry logic
+│   ├── html.ts             # HTML processing utilities
+│   └── result.ts           # Result type for error handling
+└── worker/                 # Cloudflare Worker implementation
+    ├── index.ts            # Worker entry point and HTTP handlers
+    ├── exportHandler.ts    # Daily export pipeline
+    ├── config/             # Worker configuration and validation
+    ├── publishers/         # Publisher implementations
+    │   ├── github/         # GitHub publisher
+    │   └── telegram/       # Telegram publisher
+    ├── sources/            # Content source abstraction
+    ├── logger.ts           # Structured logging for Worker
+    └── stubs/              # Node.js polyfills for Worker environment
 ```
 
 ## Important Implementation Details
@@ -168,12 +159,6 @@ src/
 - **Efficient batching**: ~3 API calls for 30 stories (vs 31+ previously)
 - **Retry logic**: Exponential backoff for failed requests (configurable in `config/constants.ts`)
 
-### Caching Strategy
-- **Location**: `.cache/stories.json`
-- **TTL**: Configurable (default 30 minutes)
-- **Invalidation**: Based on configuration changes and TTL expiration
-- **Worker**: Caching disabled by default (`CACHE_ENABLED=false` in `wrangler.toml`)
-
 ### Timezone Handling
 - **All operations use UTC timezone** for consistency with HackerNews API timestamps
 - Daily export mode queries "yesterday" in UTC (00:00-23:59 UTC)
@@ -181,7 +166,7 @@ src/
 
 ### Error Handling Philosophy
 - **Graceful degradation**: Single failures don't break entire pipeline
-- **Multiple fallbacks**: Content extraction → meta description → original text
+- **Multiple fallbacks**: Content extraction -> meta description -> original text
 - **Fail-open design**: AI content filtering failures default to no filtering
 - **Result types**: Use `Result<T, E>` pattern for explicit error handling
 
@@ -189,14 +174,8 @@ src/
 
 ### Manual Testing Commands
 ```bash
-# Test CLI functionality
-npm run fetch
-npm run fetch -- --export-daily
-npm run fetch -- --no-cache
-
 # Test Worker locally
 npm run dev:worker
-curl -X POST http://localhost:8787/trigger-export
 curl -X POST http://localhost:8787/trigger-export-sync
 
 # Monitor logs
@@ -204,10 +183,10 @@ npx wrangler tail --format pretty
 ```
 
 ### Common Issues and Solutions
-1. **Missing API keys**: Ensure `DEEPSEEK_API_KEY` is set in `.env` or via `wrangler secret put`
+1. **Missing API keys**: Ensure required keys are set in `.dev.vars` or via `wrangler secret put`
 2. **Algolia API 500 errors**: System has built-in retry logic; wait and retry
 3. **Worker timeout**: Using paid Cloudflare Workers plan (no CPU time limits)
-4. **TypeScript errors**: Run `npm run build` to check compilation
+4. **TypeScript errors**: Run `npm run build:worker` to check compilation
 
 ## Documentation
 
@@ -230,9 +209,8 @@ npx wrangler tail --format pretty
 ## Development Workflow
 
 ### Code Modification Guidelines
-- **CLI-only changes**: Edit `src/index.ts`, test with `npm run fetch`
-- **Worker-only changes**: Edit `src/worker/` files, test with `npm run dev:worker`
-- **Shared logic changes**: Edit `src/api/`, `src/services/`, `src/utils/`, test both CLI and Worker
+- **Worker changes**: Edit `src/worker/` files, test with `npm run dev:worker`
+- **Shared logic changes**: Edit `src/api/`, `src/services/`, `src/utils/`, test with `npm run dev:worker`
 - **Type definitions**: Update `src/types/` files when data structures change
 
 ### Git Conventions
@@ -247,8 +225,7 @@ npx wrangler tail --format pretty
 ## Performance Characteristics
 
 ### Typical Execution Times
-- **CLI mode**: ~2-3 minutes for 30 stories (depends on network and API response times)
-- **Worker mode**: ~2-3 minutes (similar to CLI, runs on Cloudflare edge)
+- **Worker mode**: ~2-3 minutes for 30 stories (depends on network and API response times)
 
 ### API Call Counts (for 30 stories)
 - Firebase API: 1 call (best story IDs)
@@ -256,10 +233,10 @@ npx wrangler tail --format pretty
 - Crawler API: 30 calls (one per story)
 - Algolia API (comments): 30 calls (one per story)
 - LLM API (translation/summary): 3-6 calls (batched processing)
-- GitHub API: 1 call (push final result)
-- **Total**: ~66 API calls
+- GitHub API: 1 call (push final result, if enabled)
+- Telegram API: 1-3 calls (message chunks, if enabled)
+- **Total**: ~66-68 API calls
 
 ### Optimization Tips
 - Reduce `HN_STORY_LIMIT` for faster execution
-- Enable caching (`CACHE_ENABLED=true`) for repeated runs
 - Adjust `LLM_BATCH_SIZE` in Worker configuration for batch processing

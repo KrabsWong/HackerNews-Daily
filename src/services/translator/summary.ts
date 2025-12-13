@@ -7,6 +7,7 @@ import { fromPromise } from '../../utils/result';
 import { HNComment } from '../../types/api';
 import { stripHTML } from '../../utils/html';
 import { chunk, parseJsonArray, MAX_RETRIES, delay } from '../../utils/array';
+import { getErrorMessage } from '../../worker/logger';
 import { CONTENT_CONFIG, LLM_BATCH_CONFIG } from '../../config/constants';
 import { LLMProvider, FetchError } from '../llm';
 import { translateDescription } from './title';
@@ -72,7 +73,7 @@ ${content}`;
       continue;
     }
 
-    console.warn(`Summarization failed: ${result.error.message}`);
+    console.warn(`Summarization failed: ${getErrorMessage(result.error)}`);
     return null;
   }
 
@@ -141,7 +142,7 @@ ${combinedText}`,
     return summary;
   } catch (error) {
     console.warn(
-      `Comment summarization failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      `Comment summarization failed: ${getErrorMessage(error)}`
     );
     return null;
   }
@@ -266,7 +267,7 @@ ${JSON.stringify(batchInput, null, 2)}
 
     // Handle API error
     if (!result.ok) {
-      console.warn(`Batch ${batchIdx + 1}: API error: ${result.error.message}`);
+      console.warn(`Batch ${batchIdx + 1}: API error: ${getErrorMessage(result.error)}`);
       for (const item of batch) {
         summaries[item.index] = await summarizeContent(
           provider,
@@ -301,7 +302,7 @@ ${JSON.stringify(batchInput, null, 2)}
         summaries[item.index] = parseResult.value[idx];
       });
     } else {
-      console.warn(`Batch ${batchIdx + 1}: ${parseResult.error.message}`);
+      console.warn(`Batch ${batchIdx + 1}: ${getErrorMessage(parseResult.error)}`);
       for (const item of batch) {
         summaries[item.index] = await summarizeContent(
           provider,
@@ -389,7 +390,7 @@ ${JSON.stringify(batchInput, null, 2)}
 
     // Handle API error
     if (!result.ok) {
-      console.warn(`Batch ${batchIdx + 1}: API error: ${result.error.message}`);
+      console.warn(`Batch ${batchIdx + 1}: API error: ${getErrorMessage(result.error)}`);
       for (const item of batch) {
         summaries[item.index] = await summarizeComments(provider, item.comments);
       }
@@ -416,7 +417,7 @@ ${JSON.stringify(batchInput, null, 2)}
         summaries[item.index] = parseResult.value[idx];
       });
     } else {
-      console.warn(`Batch ${batchIdx + 1}: ${parseResult.error.message}`);
+      console.warn(`Batch ${batchIdx + 1}: ${getErrorMessage(parseResult.error)}`);
       for (const item of batch) {
         summaries[item.index] = await summarizeComments(provider, item.comments);
       }

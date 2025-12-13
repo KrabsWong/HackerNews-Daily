@@ -4,6 +4,8 @@
  * Types for content publishing to various destinations (GitHub, Telegram, RSS, etc.)
  */
 
+import type { ProcessedStory } from './shared';
+
 /**
  * Configuration options passed to publishers
  * Publishers can define their own specific configuration schemas
@@ -20,6 +22,8 @@ export interface PublishContent {
   markdown: string;
   /** Date string in YYYY-MM-DD format */
   dateStr: string;
+  /** Processed stories for publishers that need structured data (e.g., Telegram) */
+  stories: ProcessedStory[];
   /** Additional metadata from the content source */
   metadata: Record<string, any>;
 }
@@ -76,4 +80,31 @@ export interface PushConfig {
   GITHUB_TOKEN: string;
   TARGET_REPO: string;
   TARGET_BRANCH: string;
+}
+
+/**
+ * Telegram publisher configuration
+ */
+export interface TelegramPublisherConfig extends PublisherConfig {
+  TELEGRAM_BOT_TOKEN: string;
+  TELEGRAM_CHANNEL_ID: string;
+}
+
+/**
+ * Telegram API sendMessage response structure
+ */
+export interface TelegramMessageResponse {
+  ok: boolean;
+  result?: {
+    message_id: number;
+    chat: {
+      id: number;
+      title?: string;
+      type: string;
+    };
+    date: number;
+    text?: string;
+  };
+  description?: string;
+  error_code?: number;
 }

@@ -5,6 +5,7 @@
 
 import { fromPromise } from '../../utils/result';
 import { chunk, parseJsonArray, MAX_RETRIES, delay } from '../../utils/array';
+import { getErrorMessage } from '../../worker/logger';
 import { LLMProvider, FetchError } from '../llm';
 
 // ============================================
@@ -74,7 +75,7 @@ Output only the translated title, no explanations.`;
 
     // Non-retryable error or max retries reached
     console.warn(
-      `Translation failed for: ${title.substring(0, 50)}... - ${result.error.message}`
+      `Translation failed for: ${title.substring(0, 50)}... - ${getErrorMessage(result.error)}`
     );
     return title;
   }
@@ -123,7 +124,7 @@ export async function translateDescription(
     return translation;
   } catch (error) {
     console.warn(
-      `Description translation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      `Description translation failed: ${getErrorMessage(error)}`
     );
     return description;
   }
@@ -183,7 +184,7 @@ Output format example: ["First translated title here", "Second translated title 
     // Handle API error
     if (!result.ok) {
       console.warn(
-        `Batch ${batchIdx + 1}: API error, falling back: ${result.error.message}`
+        `Batch ${batchIdx + 1}: API error, falling back: ${getErrorMessage(result.error)}`
       );
       for (const title of batch) {
         const translated = await translateTitle(provider, title);
@@ -211,7 +212,7 @@ Output format example: ["First translated title here", "Second translated title 
     if (parseResult.ok) {
       allTranslations.push(...parseResult.value);
     } else {
-      console.warn(`Batch ${batchIdx + 1}: ${parseResult.error.message}, falling back`);
+      console.warn(`Batch ${batchIdx + 1}: ${getErrorMessage(parseResult.error)}, falling back`);
       for (const title of batch) {
         const translated = await translateTitle(provider, title);
         allTranslations.push(translated);

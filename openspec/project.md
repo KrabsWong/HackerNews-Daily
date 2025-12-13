@@ -1,23 +1,23 @@
 # Project Context
 
 ## Purpose
-HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内容（best 列表），使用 AI 生成文章摘要和评论要点，翻译成中文，并支持多种输出格式（CLI、Markdown 日报）。支持 CLI 本地运行和 Cloudflare Worker 云端部署。使用混合 Firebase + Algolia API 策略提高效率，并提供可选的 AI 内容过滤功能。
+HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选内容（best 列表），使用 AI 生成文章摘要和评论要点，翻译成中文，并发布到 GitHub 和/或 Telegram。使用混合 Firebase + Algolia API 策略提高效率，并提供可选的 AI 内容过滤功能。
 
 ## Tech Stack
-- **Runtime**: Node.js 20+ (CLI), Cloudflare Workers (云端)
+- **Runtime**: Cloudflare Workers
 - **Language**: TypeScript 5.3+ (strict mode)
-- **Build**: tsc (CLI), esbuild (Worker)
+- **Build**: esbuild (Worker)
 - **Content Extraction**: Mozilla Readability, Crawler API
 - **LLM Provider**: DeepSeek API / OpenRouter / Zhipu AI (翻译、摘要、内容过滤)
 - **HTTP Client**: Native fetch (utils/fetch.ts 封装)
 - **HTML Parsing**: Cheerio, linkedom, @mozilla/readability
-- **Environment**: dotenv (CLI), Cloudflare secrets (Worker)
+- **Environment**: Cloudflare secrets (.dev.vars for local)
 
 ## Project Conventions
 
 ### Code Style
 - **Language**: 所有代码使用 TypeScript，启用 strict 模式
-- **Module System**: CommonJS (ES2020 target)
+- **Module System**: ES2020 target
 - **Naming**:
   - 文件名: camelCase (e.g., `hackerNews.ts`, `contentFilter.ts`)
   - 类/接口: PascalCase (e.g., `HNStory`, `AlgoliaSearchResponse`)
@@ -33,7 +33,6 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
 - **Exception**: 仅供文件内部使用的非导出类型可以在业务文件中定义
 - **Structure**: 按功能领域组织类型文件：
   - `types/api.ts` - HackerNews API 相关类型
-  - `types/cache.ts` - 缓存相关类型
   - `types/content.ts` - 内容过滤/文章相关类型
   - `types/llm.ts` - LLM provider 类型
   - `types/logger.ts` - 日志相关类型
@@ -65,14 +64,11 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
   │   │   ├── summary.ts     # 摘要翻译
   │   │   └── title.ts       # 标题翻译
   │   ├── articleFetcher.ts  # 文章抓取
-  │   ├── cache.ts           # 本地缓存
   │   ├── contentFilter.ts   # 内容过滤
-  │   ├── llmProvider.ts     # LLM 提供商抽象
   │   └── markdownExporter.ts
   ├── types/                 # 类型定义 (所有可导出类型必须在此目录)
   │   ├── index.ts           # 统一导出入口
   │   ├── api.ts             # API 相关类型
-  │   ├── cache.ts           # 缓存相关类型
   │   ├── content.ts         # 内容过滤/文章相关类型
   │   ├── llm.ts             # LLM provider 类型
   │   ├── logger.ts          # 日志相关类型
@@ -88,33 +84,37 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
   │   ├── fetch.ts           # HTTP 请求封装
   │   ├── html.ts            # HTML 处理
   │   └── result.ts          # Result 类型
-  ├── worker/                # Cloudflare Worker (v4.0+ 新架构)
-  │   ├── index.ts           # Worker 入口
-  │   ├── config/            # 配置验证
-  │   │   └── validation.ts  # 配置验证逻辑
-  │   ├── sources/           # 内容源实现
-  │   │   └── hackernews.ts  # HackerNews 源实现
-  │   ├── publishers/        # 发布渠道抽象
-  │   │   └── github/        # GitHub 发布器
-  │   │       ├── index.ts   # GitHubPublisher 实现
-  │   │       ├── client.ts  # GitHub API 客户端
-  │   │       └── versioning.ts # 文件版本控制
-  │   ├── logger.ts          # 日志工具
-  │   └── stubs/             # Worker 存根
-  └── index.ts               # CLI 入口
+  └── worker/                # Cloudflare Worker
+      ├── index.ts           # Worker 入口
+      ├── config/            # 配置验证
+      │   └── validation.ts  # 配置验证逻辑
+      ├── sources/           # 内容源实现
+      │   └── hackernews.ts  # HackerNews 源实现
+      ├── publishers/        # 发布渠道抽象
+      │   ├── github/        # GitHub 发布器
+      │   │   ├── index.ts   # GitHubPublisher 实现
+      │   │   ├── client.ts  # GitHub API 客户端
+      │   │   └── versioning.ts # 文件版本控制
+      │   └── telegram/      # Telegram 发布器 (可选)
+      │       ├── index.ts   # TelegramPublisher 实现
+      │       ├── client.ts  # Telegram API 客户端
+      │       └── formatter.ts # 消息格式化
+      ├── logger.ts          # 日志工具
+      └── stubs/             # Worker 存根
   ```
-- **Worker Architecture (v4.0+)**:
+- **Worker Architecture**:
   - **ContentSource 抽象**: 定义统一接口支持多个内容源
     - `fetchContent(date, config)`: 获取并处理特定日期的内容
     - 当前实现: `HackerNewsSource`
     - 未来可扩展: Reddit, ProductHunt 等
   - **Publisher 抽象**: 定义统一接口支持多个发布渠道
     - `publish(content, config)`: 将内容发布到目标渠道
-    - 当前实现: `GitHubPublisher` (支持自动版本控制)
-    - 未来可扩展: Telegram, RSS, Email 等
+    - 当前实现: `GitHubPublisher` (支持自动版本控制), `TelegramPublisher` (可选)
+    - 未来可扩展: RSS, Email 等
   - **Configuration Validation**: 启动时验证必需配置
-    - `LLM_PROVIDER`, `TARGET_REPO`, `GITHUB_TOKEN` 必须显式设置
-    - 提供者特定的 API 密钥根据 `LLM_PROVIDER` 验证
+    - `LLM_PROVIDER` 必须显式设置
+    - 至少一个发布器必须启用
+    - 提供者特定的配置根据启用状态验证
     - 失败时提供清晰的错误消息
 - **API Pattern**: 
   - 混合策略: Firebase (best story IDs) + Algolia (批量查询详情和评论)
@@ -126,20 +126,13 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
   ```
   Firebase (Best IDs) → Algolia (Details) → Date/Score Filter
     → Content Filter (optional) → Article Extraction → AI Summary
-    → Comment Fetch → Comment Summary → Translation → Cache → Output
+    → Comment Fetch → Comment Summary → Translation → Publishers
   ```
-- **Caching Strategy**:
-  - 本地文件缓存 (`.cache/stories.json`)
-  - TTL-based invalidation (默认 30 分钟)
-  - Configuration change detection
 
 ### Testing Strategy
 - 目前无自动化测试
 - 手动测试命令: 
-  - CLI: `npm run fetch`
-  - Daily Export: `npm run fetch -- --export-daily`
-  - 强制刷新: `npm run fetch -- --no-cache`
-  - Worker 本地: `npm run dev:worker`
+  - Worker 本地: `npm run dev:worker` + `curl -X POST http://localhost:8787/trigger-export-sync`
   - Worker 部署: `npm run deploy:worker`
 
 ### Git Workflow
@@ -190,30 +183,22 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
 - **Best Stories**: HN 的精选列表 (https://news.ycombinator.com/best)，由 HN 算法根据质量筛选
 - **Score/Points**: 帖子的评分（点赞数）
 - **Story**: 一篇帖子，包含 title, url, score, time, by 等字段
-- **Content Filtering**: 可选的 AI 内容过滤（基于 DeepSeek LLM 分类为 SAFE/SENSITIVE）
+- **Content Filtering**: 可选的 AI 内容过滤（基于 LLM 分类为 SAFE/SENSITIVE）
 - **Article Summary**: 使用 Readability 提取正文后由 AI 生成约 300 字摘要
 - **Comment Summary**: 获取 top 10 评论并生成约 100 字 AI 摘要
 
 ### 数据处理流程
 
-#### CLI / Web 模式 (默认过去 24 小时)
-1. 从 Firebase 获取 best stories ID 列表（约 200 个）
-2. 使用 Algolia 批量获取 story 详情（批次 100）
-3. 按日期范围过滤
-4. 按 score 降序排序，取 top N（默认 30，可配置）
+#### Daily Export 模式 (前一天 00:00-23:59 UTC)
+1. 从 Firebase 获取 best stories ID 列表
+2. 使用 Algolia 批量获取 story 详情
+3. 按日期范围过滤（昨天）
+4. 按 score 降序排序，取 top N（默认 30）
 5. **可选**: AI 内容过滤（移除 SENSITIVE 标题）
 6. 抓取文章全文（Mozilla Readability）
 7. 生成 AI 摘要（文章内容和评论）
 8. 翻译标题和摘要到中文
-9. 输出到 CLI / Web / 缓存
-
-#### Daily Export 模式 (前一天 00:00-23:59)
-1. 从 Algolia 查询前一天的 best stories
-2. 按创建时间降序排序
-3. 应用内容过滤（如启用）
-4. 生成 Markdown 文件（带 Jekyll frontmatter）
-5. 保存到 `hacknews-export/YYYY-MM-DD-daily.md`
-6. GitHub Actions 自动推送到 tldr-hacknews-24 仓库
+9. 发布到 GitHub 和/或 Telegram
 
 ## Important Constraints
 - **Rate Limiting**: Algolia API 有请求限制，批量大小 100 stories/batch，最多 10 页
@@ -225,8 +210,9 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
   - 内容提取失败 → 回退到 meta description
   - AI 内容过滤失败 → 回退到不过滤 (fail-open)
   - 翻译失败 → 显示原文
+  - 单个发布器失败 → 不影响其他发布器
 - **中文输出**: 最终输出面向中文用户
-- **Performance**: 处理 30 篇文章约需 2.5-3.5 分钟（包含 AI 处理）
+- **Performance**: 处理 30 篇文章约需 2-3 分钟（包含 AI 处理）
 
 ## External Dependencies
 - **HackerNews Firebase API**: 获取 best stories ID 和评论详情
@@ -236,41 +222,42 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
   - OpenRouter: 翻译、AI 摘要生成、内容过滤
   - Zhipu AI: 翻译、AI 摘要生成、内容过滤 (glm-4.5-flash 并发限制 2)
 - **Mozilla Readability**: 文章正文智能提取
+- **GitHub API**: 文件创建和更新
+- **Telegram Bot API**: 消息发送
 
 ## Configuration
 主要环境变量（详见 `.env.example`）:
 
-### CLI 配置
-- `LLM_PROVIDER`: LLM 提供商 (deepseek | openrouter | zhipu, CLI 默认 deepseek)
-- `LLM_DEEPSEEK_API_KEY`: DeepSeek API 密钥（如使用 DeepSeek）
-- `LLM_DEEPSEEK_MODEL`: DeepSeek 模型（可选，默认 deepseek-chat）
-- `LLM_OPENROUTER_API_KEY`: OpenRouter API 密钥（如 LLM_PROVIDER=openrouter）
-- `LLM_OPENROUTER_MODEL`: OpenRouter 模型（可选）
-- `LLM_OPENROUTER_SITE_URL`: OpenRouter 站点 URL（可选）
-- `LLM_OPENROUTER_SITE_NAME`: OpenRouter 站点名称（可选）
-- `LLM_ZHIPU_API_KEY`: Zhipu AI API 密钥（如 LLM_PROVIDER=zhipu）
-- `LLM_ZHIPU_MODEL`: Zhipu AI 模型（可选，默认 glm-4.5-flash，并发限制 2）
-- `HN_STORY_LIMIT`: 最大故事数（默认 30）
-- `HN_TIME_WINDOW_HOURS`: 时间窗口（默认 24 小时）
-- `ENABLE_CONTENT_FILTER`: 启用 AI 内容过滤（默认 false）
-- `CONTENT_FILTER_SENSITIVITY`: 过滤敏感度（low/medium/high，默认 medium）
-- `CACHE_ENABLED`: 启用缓存（默认 true）
-
-### Worker 配置 (v4.0+)
-**必需变量** (无默认值，缺失时 Worker 启动失败):
+### LLM 配置 (必需)
 - `LLM_PROVIDER`: **必需** (deepseek | openrouter | zhipu)
-- `TARGET_REPO`: **必需** (格式: "owner/repo")
-- `GITHUB_TOKEN`: **必需** (GitHub personal access token)
 - `LLM_DEEPSEEK_API_KEY`: 条件必需 (当 LLM_PROVIDER=deepseek)
 - `LLM_OPENROUTER_API_KEY`: 条件必需 (当 LLM_PROVIDER=openrouter)
 - `LLM_ZHIPU_API_KEY`: 条件必需 (当 LLM_PROVIDER=zhipu)
 
-**可选 LLM 配置**:
+**注意**: 至少需要启用一个发布器 (GitHub 或 Telegram)
+
+### GitHub 发布器 (默认启用)
+- `GITHUB_ENABLED`: 启用 GitHub 发布 ("true" 或 "false"，默认 "true")
+- `TARGET_REPO`: 目标仓库 (格式: "owner/repo"，启用时必需)
+- `GITHUB_TOKEN`: GitHub personal access token (启用时必需)
+
+### Telegram 发布器 (可选)
+- `TELEGRAM_ENABLED`: 启用 Telegram 发布 ("true" 或 "false"，默认 "false")
+- `TELEGRAM_BOT_TOKEN`: Bot API Token (通过 @BotFather 获取，启用时必需)
+- `TELEGRAM_CHANNEL_ID`: 频道 ID ("@channel_name" 或 "-100xxxxxxxxx"，启用时必需)
+
+### 可选 LLM 配置
 - `LLM_DEEPSEEK_MODEL`: DeepSeek 模型覆盖
 - `LLM_OPENROUTER_MODEL`: OpenRouter 模型覆盖
 - `LLM_OPENROUTER_SITE_URL`: OpenRouter 站点 URL
 - `LLM_OPENROUTER_SITE_NAME`: OpenRouter 站点名称
 - `LLM_ZHIPU_MODEL`: Zhipu AI 模型覆盖 (默认 glm-4.5-flash)
+
+### 其他配置
+- `HN_STORY_LIMIT`: 最大故事数（默认 30）
+- `HN_TIME_WINDOW_HOURS`: 时间窗口（默认 24 小时）
+- `ENABLE_CONTENT_FILTER`: 启用 AI 内容过滤（默认 false）
+- `CONTENT_FILTER_SENSITIVITY`: 过滤敏感度（low/medium/high，默认 medium）
 
 **配置验证**: Worker 启动时会验证所有必需配置，提供清晰的错误消息
 
