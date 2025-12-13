@@ -10,7 +10,7 @@ import {
   LLMProvider,
   createLLMProvider,
   CreateProviderOptions,
-} from '../llmProvider';
+} from '../llm';
 import * as title from './title';
 import * as summary from './summary';
 
@@ -25,18 +25,12 @@ class TranslationService {
 
   /**
    * Initialize the translation service with LLM provider
-   * @param apiKeyOrOptions - API key string (for backward compatibility) or provider options
+   * @param options - Provider options
    */
-  init(apiKeyOrOptions?: string | CreateProviderOptions): void {
+  init(options: CreateProviderOptions): void {
     if (this.initialized) {
       return;
     }
-
-    // Handle backward compatibility: if a string is passed, treat it as deepseekApiKey
-    const options: CreateProviderOptions =
-      typeof apiKeyOrOptions === 'string'
-        ? { deepseekApiKey: apiKeyOrOptions }
-        : apiKeyOrOptions || {};
 
     this.provider = createLLMProvider(options);
     this.initialized = true;
@@ -187,4 +181,4 @@ class TranslationService {
 export const translator = new TranslationService();
 
 // Re-export types for convenience
-export { CreateProviderOptions } from '../llmProvider';
+export type { CreateProviderOptions } from '../llm';

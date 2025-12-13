@@ -5,7 +5,7 @@
 
 import { fromPromise } from '../../utils/result';
 import { chunk, parseJsonArray, MAX_RETRIES, delay } from '../../utils/array';
-import { LLMProvider, FetchError } from '../llmProvider';
+import { LLMProvider, FetchError } from '../llm';
 
 // ============================================
 // Single-Item Translation Functions

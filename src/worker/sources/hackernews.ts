@@ -1,19 +1,20 @@
 /**
- * Export handler for Cloudflare Worker
- * Orchestrates the daily HackerNews export pipeline
+ * HackerNews Content Source
+ * Fetches and processes HackerNews stories for daily export
  */
 
-import { fetchTopStoriesByScore, fetchCommentsBatchFromAlgolia } from '../api';
-import { HNStory } from '../types/api';
-import { translator, CreateProviderOptions } from '../services/translator';
-import { fetchArticlesBatch, ArticleMetadata } from '../services/articleFetcher';
-import { AIContentFilter } from '../services/contentFilter';
-import { generateMarkdownContent, generateFilename } from '../services/markdownExporter';
-import { logInfo, logError, logWarn, logMetrics } from './logger';
-import { LLM_BATCH_CONFIG } from '../config/constants';
-import { ProcessedStory } from '../types/shared';
-import { getPreviousDayBoundaries, formatTimestamp, formatDateForDisplay } from '../utils/date';
-import type { Env } from './index';
+import { fetchTopStoriesByScore, fetchCommentsBatchFromAlgolia } from '../../api';
+import { translator } from '../../services/translator';
+import { buildProviderOptions, CreateProviderOptions } from '../../services/llm';
+import { fetchArticlesBatch, ArticleMetadata } from '../../services/articleFetcher';
+import { AIContentFilter } from '../../services/contentFilter';
+import { generateMarkdownContent } from '../../services/markdownExporter';
+import { logInfo, logError, logWarn, logMetrics } from '../logger';
+import { LLM_BATCH_CONFIG } from '../../config/constants';
+import { ProcessedStory } from '../../types/shared';
+import { getPreviousDayBoundaries, formatTimestamp, formatDateForDisplay } from '../../utils/date';
+import type { Env } from '../index';
+import { ContentSource, SourceContent, SourceConfig } from './index';
 
 /**
  * Parse LLM batch size from environment variable
@@ -43,15 +44,7 @@ function parseLLMBatchSize(envValue: string | undefined): number {
  * Initialize translator service with LLM provider options from environment
  */
 function initializeTranslator(env: Env): void {
-  const providerOptions: CreateProviderOptions = {
-    provider: (env.LLM_PROVIDER?.toLowerCase() || 'deepseek') as 'deepseek' | 'openrouter',
-    deepseekApiKey: env.DEEPSEEK_API_KEY,
-    openrouterApiKey: env.OPENROUTER_API_KEY,
-    model: env.OPENROUTER_MODEL,
-    siteUrl: env.OPENROUTER_SITE_URL,
-    siteName: env.OPENROUTER_SITE_NAME,
-  };
-  
+  const providerOptions = buildProviderOptions(env);
   translator.init(providerOptions);
 }
 
@@ -106,14 +99,7 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
       logInfo('Applying content filter');
       
       // Create content filter with the same provider options as translator
-      const contentFilterOptions: CreateProviderOptions = {
-        provider: (env.LLM_PROVIDER?.toLowerCase() || 'deepseek') as 'deepseek' | 'openrouter',
-        deepseekApiKey: env.DEEPSEEK_API_KEY,
-        openrouterApiKey: env.OPENROUTER_API_KEY,
-        model: env.OPENROUTER_MODEL,
-        siteUrl: env.OPENROUTER_SITE_URL,
-        siteName: env.OPENROUTER_SITE_NAME,
-      };
+      const contentFilterOptions = buildProviderOptions(env);
       const contentFilter = new AIContentFilter(contentFilterOptions);
       
       apiCalls['llm_filter'] = (apiCalls['llm_filter'] || 0) + 1;
@@ -277,5 +263,32 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
     });
 
     throw error;
+  }
+}
+
+/**
+ * HackerNews ContentSource implementation
+ * Implements the ContentSource interface for extensibility
+ */
+export class HackerNewsSource implements ContentSource {
+  readonly name = 'hackernews';
+  
+  /**
+   * Fetch HackerNews content for a specific date
+   * @param date - Target date (typically previous day)
+   * @param config - Configuration from Env
+   */
+  async fetchContent(date: Date, config: SourceConfig): Promise<SourceContent> {
+    const env = config as Env;
+    const result = await runDailyExport(env);
+    
+    return {
+      markdown: result.markdown,
+      dateStr: result.dateStr,
+      metadata: {
+        source: 'hackernews',
+        date: result.dateStr,
+      },
+    };
   }
 }

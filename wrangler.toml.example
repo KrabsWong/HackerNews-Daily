@@ -1,0 +1,69 @@
+name = "hacknews-daily-export"
+main = "dist/worker/index.js"
+compatibility_date = "2024-12-11"
+compatibility_flags = ["nodejs_compat"]
+
+# Enable observability features
+observability = { enabled = true }
+
+# Log level configuration (default: "log", options: "none", "error", "warn", "log", "debug")
+[env.production]
+log_level = "log"
+
+[env.dev]
+log_level = "debug"
+
+[vars]
+# Story fetching configuration
+HN_STORY_LIMIT = "30"
+HN_TIME_WINDOW_HOURS = "24"
+SUMMARY_MAX_LENGTH = "300"
+
+# Content filtering
+ENABLE_CONTENT_FILTER = "false"
+CONTENT_FILTER_SENSITIVITY = "medium"
+
+# Cache configuration (set to "false" for workers)
+CACHE_ENABLED = "false"
+
+# LLM batch processing
+LLM_BATCH_SIZE = "15"
+
+# =============================================================================
+# REQUIRED: You MUST set these variables before deploying
+# =============================================================================
+
+# LLM Provider: "deepseek" or "openrouter"
+# LLM_PROVIDER = "deepseek"
+
+# Target GitHub repository (format: "username/repo-name")
+# IMPORTANT: Change this to YOUR repository to avoid pushing to the wrong place!
+# TARGET_REPO = "yourusername/your-repo-name"
+
+# Target branch (usually "main" or "master")
+TARGET_BRANCH = "main"
+
+# =============================================================================
+# Secrets (set via: wrangler secret put SECRET_NAME)
+# =============================================================================
+# 
+# Based on your LLM_PROVIDER choice, set ONE of:
+#   - DEEPSEEK_API_KEY (if LLM_PROVIDER=deepseek)
+#   - OPENROUTER_API_KEY (if LLM_PROVIDER=openrouter)
+#
+# Also required:
+#   - GITHUB_TOKEN (GitHub personal access token with repo scope)
+#
+# Example commands:
+#   wrangler secret put DEEPSEEK_API_KEY
+#   wrangler secret put GITHUB_TOKEN
+#
+# Optional:
+#   wrangler secret put CRAWLER_API_URL
+#
+# =============================================================================
+
+# Scheduled triggers (cron format)
+# Default: Daily at 00:15 UTC
+[triggers]
+crons = ["15 0 * * *"]

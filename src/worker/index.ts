@@ -6,23 +6,28 @@
  * No subrequest limits with paid plan.
  */
 
-import { runDailyExport } from './exportHandler';
-import { pushToGitHub } from './githubPush';
+import { HackerNewsSource } from './sources/hackernews';
+import { GitHubPublisher } from './publishers/github';
+import { validateWorkerConfig } from './config/validation';
 import { logInfo, logError } from './logger';
+import { LLMProviderType } from '../config/constants';
 
 /**
  * Environment variables and secrets available to the Worker
  * Configured via wrangler.toml and Cloudflare secrets
  */
 export interface Env {
-  // Secrets (set via wrangler secret put)
+  // REQUIRED: Secrets (set via wrangler secret put)
+  GITHUB_TOKEN: string;
+  LLM_PROVIDER: string;  // Will be validated as LLMProviderType
+  TARGET_REPO: string;
+  
+  // Provider-specific API keys (one required based on LLM_PROVIDER)
   DEEPSEEK_API_KEY?: string;
   OPENROUTER_API_KEY?: string;
-  GITHUB_TOKEN: string;
-  CRAWLER_API_URL?: string;
   
-  // LLM Provider configuration
-  LLM_PROVIDER?: string;  // 'deepseek' | 'openrouter'
+  // Optional configuration
+  CRAWLER_API_URL?: string;
   OPENROUTER_MODEL?: string;
   OPENROUTER_SITE_URL?: string;
   OPENROUTER_SITE_NAME?: string;
@@ -34,7 +39,6 @@ export interface Env {
   ENABLE_CONTENT_FILTER: string;
   CONTENT_FILTER_SENSITIVITY: string;
   CACHE_ENABLED: string;
-  TARGET_REPO: string;
   TARGET_BRANCH: string;
   LLM_BATCH_SIZE: string;
 }
@@ -47,22 +51,8 @@ async function handleDailyExport(env: Env): Promise<string> {
   try {
     logInfo('=== Daily Export Started ===');
 
-    // Validate required secrets based on provider
-    const provider = (env.LLM_PROVIDER?.toLowerCase() || 'deepseek') as 'deepseek' | 'openrouter';
-    
-    if (provider === 'openrouter') {
-      if (!env.OPENROUTER_API_KEY) {
-        throw new Error('Missing OPENROUTER_API_KEY secret (required when LLM_PROVIDER=openrouter)');
-      }
-    } else {
-      if (!env.DEEPSEEK_API_KEY) {
-        throw new Error('Missing DEEPSEEK_API_KEY secret');
-      }
-    }
-    
-    if (!env.GITHUB_TOKEN) {
-      throw new Error('Missing GITHUB_TOKEN secret');
-    }
+    // Validate configuration (fail fast if required vars missing)
+    validateWorkerConfig(env);
 
     // Set environment variables for process.env access
     (process as any).env = (process as any).env || {};
@@ -82,20 +72,24 @@ async function handleDailyExport(env: Env): Promise<string> {
       (process as any).env.OPENROUTER_SITE_NAME = env.OPENROUTER_SITE_NAME;
     }
 
-    // Run the export pipeline
-    logInfo('Running export pipeline', { provider });
-    const { markdown, dateStr } = await runDailyExport(env);
-
-    // Push to GitHub
-    logInfo('Pushing to GitHub repository');
-    await pushToGitHub(markdown, dateStr, {
+    // Initialize source and publisher
+    const source = new HackerNewsSource();
+    const publisher = new GitHubPublisher();
+    
+    // Fetch content from source
+    logInfo('Fetching content from source', { source: source.name });
+    const content = await source.fetchContent(new Date(), env);
+    
+    // Publish to destination
+    logInfo('Publishing content', { publisher: publisher.name, repo: env.TARGET_REPO });
+    await publisher.publish(content, {
       GITHUB_TOKEN: env.GITHUB_TOKEN,
-      TARGET_REPO: env.TARGET_REPO || 'KrabsWong/tldr-hacknews-24',
+      TARGET_REPO: env.TARGET_REPO,
       TARGET_BRANCH: env.TARGET_BRANCH || 'main',
     });
 
-    const successMessage = `Export completed successfully for ${dateStr}`;
-    logInfo('=== Daily Export Completed ===', { dateStr });
+    const successMessage = `Export completed successfully for ${content.dateStr}`;
+    logInfo('=== Daily Export Completed ===', { dateStr: content.dateStr });
     
     return successMessage;
   } catch (error) {

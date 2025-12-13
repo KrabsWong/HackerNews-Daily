@@ -18,9 +18,12 @@ export const HN_API = {
 } as const;
 
 /**
- * LLM Provider type
+ * LLM Provider enumeration
  */
-export type LLMProviderType = 'deepseek' | 'openrouter';
+export enum LLMProviderType {
+  DEEPSEEK = 'deepseek',
+  OPENROUTER = 'openrouter',
+}
 
 /**
  * DeepSeek AI API configuration
@@ -77,17 +80,20 @@ export const OPENROUTER_API = {
 export const LLM_CONFIG = {
   /**
    * Get the configured LLM provider
-   * Defaults to 'deepseek' for backward compatibility
+   * Defaults to DEEPSEEK for backward compatibility
    */
   get PROVIDER(): LLMProviderType {
     const provider = process.env.LLM_PROVIDER?.toLowerCase();
-    if (provider === 'openrouter') {
-      return 'openrouter';
+    switch (provider) {
+      case LLMProviderType.OPENROUTER:
+        return LLMProviderType.OPENROUTER;
+      case LLMProviderType.DEEPSEEK:
+      case undefined:
+        return LLMProviderType.DEEPSEEK;
+      default:
+        console.warn(`Invalid LLM_PROVIDER "${provider}", falling back to "deepseek"`);
+        return LLMProviderType.DEEPSEEK;
     }
-    if (provider && provider !== 'deepseek') {
-      console.warn(`Invalid LLM_PROVIDER "${provider}", falling back to "deepseek"`);
-    }
-    return 'deepseek';
   },
 };
 

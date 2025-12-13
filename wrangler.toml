@@ -20,9 +20,12 @@ SUMMARY_MAX_LENGTH = "300"
 ENABLE_CONTENT_FILTER = "false"
 CONTENT_FILTER_SENSITIVITY = "medium"
 CACHE_ENABLED = "false"
+LLM_BATCH_SIZE = "15"
+
+# REQUIRED: Set these before deploying (uncomment and change values)
+LLM_PROVIDER = "deepseek"
 TARGET_REPO = "KrabsWong/tldr-hacknews-24"
 TARGET_BRANCH = "main"
-LLM_BATCH_SIZE = "15"
 
 [triggers]
 crons = ["15 0 * * *"]

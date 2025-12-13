@@ -3,8 +3,7 @@
  * Uses GitHub REST API v3
  */
 
-import { FetchError } from '../utils/fetch';
-import { logInfo, logWarn, logError } from './logger';
+import { logInfo, logWarn, logError } from '../../logger';
 
 interface GitHubFileResponse {
   sha: string;

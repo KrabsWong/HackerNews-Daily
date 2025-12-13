@@ -9,12 +9,16 @@ web/dist/
 .env
 .dev.vars
 
+# Cloudflare Worker configuration (contains personal repo settings)
+# Use wrangler.toml.example as template
+wrangler.toml
+
 # Cache
 .cache/
 .wrangler/
 
 # Exported markdown files
-TLDR-HackNews24/
+hacknews-export/
 
 # Logs
 *.log

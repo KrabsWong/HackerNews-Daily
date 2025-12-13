@@ -8,6 +8,7 @@ import { HNStory } from './types/api';
 import { translator } from './services/translator';
 import { fetchArticlesBatch } from './services/articleFetcher';
 import { STORY_LIMITS, SUMMARY_CONFIG, ENV_DEFAULTS, CONTENT_FILTER } from './config/constants';
+import { buildCliProviderOptions } from './services/llm';
 import { checkCache, writeCache, isCacheEnabled, CachedStory } from './services/cache';
 import { AIContentFilter } from './services/contentFilter';
 import {
@@ -198,12 +199,13 @@ async function fetchFreshData(
   timeWindowHours: number,
   summaryMaxLength: number
 ): Promise<ProcessedStory[]> {
-  // Validate configuration
+  // Validate configuration and build provider options
   console.log('Validating configuration...');
-  translator.init();
+  const providerOptions = buildCliProviderOptions();
+  translator.init(providerOptions);
   
   // Initialize content filter
-  const contentFilter = new AIContentFilter(translator);
+  const contentFilter = new AIContentFilter(providerOptions);
   
   // Display fetch parameters
   console.log(`Fetching up to ${storyLimit} stories from the past ${timeWindowHours} hours...`);

@@ -1,10 +1,10 @@
 /**
  * GitHub push handler with file versioning logic
- * Pushes generated Markdown files to tldr-hacknews-24 repository
+ * Pushes generated Markdown files to target repository
  */
 
-import { GitHubClient } from './githubClient';
-import { logInfo, logWarn, logError } from './logger';
+import { GitHubClient } from './client';
+import { logInfo, logWarn, logError } from '../../logger';
 
 interface PushConfig {
   GITHUB_TOKEN: string;

@@ -8,7 +8,7 @@ import { HNComment } from '../../types/api';
 import { stripHTML } from '../../utils/html';
 import { chunk, parseJsonArray, MAX_RETRIES, delay } from '../../utils/array';
 import { CONTENT_CONFIG, LLM_BATCH_CONFIG } from '../../config/constants';
-import { LLMProvider, FetchError } from '../llmProvider';
+import { LLMProvider, FetchError } from '../llm';
 import { translateDescription } from './title';
 
 // ============================================

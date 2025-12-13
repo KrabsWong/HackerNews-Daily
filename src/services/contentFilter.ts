@@ -1,6 +1,6 @@
 import { HNStory } from '../types/api';
 import { CONTENT_FILTER, SensitivityLevel } from '../config/constants';
-import { LLMProvider, createLLMProvider, CreateProviderOptions } from './llmProvider';
+import { LLMProvider, createLLMProvider, CreateProviderOptions } from './llm';
 
 /**
  * Classification result for a single story title
@@ -50,33 +50,12 @@ export class AIContentFilter implements ContentFilter {
 
   /**
    * Create a new AI content filter
-   * @param providerOrOptions - LLM provider instance or options to create one
-   *                            For backward compatibility, can also be a translator instance (ignored)
-   * @param apiKey - Optional API key (deprecated, use providerOptions instead)
+   * @param providerOptions - Options to create the LLM provider
    */
-  constructor(
-    providerOrOptions?: LLMProvider | CreateProviderOptions | { init(): void },
-    apiKey?: string
-  ) {
+  constructor(providerOptions: CreateProviderOptions) {
     this.enabled = CONTENT_FILTER.ENABLED;
     this.sensitivity = CONTENT_FILTER.SENSITIVITY;
-    
-    // Handle different constructor signatures for backward compatibility
-    if (providerOrOptions && 'chatCompletion' in providerOrOptions) {
-      // It's an LLMProvider instance
-      this.provider = providerOrOptions;
-      this.providerOptions = {};
-    } else if (providerOrOptions && 'init' in providerOrOptions) {
-      // It's a translator instance (old API) - ignore it, we'll create our own provider
-      // Use apiKey if provided for backward compatibility
-      this.providerOptions = apiKey ? { deepseekApiKey: apiKey } : {};
-    } else if (providerOrOptions) {
-      // It's CreateProviderOptions
-      this.providerOptions = providerOrOptions as CreateProviderOptions;
-    } else {
-      // No options provided, use defaults
-      this.providerOptions = apiKey ? { deepseekApiKey: apiKey } : {};
-    }
+    this.providerOptions = providerOptions;
   }
 
   /**

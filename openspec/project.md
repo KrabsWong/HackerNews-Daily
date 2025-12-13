@@ -39,7 +39,7 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
   │   │   └── mapper.ts      # 数据映射
   │   └── index.ts           # API 统一导出
   ├── config/
-  │   └── constants.ts       # 配置常量
+  │   └── constants.ts       # 配置常量 (包含 LLMProviderType 导出)
   ├── services/
   │   ├── translator/        # 翻译服务
   │   │   ├── index.ts       # 翻译服务入口
@@ -60,19 +60,42 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
   │   ├── fetch.ts           # HTTP 请求封装
   │   ├── html.ts            # HTML 处理
   │   └── result.ts          # Result 类型
-  ├── worker/                # Cloudflare Worker
+  ├── worker/                # Cloudflare Worker (v4.0+ 新架构)
   │   ├── index.ts           # Worker 入口
-  │   ├── exportHandler.ts   # 导出处理
-  │   ├── githubClient.ts    # GitHub API
-  │   ├── githubPush.ts      # Git 操作
+  │   ├── config/            # 配置验证
+  │   │   ├── validation.ts  # 配置验证逻辑
+  │   │   └── types.ts       # Worker 类型定义
+  │   ├── sources/           # 内容源抽象
+  │   │   ├── index.ts       # ContentSource 接口
+  │   │   └── hackernews.ts  # HackerNews 源实现
+  │   ├── publishers/        # 发布渠道抽象
+  │   │   ├── index.ts       # Publisher 接口
+  │   │   └── github/        # GitHub 发布器
+  │   │       ├── index.ts   # GitHubPublisher 实现
+  │   │       ├── client.ts  # GitHub API 客户端
+  │   │       └── versioning.ts # 文件版本控制
   │   ├── logger.ts          # 日志工具
   │   └── stubs/             # Worker 存根
   └── index.ts               # CLI 入口
   ```
+- **Worker Architecture (v4.0+)**:
+  - **ContentSource 抽象**: 定义统一接口支持多个内容源
+    - `fetchContent(date, config)`: 获取并处理特定日期的内容
+    - 当前实现: `HackerNewsSource`
+    - 未来可扩展: Reddit, ProductHunt 等
+  - **Publisher 抽象**: 定义统一接口支持多个发布渠道
+    - `publish(content, config)`: 将内容发布到目标渠道
+    - 当前实现: `GitHubPublisher` (支持自动版本控制)
+    - 未来可扩展: Telegram, RSS, Email 等
+  - **Configuration Validation**: 启动时验证必需配置
+    - `LLM_PROVIDER`, `TARGET_REPO`, `GITHUB_TOKEN` 必须显式设置
+    - 提供者特定的 API 密钥根据 `LLM_PROVIDER` 验证
+    - 失败时提供清晰的错误消息
 - **API Pattern**: 
   - 混合策略: Firebase (best story IDs) + Algolia (批量查询详情和评论)
   - 使用原生 fetch 进行 HTTP 请求 (utils/fetch.ts 封装)
   - 所有 API 配置集中在 `config/constants.ts`
+  - `LLMProviderType` 作为公共类型导出以保证类型安全
   - 超时和重试策略在配置中定义
 - **Data Flow**: 
   ```
@@ -191,12 +214,26 @@ HackerNews Daily 是一个自动化工具，用于抓取 HackerNews 的精选内
 
 ## Configuration
 主要环境变量（详见 `.env.example`）:
-- `DEEPSEEK_API_KEY`: DeepSeek API 密钥（必需）
+
+### CLI 配置
+- `DEEPSEEK_API_KEY`: DeepSeek API 密钥（如使用 DeepSeek）
+- `LLM_PROVIDER`: LLM 提供商 (deepseek | openrouter, CLI 默认 deepseek)
+- `OPENROUTER_API_KEY`: OpenRouter API 密钥（如 LLM_PROVIDER=openrouter）
 - `HN_STORY_LIMIT`: 最大故事数（默认 30）
 - `HN_TIME_WINDOW_HOURS`: 时间窗口（默认 24 小时）
 - `ENABLE_CONTENT_FILTER`: 启用 AI 内容过滤（默认 false）
 - `CONTENT_FILTER_SENSITIVITY`: 过滤敏感度（low/medium/high，默认 medium）
 - `CACHE_ENABLED`: 启用缓存（默认 true）
+
+### Worker 配置 (v4.0+)
+**必需变量** (无默认值，缺失时 Worker 启动失败):
+- `LLM_PROVIDER`: **必需** (deepseek | openrouter)
+- `TARGET_REPO`: **必需** (格式: "owner/repo")
+- `GITHUB_TOKEN`: **必需** (GitHub personal access token)
+- `DEEPSEEK_API_KEY`: 条件必需 (当 LLM_PROVIDER=deepseek)
+- `OPENROUTER_API_KEY`: 条件必需 (当 LLM_PROVIDER=openrouter)
+
+**配置验证**: Worker 启动时会验证所有必需配置，提供清晰的错误消息
 
 ## OpenSpec Conventions
 
