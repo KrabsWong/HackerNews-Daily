@@ -299,12 +299,12 @@ Every `tasks.md` MUST include a final documentation update section:
 ```markdown
 ## X. Documentation Update (REQUIRED)
 
-- [ ] X.1 Check README.md for affected sections
-- [ ] X.2 Check openspec/project.md for structural changes
-- [ ] X.3 Check docs/ for affected guides
-- [ ] X.4 Update or remove references to changed features
-- [ ] X.5 Test code examples in documentation
-- [ ] X.6 Verify no broken links or outdated information
+- [x] X.1 Check README.md for affected sections
+- [x] X.2 Check openspec/project.md for structural changes
+- [x] X.3 Check docs/ for affected guides
+- [x] X.4 Update or remove references to changed features
+- [x] X.5 Test code examples in documentation
+- [x] X.6 Verify no broken links or outdated information
 ```
 
 Where X is the next section number after implementation tasks.
@@ -318,17 +318,17 @@ If implementation tasks end at "## 3. Testing", then documentation section shoul
 #### 18-24. 最终验证
 
 **检查清单**：
-- [ ] `openspec validate update-documentation --strict` 通过
-- [ ] Markdown 格式正确（无语法错误）
-- [ ] 所有内部链接可访问（包括重命名后的文件）
-- [ ] README.md Features 描述准确（LLM provider）
-- [ ] README.md 长度合理（约 150-180 行，如有精简）
-- [ ] project.md 目录结构与实际代码一致
-- [ ] docs/ 所有文件使用小写连字符命名
-- [ ] docs/ 目录所有文档语言风格统一
-- [ ] docs/ 目录所有文档与代码一致
-- [ ] AGENTS.md 新增内容格式正确
-- [ ] project.md 新增内容格式正确
+- [x] `openspec validate update-documentation --strict` 通过
+- [x] Markdown 格式正确（无语法错误）
+- [x] 所有内部链接可访问（包括重命名后的文件）
+- [x] README.md Features 描述准确（LLM provider）
+- [x] README.md 长度合理（约 150-180 行，如有精简）
+- [x] project.md 目录结构与实际代码一致
+- [x] docs/ 所有文件使用小写连字符命名
+- [x] docs/ 目录所有文档语言风格统一
+- [x] docs/ 目录所有文档与代码一致
+- [x] AGENTS.md 新增内容格式正确
+- [x] project.md 新增内容格式正确
 
 ## Implementation Notes
 
@@ -341,17 +341,17 @@ If implementation tasks end at "## 3. Testing", then documentation section shoul
 ## Validation Checklist
 
 完成后检查：
-- [ ] README.md Features 描述准确（支持多 LLM provider）
-- [ ] README.md 长度合理（如有精简，约 150-180 行）
-- [ ] 删除了所有冗余的开发细节章节（如有精简）
-- [ ] 保留了所有核心功能说明
-- [ ] project.md 目录结构准确反映实际代码
-- [ ] docs/ 所有文件使用小写连字符命名
-- [ ] docs/ 目录无过期内容
-- [ ] docs/ 目录文档语言风格统一
-- [ ] 所有文档链接有效（包括重命名后的文件）
-- [ ] `openspec validate update-documentation --strict` 通过
-- [ ] Markdown 格式正确
-- [ ] AGENTS.md 包含文档更新检查清单
-- [ ] project.md 包含文档维护规范
-- [ ] 未来 proposals 将自动遵循新规范
+- [x] README.md Features 描述准确（支持多 LLM provider）
+- [x] README.md 长度合理（如有精简，约 150-180 行）
+- [x] 删除了所有冗余的开发细节章节（如有精简）
+- [x] 保留了所有核心功能说明
+- [x] project.md 目录结构准确反映实际代码
+- [x] docs/ 所有文件使用小写连字符命名
+- [x] docs/ 目录无过期内容
+- [x] docs/ 目录文档语言风格统一
+- [x] 所有文档链接有效（包括重命名后的文件）
+- [x] `openspec validate update-documentation --strict` 通过
+- [x] Markdown 格式正确
+- [x] AGENTS.md 包含文档更新检查清单
+- [x] project.md 包含文档维护规范
+- [x] 未来 proposals 将自动遵循新规范
