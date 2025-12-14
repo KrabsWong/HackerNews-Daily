@@ -7,6 +7,7 @@ import { fromPromise } from '../../utils/result';
 import { chunk, parseJsonArray, MAX_RETRIES, delay } from '../../utils/array';
 import { getErrorMessage } from '../../worker/logger';
 import { LLMProvider, FetchError } from '../llm';
+import { ProgressTracker } from './progress';
 
 // ============================================
 // Single-Item Translation Functions
@@ -41,9 +42,16 @@ export async function translateTitle(
 
 3. Maintain readability for technical Chinese audiences
 
+IMPORTANT OUTPUT REQUIREMENTS:
+- Return ONLY the translated title
+- DO NOT include any meta-information, notes, or explanations
+- DO NOT add character counts or formatting notes
+- DO NOT add prefixes like "翻译:" or similar
+- Output must be clean, ready-to-use content
+
 Title to translate: ${title}
 
-Output only the translated title, no explanations.`;
+Output only the translated title.`;
 
   // Loop-based retry pattern
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -151,6 +159,13 @@ export async function translateTitlesBatch(
     return [];
   }
 
+  const progress = new ProgressTracker({ logInterval: 5 });
+  const providerName = provider.getName();
+  const modelName = provider.getModel();
+  
+  console.log(`Starting title translation: ${titles.length} titles using ${providerName}/${modelName}`);
+  progress.start(titles.length);
+
   const batches = chunk(titles, batchSize);
   const allTranslations: string[] = [];
 
@@ -174,6 +189,13 @@ Rules:
 4. Each translation should be accurate and natural Chinese
 5. Do NOT add any numbering or prefix like "Translation 1:", just the translated text
 
+IMPORTANT OUTPUT REQUIREMENTS:
+- Return ONLY the JSON array of translations
+- DO NOT include any meta-information, notes, or explanations
+- DO NOT add character counts or formatting notes
+- DO NOT add prefixes like "翻译:" or "标题:" to each translation
+- Each array element must be clean, ready-to-use content
+
 Output format example: ["First translated title here", "Second translated title here"]`,
           },
         ],
@@ -190,7 +212,11 @@ Output format example: ["First translated title here", "Second translated title 
         const translated = await translateTitle(provider, title);
         allTranslations.push(translated);
       }
-      console.log(`Batch translated ${allTranslations.length}/${titles.length} titles...`);
+      
+      // Update progress
+      if (progress.update(allTranslations.length)) {
+        console.log(progress.formatMessage('title translation', providerName, modelName));
+      }
       continue;
     }
 
@@ -202,7 +228,11 @@ Output format example: ["First translated title here", "Second translated title 
         const translated = await translateTitle(provider, title);
         allTranslations.push(translated);
       }
-      console.log(`Batch translated ${allTranslations.length}/${titles.length} titles...`);
+      
+      // Update progress
+      if (progress.update(allTranslations.length)) {
+        console.log(progress.formatMessage('title translation', providerName, modelName));
+      }
       continue;
     }
 
@@ -210,7 +240,17 @@ Output format example: ["First translated title here", "Second translated title 
     const parseResult = parseJsonArray<string>(content, batch.length);
 
     if (parseResult.ok) {
-      allTranslations.push(...parseResult.value);
+      const results = parseResult.value;
+      allTranslations.push(...results);
+      
+      // If we got fewer results than expected, translate the missing ones individually
+      if (results.length < batch.length) {
+        console.warn(`Batch ${batchIdx + 1}: Got ${results.length}/${batch.length} results, translating remaining individually`);
+        for (let i = results.length; i < batch.length; i++) {
+          const translated = await translateTitle(provider, batch[i]);
+          allTranslations.push(translated);
+        }
+      }
     } else {
       console.warn(`Batch ${batchIdx + 1}: ${getErrorMessage(parseResult.error)}, falling back`);
       for (const title of batch) {
@@ -219,9 +259,13 @@ Output format example: ["First translated title here", "Second translated title 
       }
     }
 
-    console.log(`Batch translated ${allTranslations.length}/${titles.length} titles...`);
+    // Update progress
+    if (progress.update(allTranslations.length) || progress.shouldLogByTime(30)) {
+      console.log(progress.formatMessage('title translation', providerName, modelName));
+    }
   }
 
+  console.log(`Completed title translation: ${allTranslations.length}/${titles.length} titles in ${progress.getElapsedSeconds()}s`);
   return allTranslations;
 }
 
@@ -235,6 +279,13 @@ export async function translateBatchSequential(
   provider: LLMProvider,
   titles: string[]
 ): Promise<string[]> {
+  const progress = new ProgressTracker({ logInterval: 5 });
+  const providerName = provider.getName();
+  const modelName = provider.getModel();
+  
+  console.log(`Starting sequential title translation: ${titles.length} titles using ${providerName}/${modelName}`);
+  progress.start(titles.length);
+  
   const translations: string[] = [];
 
   for (let i = 0; i < titles.length; i++) {
@@ -242,11 +293,12 @@ export async function translateBatchSequential(
     translations.push(translation);
 
     // Show progress
-    if ((i + 1) % 5 === 0 || i === titles.length - 1) {
-      console.log(`Translated ${i + 1}/${titles.length} titles...`);
+    if (progress.update(i + 1) || progress.shouldLogByTime(30)) {
+      console.log(progress.formatMessage('title translation', providerName, modelName));
     }
   }
 
+  console.log(`Completed title translation: ${translations.length}/${titles.length} titles in ${progress.getElapsedSeconds()}s`);
   return translations;
 }
 

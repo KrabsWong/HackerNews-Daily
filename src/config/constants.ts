@@ -255,21 +255,32 @@ export const CONTENT_CONFIG = {
 
 /**
  * LLM batch processing settings for translation and summarization
- * Since subrequest limits are no longer a concern, batch sizes can be more relaxed
+ * Note: Content and comment summarization functions use default batch size of 10
+ * This configuration primarily affects title translation
  */
 export const LLM_BATCH_CONFIG = {
   /** 
-   * Default batch size for LLM operations
+   * Default batch size for LLM operations (primarily title translation)
    * Set to 1 for single-request mode (one API call per item, best quality)
    * Set to 0 to process all items in a single batch (no splitting)
    * Set to N>1 for batch mode (N items per API call)
+   * 
+   * Recommendation: Use 10 for batch mode to balance reliability and API efficiency
+   * Content/comment summarization use batch size 10 by default (defined in function signatures)
    */
-  DEFAULT_BATCH_SIZE: 1,
-  /** Minimum batch size (only applies when batch size > 0) */
-  MIN_BATCH_SIZE: 5,
+  DEFAULT_BATCH_SIZE: 10,
+  /** 
+   * Minimum batch size (only applies when batch size > 1)
+   * Ensures efficient batching when enabled
+   * Set to 0 to disable minimum constraint
+   */
+  MIN_BATCH_SIZE: 0,
   /** 
    * Maximum batch size limit
    * Set to 0 for no limit (process all at once)
+   * 
+   * Important: Large batches may cause LLM JSON parsing errors
+   * Recommended: Keep batches at 10 or smaller for reliable results
    */
   MAX_BATCH_SIZE: 0,
   /**
@@ -326,6 +337,83 @@ export const CONTENT_FILTER = {
   /** Fallback behavior on error - if true, allow stories through when filter fails (fail-open) */
   FALLBACK_ON_ERROR: true,
 };
+
+// =============================================================================
+// Telegram Publisher Configuration
+// =============================================================================
+
+/**
+ * Telegram message batching configuration
+ * Stories are merged into batched messages to reduce notification volume
+ */
+export const TELEGRAM_BATCH_CONFIG = {
+  /**
+   * Number of stories to merge per message (default: 2)
+   * Can be overridden by TELEGRAM_BATCH_SIZE environment variable
+   * 
+   * Example: 10 stories with batch_size=2 → 5 merged messages (+ header/footer)
+   */
+  DEFAULT_BATCH_SIZE: 2,
+  
+  /**
+   * Minimum batch size (1 story per message = no merging)
+   */
+  MIN_BATCH_SIZE: 1,
+  
+  /**
+   * Maximum batch size (10 stories per message)
+   */
+  MAX_BATCH_SIZE: 10,
+  
+  /**
+   * Delay between sending messages in milliseconds (default: 500ms)
+   */
+  MESSAGE_DELAY: 500,
+} as const;
+
+// =============================================================================
+// Translation Progress Logging Configuration
+// =============================================================================
+
+/**
+ * Progress logging settings for translation operations
+ */
+export const TRANSLATION_PROGRESS_CONFIG = {
+  /**
+   * Log progress every N items
+   */
+  LOG_INTERVAL: 5,
+  
+  /**
+   * Time-based logging interval in seconds (log at least every N seconds)
+   */
+  TIME_INTERVAL_SECONDS: 30,
+  
+  /**
+   * Enable detailed logging (includes ETA and elapsed time)
+   */
+  ENABLE_DETAILED_LOGGING: false,
+} as const;
+
+/**
+ * Comment translation reliability configuration
+ */
+export const COMMENT_TRANSLATION_CONFIG = {
+  /**
+   * Maximum number of retry attempts for comment translation
+   */
+  MAX_RETRIES: 3,
+  
+  /**
+   * Base delay for exponential backoff in milliseconds
+   */
+  RETRY_BASE_DELAY: 1000,
+  
+  /**
+   * Minimum Chinese character ratio to consider translation valid (0.2 = 20%)
+   */
+  MIN_CHINESE_RATIO: 0.2,
+} as const;
 
 // =============================================================================
 // Default Environment Values

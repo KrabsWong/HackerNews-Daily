@@ -11,6 +11,7 @@ import { getErrorMessage } from '../../worker/logger';
 import { CONTENT_CONFIG, LLM_BATCH_CONFIG } from '../../config/constants';
 import { LLMProvider, FetchError } from '../llm';
 import { translateDescription } from './title';
+import { ProgressTracker } from './progress';
 
 // ============================================
 // Single-Item Summarization Functions
@@ -40,8 +41,16 @@ export async function summarizeContent(
 - 使用清晰、简洁的中文表达
 - 专注于读者需要了解的内容
 
+IMPORTANT OUTPUT REQUIREMENTS:
+- Return ONLY the summary content in Chinese
+- DO NOT include any meta-information, notes, or explanations
+- DO NOT add character counts like "注:实际字符数XXX"
+- DO NOT add prefixes like "总结:", "摘要:", "300字总结" or similar
+- Output must be clean, ready-to-use content
+
 文章内容：
 ${content}`;
+
 
   // Loop-based retry pattern
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -125,6 +134,13 @@ export async function summarizeComments(
 - 如果有争议观点，简要提及
 - 使用清晰、简洁的中文表达
 
+IMPORTANT OUTPUT REQUIREMENTS:
+- Return ONLY the summary content in Chinese
+- DO NOT include any meta-information, notes, or explanations
+- DO NOT add character counts like "注:实际字符数XXX"
+- DO NOT add prefixes like "总结:", "评论要点:", "100字总结" or similar
+- Output must be clean, ready-to-use content
+
 评论内容：
 ${combinedText}`,
         },
@@ -148,6 +164,54 @@ ${combinedText}`,
   }
 }
 
+/**
+ * Summarize comments with retry logic for reliability
+ * Retries on failure with exponential backoff
+ * @param provider - LLM provider instance
+ * @param comments - Array of comment objects to summarize
+ * @param maxRetries - Maximum number of retry attempts (default 3)
+ * @returns Chinese summary or null if all attempts fail
+ */
+export async function summarizeCommentsWithRetry(
+  provider: LLMProvider,
+  comments: HNComment[],
+  maxRetries: number = 3
+): Promise<string | null> {
+  const baseDelay = 1000; // 1 second
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await summarizeComments(provider, comments);
+      
+      if (result) {
+        if (attempt > 1) {
+          console.log(`Comment translation succeeded on attempt ${attempt}`);
+        }
+        return result;
+      }
+      
+      if (attempt < maxRetries) {
+        console.warn(
+          `Comment translation attempt ${attempt}/${maxRetries} returned empty, retrying...`
+        );
+        // Exponential backoff
+        await delay(baseDelay * Math.pow(2, attempt - 1));
+      }
+    } catch (error) {
+      console.warn(
+        `Comment translation attempt ${attempt}/${maxRetries} failed: ${getErrorMessage(error)}`
+      );
+      
+      if (attempt < maxRetries) {
+        await delay(baseDelay * Math.pow(2, attempt - 1));
+      }
+    }
+  }
+  
+  console.warn('All comment translation attempts failed, returning null');
+  return null;
+}
+
 // ============================================
 // Batch Summarization Functions
 // ============================================
@@ -166,6 +230,13 @@ export async function summarizeBatchSequential(
   fallbackDescriptions: (string | null)[],
   maxLength: number
 ): Promise<string[]> {
+  const progress = new ProgressTracker({ logInterval: 5 });
+  const providerName = provider.getName();
+  const modelName = provider.getModel();
+  
+  console.log(`Starting content summarization: ${contents.length} articles using ${providerName}/${modelName}`);
+  progress.start(contents.length);
+  
   const summaries: string[] = [];
 
   for (let i = 0; i < contents.length; i++) {
@@ -188,11 +259,12 @@ export async function summarizeBatchSequential(
     summaries.push(summary);
 
     // Show progress
-    if ((i + 1) % 5 === 0 || i === summaries.length - 1) {
-      console.log(`Processed ${i + 1}/${contents.length} summaries...`);
+    if (progress.update(i + 1) || progress.shouldLogByTime(30)) {
+      console.log(progress.formatMessage('content summarization', providerName, modelName));
     }
   }
 
+  console.log(`Completed content summarization: ${summaries.length}/${contents.length} articles in ${progress.getElapsedSeconds()}s`);
   return summaries;
 }
 
@@ -214,6 +286,12 @@ export async function summarizeContentBatch(
     return [];
   }
 
+  const progress = new ProgressTracker({ logInterval: 5 });
+  const providerName = provider.getName();
+  const modelName = provider.getModel();
+  
+  console.log(`Starting batch content summarization: ${contents.length} articles using ${providerName}/${modelName}`);
+
   // Filter out null/empty contents and track their indices
   const validContents: Array<{ index: number; content: string }> = [];
   contents.forEach((content, index) => {
@@ -226,11 +304,16 @@ export async function summarizeContentBatch(
     return contents.map(() => null);
   }
 
+  progress.start(validContents.length);
   const batches = chunk(validContents, batchSize);
   const summaries: (string | null)[] = new Array(contents.length).fill(null);
+  let processedCount = 0;
 
   for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
     const batch = batches[batchIdx];
+    
+    // Log batch start for better user visibility
+    console.log(`[Content Summary] Processing batch ${batchIdx + 1}/${batches.length}: ${batch.length} articles | Provider: ${providerName}/${modelName}`);
 
     // Prepare batch input
     const maxContentLength = LLM_BATCH_CONFIG.MAX_CONTENT_PER_ARTICLE;
@@ -258,7 +341,14 @@ ${JSON.stringify(batchInput, null, 2)}
 - 使用清晰、简洁的中文表达
 - 直接输出摘要内容，不要添加"文章1:"、"摘要1:"等任何序号或标记前缀
 - 输出格式示例：["这是第一篇文章的摘要内容...", "这是第二篇文章的摘要内容..."]
-- 只输出 JSON 数组，不要其他说明`,
+- 只输出 JSON 数组，不要其他说明
+
+IMPORTANT OUTPUT REQUIREMENTS:
+- Return ONLY a JSON array of summaries
+- DO NOT include any meta-information, notes, or explanations
+- DO NOT add character counts like "注:实际字符数XXX" in the summaries
+- DO NOT add prefixes like "总结:", "摘要:", "300字总结" to any summary
+- Each array element must be clean, ready-to-use Chinese content`,
           },
         ],
         temperature: 0.5,
@@ -267,30 +357,51 @@ ${JSON.stringify(batchInput, null, 2)}
 
     // Handle API error
     if (!result.ok) {
-      console.warn(`Batch ${batchIdx + 1}: API error: ${getErrorMessage(result.error)}`);
-      for (const item of batch) {
+      const errorMsg = getErrorMessage(result.error);
+      console.error(`[Content Summary] Batch ${batchIdx + 1}/${batches.length} failed:`, {
+        error: errorMsg,
+        batchSize: batch.length,
+        provider: providerName,
+        model: modelName,
+        fallbackStrategy: 'Processing items individually',
+      });
+      console.log(`[Content Summary] Fallback: Processing ${batch.length} items individually...`);
+      for (let i = 0; i < batch.length; i++) {
+        const item = batch[i];
+        console.log(`[Content Summary] Fallback item ${i + 1}/${batch.length} | Provider: ${providerName}/${modelName}`);
         summaries[item.index] = await summarizeContent(
           provider,
           item.content,
           maxLength
         );
+        processedCount++;
       }
-      console.log(`Batch summarized ${batchIdx + 1}/${batches.length} batches...`);
+      
+      if (progress.update(processedCount) || progress.shouldLogByTime(30)) {
+        console.log(progress.formatMessage('content summarization', providerName, modelName));
+      }
       continue;
     }
 
     const content = result.value.content;
 
     if (!content) {
-      console.warn(`Batch ${batchIdx + 1} returned empty, falling back`);
-      for (const item of batch) {
+      console.warn(`[Content Summary] Batch ${batchIdx + 1}/${batches.length} returned empty, falling back`);
+      console.log(`[Content Summary] Fallback: Processing ${batch.length} items individually...`);
+      for (let i = 0; i < batch.length; i++) {
+        const item = batch[i];
+        console.log(`[Content Summary] Fallback item ${i + 1}/${batch.length} | Provider: ${providerName}/${modelName}`);
         summaries[item.index] = await summarizeContent(
           provider,
           item.content,
           maxLength
         );
+        processedCount++;
       }
-      console.log(`Batch summarized ${batchIdx + 1}/${batches.length} batches...`);
+      
+      if (progress.update(processedCount) || progress.shouldLogByTime(30)) {
+        console.log(progress.formatMessage('content summarization', providerName, modelName));
+      }
       continue;
     }
 
@@ -298,23 +409,57 @@ ${JSON.stringify(batchInput, null, 2)}
     const parseResult = parseJsonArray<string>(content, batch.length);
 
     if (parseResult.ok) {
+      const results = parseResult.value;
+      
+      // Handle partial results - map available results to batch items
       batch.forEach((item, idx) => {
-        summaries[item.index] = parseResult.value[idx];
+        if (idx < results.length) {
+          summaries[item.index] = results[idx];
+          processedCount++;
+        } else {
+          // If this item wasn't returned, log and mark for retry
+          console.warn(`Batch ${batchIdx + 1}: Missing result for item ${idx + 1}, will retry individually`);
+        }
       });
-    } else {
-      console.warn(`Batch ${batchIdx + 1}: ${getErrorMessage(parseResult.error)}`);
-      for (const item of batch) {
+      
+      // Retry items that didn't get results
+      for (let idx = results.length; idx < batch.length; idx++) {
+        const item = batch[idx];
         summaries[item.index] = await summarizeContent(
           provider,
           item.content,
           maxLength
         );
+        processedCount++;
+      }
+    } else {
+      console.error(`[Content Summary] Batch ${batchIdx + 1}/${batches.length} JSON parse failed:`, {
+        error: getErrorMessage(parseResult.error),
+        expectedItems: batch.length,
+        provider: providerName,
+        model: modelName,
+        note: 'Check parseJsonArray logs above for content preview',
+        fallbackStrategy: 'Processing items individually',
+      });
+      console.log(`[Content Summary] Fallback: Processing ${batch.length} items individually...`);
+      for (let i = 0; i < batch.length; i++) {
+        const item = batch[i];
+        console.log(`[Content Summary] Fallback item ${i + 1}/${batch.length} | Provider: ${providerName}/${modelName}`);
+        summaries[item.index] = await summarizeContent(
+          provider,
+          item.content,
+          maxLength
+        );
+        processedCount++;
       }
     }
 
-    console.log(`Batch summarized ${batchIdx + 1}/${batches.length} batches...`);
+    if (progress.update(processedCount) || progress.shouldLogByTime(30)) {
+      console.log(progress.formatMessage('content summarization', providerName, modelName));
+    }
   }
 
+  console.log(`Completed content summarization: ${processedCount}/${validContents.length} articles in ${progress.getElapsedSeconds()}s`);
   return summaries;
 }
 
@@ -334,6 +479,12 @@ export async function summarizeCommentsBatch(
     return [];
   }
 
+  const progress = new ProgressTracker({ logInterval: 5 });
+  const providerName = provider.getName();
+  const modelName = provider.getModel();
+  
+  console.log(`Starting batch comment summarization: ${commentArrays.length} stories using ${providerName}/${modelName}`);
+
   // Filter stories with enough comments
   const validStories: Array<{ index: number; comments: HNComment[] }> = [];
   commentArrays.forEach((comments, index) => {
@@ -346,11 +497,16 @@ export async function summarizeCommentsBatch(
     return commentArrays.map(() => null);
   }
 
+  progress.start(validStories.length);
   const batches = chunk(validStories, batchSize);
   const summaries: (string | null)[] = new Array(commentArrays.length).fill(null);
+  let processedCount = 0;
 
   for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
     const batch = batches[batchIdx];
+    
+    // Log batch start for better user visibility
+    console.log(`[Comment Summary] Processing batch ${batchIdx + 1}/${batches.length}: ${batch.length} stories | Provider: ${providerName}/${modelName}`);
 
     // Prepare batch input
     const batchInput = batch.map(item => {
@@ -381,7 +537,14 @@ ${JSON.stringify(batchInput, null, 2)}
 - 捕捉评论中的主要观点和共识
 - 直接输出摘要内容，不要添加"摘要1:"等任何序号或标记前缀
 - 输出格式示例：["评论讨论了某技术的优缺点...", "用户普遍认为..."]
-- 只输出 JSON 数组`,
+- 只输出 JSON 数组
+
+IMPORTANT OUTPUT REQUIREMENTS:
+- Return ONLY a JSON array of summaries
+- DO NOT include any meta-information, notes, or explanations  
+- DO NOT add character counts like "注:实际字符数XXX" in the summaries
+- DO NOT add prefixes like "总结:", "评论要点:", "100字总结" to any summary
+- Each array element must be clean, ready-to-use Chinese content`,
           },
         ],
         temperature: 0.5,
@@ -390,22 +553,48 @@ ${JSON.stringify(batchInput, null, 2)}
 
     // Handle API error
     if (!result.ok) {
-      console.warn(`Batch ${batchIdx + 1}: API error: ${getErrorMessage(result.error)}`);
-      for (const item of batch) {
-        summaries[item.index] = await summarizeComments(provider, item.comments);
+      const errorMsg = getErrorMessage(result.error);
+      console.error(`[Comment Summary] Batch ${batchIdx + 1}/${batches.length} failed:`, {
+        error: errorMsg,
+        batchSize: batch.length,
+        provider: providerName,
+        model: modelName,
+        fallbackStrategy: 'Processing items individually with retry',
+      });
+      console.log(`[Comment Summary] Fallback: Processing ${batch.length} items individually...`);
+      for (let i = 0; i < batch.length; i++) {
+        const item = batch[i];
+        console.log(`[Comment Summary] Fallback item ${i + 1}/${batch.length} | Provider: ${providerName}/${modelName}`);
+        summaries[item.index] = await summarizeCommentsWithRetry(provider, item.comments);
+        processedCount++;
       }
-      console.log(`Batch summarized comments ${batchIdx + 1}/${batches.length} batches...`);
+      
+      if (progress.update(processedCount) || progress.shouldLogByTime(30)) {
+        console.log(progress.formatMessage('comment summarization', providerName, modelName));
+      }
       continue;
     }
 
     const content = result.value.content;
 
     if (!content) {
-      console.warn(`Batch ${batchIdx + 1} returned empty`);
-      for (const item of batch) {
-        summaries[item.index] = await summarizeComments(provider, item.comments);
+      console.error(`[Comment Summary] Batch ${batchIdx + 1}/${batches.length} returned empty content`, {
+        batchSize: batch.length,
+        provider: providerName,
+        model: modelName,
+        fallbackStrategy: 'Processing items individually with retry',
+      });
+      console.log(`[Comment Summary] Fallback: Processing ${batch.length} items individually...`);
+      for (let i = 0; i < batch.length; i++) {
+        const item = batch[i];
+        console.log(`[Comment Summary] Fallback item ${i + 1}/${batch.length} | Provider: ${providerName}/${modelName}`);
+        summaries[item.index] = await summarizeCommentsWithRetry(provider, item.comments);
+        processedCount++;
       }
-      console.log(`Batch summarized comments ${batchIdx + 1}/${batches.length} batches...`);
+      
+      if (progress.update(processedCount) || progress.shouldLogByTime(30)) {
+        console.log(progress.formatMessage('comment summarization', providerName, modelName));
+      }
       continue;
     }
 
@@ -413,18 +602,48 @@ ${JSON.stringify(batchInput, null, 2)}
     const parseResult = parseJsonArray<string>(content, batch.length);
 
     if (parseResult.ok) {
+      const results = parseResult.value;
+      
+      // Handle partial results - map available results to batch items
       batch.forEach((item, idx) => {
-        summaries[item.index] = parseResult.value[idx];
+        if (idx < results.length) {
+          summaries[item.index] = results[idx];
+          processedCount++;
+        } else {
+          // If this item wasn't returned, log and mark for retry
+          console.warn(`Batch ${batchIdx + 1}: Missing result for item ${idx + 1}, will retry individually`);
+        }
       });
+      
+      // Retry items that didn't get results
+      for (let idx = results.length; idx < batch.length; idx++) {
+        const item = batch[idx];
+        summaries[item.index] = await summarizeCommentsWithRetry(provider, item.comments);
+        processedCount++;
+      }
     } else {
-      console.warn(`Batch ${batchIdx + 1}: ${getErrorMessage(parseResult.error)}`);
-      for (const item of batch) {
-        summaries[item.index] = await summarizeComments(provider, item.comments);
+      console.error(`[Comment Summary] Batch ${batchIdx + 1}/${batches.length} JSON parse failed:`, {
+        error: getErrorMessage(parseResult.error),
+        expectedItems: batch.length,
+        provider: providerName,
+        model: modelName,
+        note: 'Check parseJsonArray logs above for content preview',
+        fallbackStrategy: 'Processing items individually with retry',
+      });
+      console.log(`[Comment Summary] Fallback: Processing ${batch.length} items individually...`);
+      for (let i = 0; i < batch.length; i++) {
+        const item = batch[i];
+        console.log(`[Comment Summary] Fallback item ${i + 1}/${batch.length} | Provider: ${providerName}/${modelName}`);
+        summaries[item.index] = await summarizeCommentsWithRetry(provider, item.comments);
+        processedCount++;
       }
     }
 
-    console.log(`Batch summarized comments ${batchIdx + 1}/${batches.length} batches...`);
+    if (progress.update(processedCount) || progress.shouldLogByTime(30)) {
+      console.log(progress.formatMessage('comment summarization', providerName, modelName));
+    }
   }
 
+  console.log(`Completed comment summarization: ${processedCount}/${validStories.length} stories in ${progress.getElapsedSeconds()}s`);
   return summaries;
 }

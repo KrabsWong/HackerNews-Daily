@@ -24,11 +24,11 @@ function parseLLMBatchSize(envValue: string | undefined): number {
   const parsed = parseInt(envValue || String(LLM_BATCH_CONFIG.DEFAULT_BATCH_SIZE), 10);
   
   // 0 means no batching - process all items at once
-  if (parsed === 0 || LLM_BATCH_CONFIG.MAX_BATCH_SIZE === 0) {
+  if (parsed === 0) {
     return 0;
   }
   
-  // Apply min/max constraints only when batching is enabled
+  // Apply min/max constraints only when they are set (> 0)
   let batchSize = parsed;
   if (LLM_BATCH_CONFIG.MIN_BATCH_SIZE > 0) {
     batchSize = Math.max(LLM_BATCH_CONFIG.MIN_BATCH_SIZE, batchSize);

@@ -222,6 +222,7 @@ To enable Telegram push notifications:
 | `TELEGRAM_ENABLED` | Set to "true" to enable Telegram publishing | No |
 | `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather (secret) | If enabled |
 | `TELEGRAM_CHANNEL_ID` | Channel ID: "@channel_name" or "-100xxxxxxxxx" | If enabled |
+| `TELEGRAM_BATCH_SIZE` | Stories to merge per message (1-10, default: 2) | No |
 
 **Setup Steps:**
 1. Create a bot via [@BotFather](https://t.me/BotFather) and get the token
@@ -232,6 +233,11 @@ To enable Telegram push notifications:
    wrangler secret put TELEGRAM_CHANNEL_ID
    ```
 4. Set `TELEGRAM_ENABLED = "true"` in `wrangler.toml`
+
+**Message Batching:**
+- Multiple stories are merged into a single message to reduce notifications
+- Default: 2 stories per message (10 stories → 5 content messages + header/footer)
+- Adjust `TELEGRAM_BATCH_SIZE` to change stories per message
 
 ### Other Configuration
 

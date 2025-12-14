@@ -163,6 +163,20 @@ class TranslationService {
   }
 
   /**
+   * Summarize comments with retry logic for reliability
+   */
+  async summarizeCommentsWithRetry(
+    comments: HNComment[],
+    maxRetries?: number
+  ): Promise<string | null> {
+    return summary.summarizeCommentsWithRetry(
+      this.ensureProvider(),
+      comments,
+      maxRetries
+    );
+  }
+
+  /**
    * Batch summarize comments for multiple stories (optimized)
    */
   async summarizeCommentsBatch(

@@ -1,24 +1,25 @@
 /**
  * Telegram Publisher
  * Publishes HackerNews daily digest to a Telegram channel
- * Each story is sent as a separate message for better readability
+ * Multiple stories can be merged into a single message based on batch size
  */
 
 import type { Publisher, PublishContent, PublisherConfig, TelegramPublisherConfig } from '../../../types/publisher';
 import { sendMessage, delay } from './client';
-import { formatMessages, getMessageDelay } from './formatter';
+import { formatMessagesWithBatching, getMessageDelay, getBatchSize } from './formatter';
 import { logInfo, logError } from '../../logger';
 
 /**
  * Telegram Publisher implementation
  * Sends formatted messages to a Telegram channel using the Bot API
+ * Stories are merged into batches based on batch size configuration
  */
 export class TelegramPublisher implements Publisher {
   readonly name = 'telegram';
   
   /**
    * Publish content to Telegram channel
-   * Each story is sent as a separate message
+   * Stories are merged into batches (e.g., batch_size=2 means 2 stories per message)
    * @param content - Content to publish (includes stories array)
    * @param config - Telegram-specific configuration
    */
@@ -33,18 +34,25 @@ export class TelegramPublisher implements Publisher {
       throw new Error('TELEGRAM_CHANNEL_ID is required for Telegram publisher');
     }
     
-    // Format content into messages (one per story)
-    const messages = formatMessages(content.stories, content.dateStr);
-    logInfo('Telegram: formatted content', { 
-      messageCount: messages.length,
+    // Format content into batched messages (multiple stories per message)
+    const batchSize = getBatchSize();
+    const messages = formatMessagesWithBatching(content.stories, content.dateStr, batchSize);
+    const messageDelay = getMessageDelay();
+    
+    logInfo('Telegram: formatted content with batching', { 
+      totalMessages: messages.length,
       storyCount: content.stories.length,
-      dateStr: content.dateStr 
+      batchSize,
+      storiesPerMessage: batchSize,
+      dateStr: content.dateStr
     });
     
-    // Send messages sequentially with delay
     let successCount = 0;
     let failCount = 0;
     
+    logInfo(`Telegram: sending ${messages.length} messages (including header/footer)`);
+    
+    // Send messages sequentially with delay between them
     for (let i = 0; i < messages.length; i++) {
       const message = messages[i];
       
@@ -63,15 +71,14 @@ export class TelegramPublisher implements Publisher {
         successCount++;
         logInfo(`Telegram: message ${i + 1}/${messages.length} sent successfully`);
         
-        // Add delay between messages to avoid rate limiting
+        // Add delay between messages (except after last message)
         if (i < messages.length - 1) {
-          await delay(getMessageDelay());
+          await delay(messageDelay);
         }
       } catch (error) {
         failCount++;
         logError(`Telegram: failed to send message ${i + 1}/${messages.length}`, error);
         // Continue with other messages (graceful degradation)
-        // Don't throw - try to send as many messages as possible
       }
     }
     
@@ -91,4 +98,4 @@ export class TelegramPublisher implements Publisher {
 
 // Re-export utilities
 export { sendMessage } from './client';
-export { formatMessages, formatStoryMessage } from './formatter';
+export { formatMessagesWithBatching, formatStoryMessage } from './formatter';

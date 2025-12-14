@@ -245,6 +245,7 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
 - `TELEGRAM_ENABLED`: 启用 Telegram 发布 ("true" 或 "false"，默认 "false")
 - `TELEGRAM_BOT_TOKEN`: Bot API Token (通过 @BotFather 获取，启用时必需)
 - `TELEGRAM_CHANNEL_ID`: 频道 ID ("@channel_name" 或 "-100xxxxxxxxx"，启用时必需)
+- `TELEGRAM_BATCH_SIZE`: 每条消息合并的文章数 (1-10，默认 2)
 
 ### 可选 LLM 配置
 - `LLM_DEEPSEEK_MODEL`: DeepSeek 模型覆盖
