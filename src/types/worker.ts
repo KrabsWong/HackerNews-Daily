@@ -38,6 +38,9 @@ export interface Env {
   TELEGRAM_BOT_TOKEN?: string;    // Bot token from @BotFather
   TELEGRAM_CHANNEL_ID?: string;   // Channel ID (@channel_name or -100xxx)
   
+  // Local test mode (optional)
+  LOCAL_TEST_MODE?: string;       // "true" to enable local test mode (output to terminal instead of publishing)
+  
   // Configuration variables (set in wrangler.toml)
   HN_STORY_LIMIT: string;
   HN_TIME_WINDOW_HOURS: string;

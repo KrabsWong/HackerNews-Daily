@@ -24,11 +24,9 @@ The system SHALL extend the `ProcessedStory` interface to include a numeric `sto
 **Then** the storyId SHALL be used to construct HackerNews URL: `https://news.ycombinator.com/item?id={storyId}`  
 **And** users SHALL be able to click to navigate to the original discussion
 
-## MODIFIED Requirements
+### Requirement: Backward compatibility with existing ProcessedStory fields
 
-### Requirement: Type definitions SHALL be maintained in src/types/
-
-The modified `ProcessedStory` interface in `src/types/shared.ts` SHALL include the new `storyId` field while preserving all existing fields and their behavior.
+The system SHALL extend the `ProcessedStory` interface with the new `storyId` field while preserving all existing fields and their behavior for backward compatibility.
 
 #### Scenario: Backward compatibility maintained
 

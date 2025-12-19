@@ -1,5 +1,13 @@
 # Proposal: Add Story ID and Remove Title Brackets
 
+## Why
+
+Users currently cannot easily reference or navigate to original HackerNews discussions from the exported markdown. Titles also display with unnecessary Chinese brackets that reduce readability. This friction makes it harder for users to verify information or engage with the original community.
+
+## What Changes
+
+Add HackerNews story IDs to markdown output as clickable links, and remove decorative Chinese brackets from titles for cleaner formatting.
+
 ## Overview
 
 Enhance the final markdown export with HackerNews story IDs to enable users to quickly navigate to original discussions, while simplifying title formatting by removing unnecessary Chinese brackets.

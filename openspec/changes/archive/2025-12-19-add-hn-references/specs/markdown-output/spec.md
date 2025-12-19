@@ -4,7 +4,7 @@
 
 Modifies markdown generation to remove Chinese title brackets and add HackerNews story links for user reference.
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Markdown titles SHALL be formatted without Chinese brackets
 
@@ -44,7 +44,3 @@ The system SHALL add a HackerNews link as an italic secondary label to enable us
 8. `{commentSummary}` (if available)
 9. `*[HackerNews](https://news.ycombinator.com/item?id={storyId})*`
 10. `---` (separator)
-
-## REMOVED Requirements
-
-None - this is purely additive formatting change with one existing format modification (title brackets).

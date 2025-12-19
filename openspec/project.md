@@ -95,10 +95,13 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
       │   │   ├── index.ts   # GitHubPublisher 实现
       │   │   ├── client.ts  # GitHub API 客户端
       │   │   └── versioning.ts # 文件版本控制
-      │   └── telegram/      # Telegram 发布器 (可选)
-      │       ├── index.ts   # TelegramPublisher 实现
-      │       ├── client.ts  # Telegram API 客户端
-      │       └── formatter.ts # 消息格式化
+      │   ├── telegram/      # Telegram 发布器 (可选)
+      │   │   ├── index.ts   # TelegramPublisher 实现
+      │   │   ├── client.ts  # Telegram API 客户端
+      │   │   └── formatter.ts # 消息格式化
+      │   └── terminal/      # Terminal 发布器 (本地测试)
+      │       ├── index.ts   # TerminalPublisher 实现
+      │       └── formatter.ts # 终端输出格式化
       ├── logger.ts          # 日志工具
       └── stubs/             # Worker 存根
   ```
@@ -109,11 +112,12 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
     - 未来可扩展: Reddit, ProductHunt 等
   - **Publisher 抽象**: 定义统一接口支持多个发布渠道
     - `publish(content, config)`: 将内容发布到目标渠道
-    - 当前实现: `GitHubPublisher` (支持自动版本控制), `TelegramPublisher` (可选)
+    - 当前实现: `GitHubPublisher` (支持自动版本控制), `TelegramPublisher` (可选), `TerminalPublisher` (本地测试)
+    - `TerminalPublisher`: 用于本地开发测试，将 Markdown 输出到终端而不是发布到外部服务
     - 未来可扩展: RSS, Email 等
   - **Configuration Validation**: 启动时验证必需配置
     - `LLM_PROVIDER` 必须显式设置
-    - 至少一个发布器必须启用
+    - 至少一个发布器必须启用 (GitHub, Telegram 或 LOCAL_TEST_MODE)
     - 提供者特定的配置根据启用状态验证
     - 失败时提供清晰的错误消息
 - **API Pattern**: 
@@ -273,7 +277,7 @@ English Title
 - `LLM_OPENROUTER_API_KEY`: 条件必需 (当 LLM_PROVIDER=openrouter)
 - `LLM_ZHIPU_API_KEY`: 条件必需 (当 LLM_PROVIDER=zhipu)
 
-**注意**: 至少需要启用一个发布器 (GitHub 或 Telegram)
+**注意**: 至少需要启用一个发布器 (GitHub、Telegram 或 LOCAL_TEST_MODE)
 
 ### GitHub 发布器 (默认启用)
 - `GITHUB_ENABLED`: 启用 GitHub 发布 ("true" 或 "false"，默认 "true")
@@ -285,6 +289,21 @@ English Title
 - `TELEGRAM_BOT_TOKEN`: Bot API Token (通过 @BotFather 获取，启用时必需)
 - `TELEGRAM_CHANNEL_ID`: 频道 ID ("@channel_name" 或 "-100xxxxxxxxx"，启用时必需)
 - `TELEGRAM_BATCH_SIZE`: 每条消息合并的文章数 (1-10，默认 2)
+
+### 本地测试模式 (仅用于本地开发)
+- `LOCAL_TEST_MODE`: 启用本地测试模式 ("true" 或 "false"，默认 "false")
+  - 当启用时，输出最终 Markdown 到终端而不是发布到外部服务
+  - 必须同时禁用 GitHub 和 Telegram: `GITHUB_ENABLED="false" TELEGRAM_ENABLED="false"`
+  - 适合本地开发和测试，不会污染 GitHub 仓库或 Telegram 频道
+
+**本地测试模式示例配置**:
+```env
+LOCAL_TEST_MODE=true
+GITHUB_ENABLED=false
+TELEGRAM_ENABLED=false
+LLM_PROVIDER=openrouter
+LLM_OPENROUTER_API_KEY=<your-api-key>
+```
 
 ### 可选 LLM 配置
 - `LLM_DEEPSEEK_MODEL`: DeepSeek 模型覆盖

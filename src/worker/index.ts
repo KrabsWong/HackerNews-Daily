@@ -9,17 +9,19 @@
 import { HackerNewsSource } from './sources/hackernews';
 import { GitHubPublisher } from './publishers/github';
 import { TelegramPublisher } from './publishers/telegram';
-import { validateWorkerConfig, isGitHubConfigValid, validateGitHubConfig, isTelegramConfigValid, validateTelegramConfig } from './config/validation';
+import { TerminalPublisher } from './publishers/terminal';
+import { validateWorkerConfig, isGitHubConfigValid, validateGitHubConfig, isTelegramConfigValid, validateTelegramConfig, isLocalTestModeEnabled } from './config/validation';
 import { logInfo, logError, logWarn } from './logger';
 import { LLMProviderType } from '../config/constants';
 import type { Env } from '../types/worker';
+import type { Publisher } from '../types/publisher';
 
 // Re-export Env type for backward compatibility
 export type { Env } from '../types/worker';
 
 /**
  * Handle the daily export process
- * Executes the export pipeline and pushes to GitHub
+ * Executes the export pipeline and routes to configured publishers
  */
 async function handleDailyExport(env: Env): Promise<string> {
   try {
@@ -56,62 +58,71 @@ async function handleDailyExport(env: Env): Promise<string> {
     logInfo('Fetching content from source', { source: source.name });
     const content = await source.fetchContent(new Date(), env);
     
-    // Track publishing results
+    // Build publisher list
+    const publishers: Publisher[] = [];
+    const publisherConfigs: Record<string, any> = {};
     const publishResults: string[] = [];
     
-    // Publish to GitHub (optional, enabled by default)
-    const githubWarnings = validateGitHubConfig(env);
-    for (const warning of githubWarnings) {
-      logWarn(warning);
-    }
+    // Check if local test mode is enabled
+    const localTestMode = isLocalTestModeEnabled(env);
     
-    if (isGitHubConfigValid(env)) {
-      try {
-        const githubPublisher = new GitHubPublisher();
-        logInfo('Publishing content to GitHub', { 
-          publisher: githubPublisher.name, 
-          repo: env.TARGET_REPO 
-        });
-        await githubPublisher.publish(content, {
+    if (localTestMode) {
+      // In local test mode, use terminal publisher
+      logInfo('Local test mode enabled - using terminal publisher');
+      publishers.push(new TerminalPublisher());
+    } else {
+      // In normal mode, check for external publishers
+      
+      // Publish to GitHub (optional, enabled by default)
+      const githubWarnings = validateGitHubConfig(env);
+      for (const warning of githubWarnings) {
+        logWarn(warning);
+      }
+      
+      if (isGitHubConfigValid(env)) {
+        publishers.push(new GitHubPublisher());
+        publisherConfigs['github'] = {
           GITHUB_TOKEN: env.GITHUB_TOKEN!,
           TARGET_REPO: env.TARGET_REPO!,
           TARGET_BRANCH: env.TARGET_BRANCH || 'main',
-        });
-        logInfo('GitHub publishing completed successfully');
-        publishResults.push('GitHub');
-      } catch (error) {
-        logError('GitHub publishing failed', error);
-        throw error; // Re-throw GitHub errors as they are critical when enabled
+        };
+      } else {
+        logInfo('GitHub publishing is disabled');
       }
-    } else {
-      logInfo('GitHub publishing is disabled');
-    }
 
-    // Publish to Telegram (optional)
-    const telegramWarnings = validateTelegramConfig(env);
-    for (const warning of telegramWarnings) {
-      logWarn(warning);
-    }
-    
-    if (isTelegramConfigValid(env)) {
-      try {
-        const telegramPublisher = new TelegramPublisher();
-        logInfo('Publishing content to Telegram', { 
-          publisher: telegramPublisher.name, 
-          channelId: env.TELEGRAM_CHANNEL_ID 
-        });
-        await telegramPublisher.publish(content, {
+      // Publish to Telegram (optional)
+      const telegramWarnings = validateTelegramConfig(env);
+      for (const warning of telegramWarnings) {
+        logWarn(warning);
+      }
+      
+      if (isTelegramConfigValid(env)) {
+        publishers.push(new TelegramPublisher());
+        publisherConfigs['telegram'] = {
           TELEGRAM_BOT_TOKEN: env.TELEGRAM_BOT_TOKEN!,
           TELEGRAM_CHANNEL_ID: env.TELEGRAM_CHANNEL_ID!,
-        });
-        logInfo('Telegram publishing completed successfully');
-        publishResults.push('Telegram');
-      } catch (error) {
-        // Log error but don't fail the export - Telegram is optional
-        logError('Telegram publishing failed (export continues)', error);
+        };
+      } else {
+        logInfo('Telegram publishing is disabled');
       }
-    } else {
-      logInfo('Telegram publishing is disabled');
+    }
+    
+    // Execute publishers
+    for (const publisher of publishers) {
+      try {
+        logInfo('Publishing content', { publisher: publisher.name });
+        const config = publisherConfigs[publisher.name] || {};
+        await publisher.publish(content, config);
+        logInfo(`${publisher.name} publishing completed successfully`);
+        publishResults.push(publisher.name);
+      } catch (error) {
+        logError(`${publisher.name} publishing failed`, error);
+        // For GitHub, re-throw errors as they are critical when enabled
+        // For Telegram and Terminal, log but continue
+        if (publisher.name === 'github') {
+          throw error;
+        }
+      }
     }
 
     const successMessage = `Export completed successfully for ${content.dateStr} (published to: ${publishResults.join(', ') || 'none'})`;

@@ -252,15 +252,51 @@ To enable Telegram push notifications:
 
 ## Local Development
 
+### Quick Start
+
 ```bash
 # Start local worker
 npm run dev:worker
 
 # Trigger export manually
 curl -X POST http://localhost:8787/trigger-export-sync
+```
 
-# View worker logs
-npm run logs:worker
+### Local Test Mode
+
+For testing without publishing to GitHub or Telegram, use local test mode to output directly to terminal:
+
+```bash
+# Setup: Create .dev.vars with local test configuration
+cat > .dev.vars << 'EOF'
+LOCAL_TEST_MODE=true
+GITHUB_ENABLED=false
+TELEGRAM_ENABLED=false
+LLM_PROVIDER=openrouter
+LLM_OPENROUTER_API_KEY=<your-api-key>
+EOF
+
+# Start local worker
+npm run dev:worker
+
+# Trigger export - output will appear in terminal
+curl -X POST http://localhost:8787/trigger-export-sync
+```
+
+**Example output:**
+```
+======================================
+HackerNews Daily - 2025-01-19
+======================================
+
+## 1. 标题（中文翻译）
+English Title
+**发布时间**: 2025-01-19 10:00:00 UTC
+...
+
+======================================
+Export completed: 30 stories
+======================================
 ```
 
 See [Local Development Guide](./docs/local-development.md) for more details.
