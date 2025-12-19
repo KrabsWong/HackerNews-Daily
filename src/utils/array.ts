@@ -35,6 +35,15 @@ export function chunk<T>(arr: T[], size: number): T[][] {
   for (let i = 0; i < arr.length; i += size) {
     chunks.push(arr.slice(i, i + size));
   }
+  
+  // Validate that chunking preserves array integrity
+  if (chunks.length > 0) {
+    const reconstructed = chunks.flat();
+    if (reconstructed.length !== arr.length) {
+      console.warn(`chunk: Array length mismatch after chunking. Original: ${arr.length}, Reconstructed: ${reconstructed.length}`);
+    }
+  }
+  
   return chunks;
 }
 

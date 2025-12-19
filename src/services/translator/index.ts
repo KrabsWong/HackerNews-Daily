@@ -137,12 +137,13 @@ class TranslationService {
 
   /**
    * Batch summarize multiple contents in single API calls (optimized)
+   * Returns array with empty strings for null/missing content (preserves indices)
    */
   async summarizeContentBatch(
     contents: (string | null)[],
     maxLength: number,
     batchSize: number = 10
-  ): Promise<(string | null)[]> {
+  ): Promise<string[]> {
     return summary.summarizeContentBatch(
       this.ensureProvider(),
       contents,
@@ -178,11 +179,12 @@ class TranslationService {
 
   /**
    * Batch summarize comments for multiple stories (optimized)
+   * Returns array with empty strings for insufficient comments (preserves indices)
    */
   async summarizeCommentsBatch(
     commentArrays: HNComment[][],
     batchSize: number = 10
-  ): Promise<(string | null)[]> {
+  ): Promise<string[]> {
     return summary.summarizeCommentsBatch(
       this.ensureProvider(),
       commentArrays,

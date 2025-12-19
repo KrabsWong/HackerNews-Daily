@@ -270,18 +270,19 @@ export async function summarizeBatchSequential(
 
 /**
  * Batch summarize multiple article contents in a single API call
+ * Preserves array indices by keeping empty strings for null/missing content
  * @param provider - LLM provider instance
  * @param contents - Array of article contents to summarize
  * @param maxLength - Target summary length in characters
  * @param batchSize - Number of articles per batch (default 10)
- * @returns Array of summaries (null for empty contents)
+ * @returns Array of summaries (empty string for empty contents, preserving indices)
  */
 export async function summarizeContentBatch(
   provider: LLMProvider,
   contents: (string | null)[],
   maxLength: number,
   batchSize: number = 10
-): Promise<(string | null)[]> {
+): Promise<string[]> {
   if (contents.length === 0) {
     return [];
   }
@@ -292,22 +293,28 @@ export async function summarizeContentBatch(
   
   console.log(`Starting batch content summarization: ${contents.length} articles using ${providerName}/${modelName}`);
 
-  // Filter out null/empty contents and track their indices
-  const validContents: Array<{ index: number; content: string }> = [];
+  // Build items with content only, but keep track of all indices
+  const itemsToProcess: Array<{ index: number; content: string }> = [];
   contents.forEach((content, index) => {
     if (content?.trim()) {
-      validContents.push({ index, content });
+      itemsToProcess.push({ index, content });
     }
   });
 
-  if (validContents.length === 0) {
-    return contents.map(() => null);
+  // Initialize results array with empty strings (preserving all indices)
+  const summaries: string[] = new Array(contents.length).fill('');
+  
+  if (itemsToProcess.length === 0) {
+    console.log(`[Content Summary] No valid content found, returning empty summaries array`);
+    return summaries;
   }
 
-  progress.start(validContents.length);
-  const batches = chunk(validContents, batchSize);
-  const summaries: (string | null)[] = new Array(contents.length).fill(null);
+  progress.start(contents.length);
+  const batches = chunk(itemsToProcess, batchSize);
   let processedCount = 0;
+  
+  // Log alignment information for debugging
+  console.log(`[Content Summary] Processing: ${contents.length} total items, ${itemsToProcess.length} with valid content, ${contents.length - itemsToProcess.length} empty/null`);
 
   for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
     const batch = batches[batchIdx];
@@ -369,11 +376,12 @@ IMPORTANT OUTPUT REQUIREMENTS:
       for (let i = 0; i < batch.length; i++) {
         const item = batch[i];
         console.log(`[Content Summary] Fallback item ${i + 1}/${batch.length} | Provider: ${providerName}/${modelName}`);
-        summaries[item.index] = await summarizeContent(
+        const summary = await summarizeContent(
           provider,
           item.content,
           maxLength
         );
+        summaries[item.index] = summary || '';
         processedCount++;
       }
       
@@ -391,11 +399,12 @@ IMPORTANT OUTPUT REQUIREMENTS:
       for (let i = 0; i < batch.length; i++) {
         const item = batch[i];
         console.log(`[Content Summary] Fallback item ${i + 1}/${batch.length} | Provider: ${providerName}/${modelName}`);
-        summaries[item.index] = await summarizeContent(
+        const summary = await summarizeContent(
           provider,
           item.content,
           maxLength
         );
+        summaries[item.index] = summary || '';
         processedCount++;
       }
       
@@ -411,10 +420,10 @@ IMPORTANT OUTPUT REQUIREMENTS:
     if (parseResult.ok) {
       const results = parseResult.value;
       
-      // Handle partial results - map available results to batch items
+      // Map results back to original indices, preserving order and length
       batch.forEach((item, idx) => {
         if (idx < results.length) {
-          summaries[item.index] = results[idx];
+          summaries[item.index] = results[idx] || '';
           processedCount++;
         } else {
           // If this item wasn't returned, log and mark for retry
@@ -425,11 +434,12 @@ IMPORTANT OUTPUT REQUIREMENTS:
       // Retry items that didn't get results
       for (let idx = results.length; idx < batch.length; idx++) {
         const item = batch[idx];
-        summaries[item.index] = await summarizeContent(
+        const summary = await summarizeContent(
           provider,
           item.content,
           maxLength
         );
+        summaries[item.index] = summary || '';
         processedCount++;
       }
     } else {
@@ -445,11 +455,12 @@ IMPORTANT OUTPUT REQUIREMENTS:
       for (let i = 0; i < batch.length; i++) {
         const item = batch[i];
         console.log(`[Content Summary] Fallback item ${i + 1}/${batch.length} | Provider: ${providerName}/${modelName}`);
-        summaries[item.index] = await summarizeContent(
+        const summary = await summarizeContent(
           provider,
           item.content,
           maxLength
         );
+        summaries[item.index] = summary || '';
         processedCount++;
       }
     }
@@ -459,22 +470,24 @@ IMPORTANT OUTPUT REQUIREMENTS:
     }
   }
 
-  console.log(`Completed content summarization: ${processedCount}/${validContents.length} articles in ${progress.getElapsedSeconds()}s`);
+  const completedCount = summaries.filter(s => s !== '').length;
+  console.log(`Completed content summarization: ${completedCount}/${contents.length} articles in ${progress.getElapsedSeconds()}s`);
   return summaries;
 }
 
 /**
  * Batch summarize comments for multiple stories
+ * Preserves array indices by keeping empty strings for insufficient comments
  * @param provider - LLM provider instance
  * @param commentArrays - Array of comment arrays (one per story)
  * @param batchSize - Number of stories per batch (default 10)
- * @returns Array of comment summaries (null for insufficient comments)
+ * @returns Array of comment summaries (empty string for insufficient comments, preserving indices)
  */
 export async function summarizeCommentsBatch(
   provider: LLMProvider,
   commentArrays: HNComment[][],
   batchSize: number = 10
-): Promise<(string | null)[]> {
+): Promise<string[]> {
   if (commentArrays.length === 0) {
     return [];
   }
@@ -486,21 +499,27 @@ export async function summarizeCommentsBatch(
   console.log(`Starting batch comment summarization: ${commentArrays.length} stories using ${providerName}/${modelName}`);
 
   // Filter stories with enough comments
-  const validStories: Array<{ index: number; comments: HNComment[] }> = [];
+  const storiesToProcess: Array<{ index: number; comments: HNComment[] }> = [];
   commentArrays.forEach((comments, index) => {
     if (comments?.length >= CONTENT_CONFIG.MIN_COMMENTS_FOR_SUMMARY) {
-      validStories.push({ index, comments });
+      storiesToProcess.push({ index, comments });
     }
   });
 
-  if (validStories.length === 0) {
-    return commentArrays.map(() => null);
+  // Initialize results array with empty strings (preserving all indices)
+  const summaries: string[] = new Array(commentArrays.length).fill('');
+  
+  if (storiesToProcess.length === 0) {
+    console.log(`[Comment Summary] No stories with sufficient comments, returning empty summaries array`);
+    return summaries;
   }
 
-  progress.start(validStories.length);
-  const batches = chunk(validStories, batchSize);
-  const summaries: (string | null)[] = new Array(commentArrays.length).fill(null);
+  progress.start(commentArrays.length);
+  const batches = chunk(storiesToProcess, batchSize);
   let processedCount = 0;
+  
+  // Log alignment information for debugging
+  console.log(`[Comment Summary] Processing: ${commentArrays.length} total stories, ${storiesToProcess.length} with sufficient comments, ${commentArrays.length - storiesToProcess.length} insufficient`);
 
   for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
     const batch = batches[batchIdx];
@@ -565,7 +584,8 @@ IMPORTANT OUTPUT REQUIREMENTS:
       for (let i = 0; i < batch.length; i++) {
         const item = batch[i];
         console.log(`[Comment Summary] Fallback item ${i + 1}/${batch.length} | Provider: ${providerName}/${modelName}`);
-        summaries[item.index] = await summarizeCommentsWithRetry(provider, item.comments);
+        const summary = await summarizeCommentsWithRetry(provider, item.comments);
+        summaries[item.index] = summary || '';
         processedCount++;
       }
       
@@ -588,7 +608,8 @@ IMPORTANT OUTPUT REQUIREMENTS:
       for (let i = 0; i < batch.length; i++) {
         const item = batch[i];
         console.log(`[Comment Summary] Fallback item ${i + 1}/${batch.length} | Provider: ${providerName}/${modelName}`);
-        summaries[item.index] = await summarizeCommentsWithRetry(provider, item.comments);
+        const summary = await summarizeCommentsWithRetry(provider, item.comments);
+        summaries[item.index] = summary || '';
         processedCount++;
       }
       
@@ -604,10 +625,10 @@ IMPORTANT OUTPUT REQUIREMENTS:
     if (parseResult.ok) {
       const results = parseResult.value;
       
-      // Handle partial results - map available results to batch items
+      // Map results back to original indices, preserving order and length
       batch.forEach((item, idx) => {
         if (idx < results.length) {
-          summaries[item.index] = results[idx];
+          summaries[item.index] = results[idx] || '';
           processedCount++;
         } else {
           // If this item wasn't returned, log and mark for retry
@@ -618,7 +639,8 @@ IMPORTANT OUTPUT REQUIREMENTS:
       // Retry items that didn't get results
       for (let idx = results.length; idx < batch.length; idx++) {
         const item = batch[idx];
-        summaries[item.index] = await summarizeCommentsWithRetry(provider, item.comments);
+        const summary = await summarizeCommentsWithRetry(provider, item.comments);
+        summaries[item.index] = summary || '';
         processedCount++;
       }
     } else {
@@ -634,7 +656,8 @@ IMPORTANT OUTPUT REQUIREMENTS:
       for (let i = 0; i < batch.length; i++) {
         const item = batch[i];
         console.log(`[Comment Summary] Fallback item ${i + 1}/${batch.length} | Provider: ${providerName}/${modelName}`);
-        summaries[item.index] = await summarizeCommentsWithRetry(provider, item.comments);
+        const summary = await summarizeCommentsWithRetry(provider, item.comments);
+        summaries[item.index] = summary || '';
         processedCount++;
       }
     }
@@ -644,6 +667,7 @@ IMPORTANT OUTPUT REQUIREMENTS:
     }
   }
 
-  console.log(`Completed comment summarization: ${processedCount}/${validStories.length} stories in ${progress.getElapsedSeconds()}s`);
+  const completedCount = summaries.filter(s => s !== '').length;
+  console.log(`Completed comment summarization: ${completedCount}/${commentArrays.length} stories in ${progress.getElapsedSeconds()}s`);
   return summaries;
 }

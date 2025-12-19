@@ -174,7 +174,7 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
       const descriptions: string[] = [];
       for (let i = 0; i < filteredStories.length; i++) {
         if (contentSummaries[i]) {
-          descriptions.push(contentSummaries[i]!);
+          descriptions.push(contentSummaries[i]);
         } else {
           const translated = await translator.translateDescription(metaDescriptions[i]);
           descriptions.push(translated);
@@ -200,8 +200,8 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
             url: story.url ?? '',
             time: formatTimestamp(story.time, true),
             timestamp: story.time,
-            description: descriptions[i] ?? '暂无描述',
-            commentSummary: commentSummaries[i] ?? null,
+            description: descriptions[i] || '暂无描述',
+            commentSummary: commentSummaries[i] || '暂无评论',
           });
           
           successCount++;

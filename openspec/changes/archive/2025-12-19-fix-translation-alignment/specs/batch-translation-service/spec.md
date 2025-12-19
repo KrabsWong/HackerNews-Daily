@@ -1,43 +1,9 @@
-# batch-translation-service Specification
+# batch-translation-service Specification Delta
 
-## Purpose
-TBD - created by archiving change optimize-worker-subrequests. Update Purpose after archive.
-## Requirements
-### Requirement: 集中化批量配置
-系统 SHALL 通过 `LLM_BATCH_CONFIG` 提供可配置的批量处理参数，**默认使用单请求模式**。
+## Overview
+Fix data alignment issues in batch translation when articles have missing content. Ensure translated results maintain correct positional correspondence with input articles.
 
-#### Scenario: 加载批量配置（修改后）
-**Given** 系统正在初始化  
-**When** 配置被加载  
-**Then** 系统 SHALL 读取 `LLM_BATCH_CONFIG` 配置  
-**And** `DEFAULT_BATCH_SIZE=1` 表示默认每批处理 1 个请求（单独请求模式）  
-**And** `MAX_BATCH_SIZE=0` 表示无上限  
-**And** `MAX_CONTENT_PER_ARTICLE=0` 表示不截断文章内容
-
-#### Scenario: 环境变量覆盖
-**Given** 环境变量 `LLM_BATCH_SIZE` 已设置  
-**When** 系统解析批量大小  
-**Then** 系统 SHALL 使用环境变量值  
-**And** 值大于 1 时启用批量模式
-
-### Requirement: 批量标题翻译
-系统 SHALL 在 LLM API 调用中翻译标题，**prompt 中不使用序号占位符**。
-
-#### Scenario: 单请求翻译标题（新增）
-**Given** 系统收集了 30 个标题需要翻译  
-**And** `batchSize=1`（默认单请求模式）  
-**When** `translateTitlesBatch` 被调用  
-**Then** 系统 SHALL 将每个标题作为独立批次处理  
-**And** 系统 SHALL 发送 30 个独立的 LLM API 请求  
-**And** 系统 SHALL 返回与输入顺序相同的翻译结果
-
-#### Scenario: 批量翻译标题（启用批量模式）
-**Given** 系统收集了 30 个标题需要翻译  
-**And** `batchSize=10`（批量模式）  
-**When** `translateTitlesBatch` 被调用  
-**Then** 系统 SHALL 将标题格式化为 JSON 数组  
-**And** prompt 输出格式示例 SHALL NOT 包含 "翻译1"、"翻译2" 等序号  
-**And** 系统 SHALL 返回与输入顺序相同的翻译结果
+## MODIFIED Requirements
 
 ### Requirement: 批量内容摘要
 The system SHALL maintain data alignment between input articles and translated summaries when processing batches with missing content. Return arrays always have the same length as input arrays, using empty strings for null/missing content.
@@ -61,16 +27,6 @@ The system SHALL maintain data alignment between input articles and translated s
 - **And** 缺失内容的文章对应位置 SHALL 为空字符串 `''`
 - **And** 结果数组中每个元素的位置 SHALL 精确对应输入数组中的位置
 
-### Requirement: 批量评论摘要
-系统 SHALL 批量摘要评论，**prompt 中不使用序号占位符**。
-
-#### Scenario: 批量摘要评论无序号标记（修改）
-**Given** 系统有多个故事的评论需要批量摘要  
-**And** `batchSize > 1`  
-**When** `summarizeCommentsBatch` 被调用  
-**Then** prompt 输出格式示例 SHALL NOT 包含 "摘要1"、"摘要2" 等序号  
-**And** 返回的摘要内容 SHALL NOT 包含序号前缀
-
 ### Requirement: 统一的 chunk 方法
 The system SHALL support chunking arrays while preserving positional information for sparse data.
 
@@ -89,6 +45,8 @@ The system SHALL support chunking arrays while preserving positional information
 - **And** 无效/缺失内容的位置 SHALL 用空字符串 `''` 填充
 - **And** 系统 SHALL 不需要在调用方进行复杂的索引跟踪
 
+## ADDED Requirements
+
 ### Requirement: 数据对齐验证
 The system SHALL validate that output arrays maintain alignment with input arrays.
 
@@ -104,4 +62,3 @@ The system SHALL validate that output arrays maintain alignment with input array
 - **Then** 结果数组中对应位置 SHALL 为空字符串 `''`
 - **And** 系统 SHALL 记录处理过程中跳过的缺失内容
 - **And** 调用方 SHALL 在展示层检查空字符串并应用兜底文案（如"暂无描述"、"暂无评论"）
-
