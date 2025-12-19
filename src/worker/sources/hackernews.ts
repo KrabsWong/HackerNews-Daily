@@ -194,6 +194,7 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
         try {
           processedStories.push({
             rank: i + 1,
+            storyId: story.id,
             titleChinese: translatedTitles[i] ?? story.title,
             titleEnglish: story.title,
             score: story.score,

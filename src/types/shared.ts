@@ -10,6 +10,8 @@
 export interface ProcessedStory {
   /** Display rank (1-based) */
   rank: number;
+  /** HackerNews story ID for navigation to original discussion */
+  storyId: number;
   /** Chinese translated title */
   titleChinese: string;
   /** Original English title */

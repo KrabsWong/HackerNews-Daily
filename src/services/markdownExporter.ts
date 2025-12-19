@@ -32,8 +32,8 @@ export function generateMarkdownContent(stories: ProcessedStory[], date: Date): 
   content += generateJekyllFrontMatter(date);
   
   for (const story of stories) {
-    // Article heading (H2) with rank and Chinese title
-    content += `## ${story.rank}. 【${story.titleChinese}】\n\n`;
+    // Article heading (H2) with rank and Chinese title (no brackets)
+    content += `## ${story.rank}. ${story.titleChinese}\n\n`;
     
     // English title as plain text
     content += `${story.titleEnglish}\n\n`;
@@ -49,6 +49,9 @@ export function generateMarkdownContent(stories: ProcessedStory[], date: Date): 
     if (story.commentSummary) {
       content += `**评论要点**:\n\n${story.commentSummary}\n\n`;
     }
+    
+    // HackerNews link as italic secondary label
+    content += `*[HackerNews](https://news.ycombinator.com/item?id=${story.storyId})*\n\n`;
     
     // Separator between articles
     content += `---\n\n`;

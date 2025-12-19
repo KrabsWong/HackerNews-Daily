@@ -183,6 +183,8 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
 - **Best Stories**: HN 的精选列表 (https://news.ycombinator.com/best)，由 HN 算法根据质量筛选
 - **Score/Points**: 帖子的评分（点赞数）
 - **Story**: 一篇帖子，包含 title, url, score, time, by 等字段
+- **Story ID**: HackerNews 上该帖子的唯一标识符，用于链接到原始讨论（格式: `https://news.ycombinator.com/item?id={storyId}`）
+- **ProcessedStory**: 处理后的故事对象，包含中文翻译、AI 摘要、评论总结和 story ID，用于最终导出
 - **Content Filtering**: 可选的 AI 内容过滤（基于 LLM 分类为 SAFE/SENSITIVE）
 - **Article Summary**: 使用 Readability 提取正文后由 AI 生成约 300 字摘要
 - **Comment Summary**: 获取 top 10 评论并生成约 100 字 AI 摘要
@@ -199,6 +201,43 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
 7. 生成 AI 摘要（文章内容和评论）
 8. 翻译标题和摘要到中文
 9. 发布到 GitHub 和/或 Telegram
+
+#### Markdown 输出格式
+最终生成的 Markdown 文件（Jekyll 兼容）包含以下结构：
+
+```markdown
+---
+layout: post
+title: HackerNews Daily - YYYY-MM-DD
+date: YYYY-MM-DD
+---
+
+## 1. 标题（中文翻译）
+
+English Title
+
+**发布时间**: YYYY-MM-DD HH:MM:SS UTC
+
+**链接**: [Article URL](Article URL)
+
+**描述**:
+
+内容摘要...
+
+**评论要点**:
+
+评论摘要...（如有）
+
+*[HackerNews](https://news.ycombinator.com/item?id={storyId})*
+
+---
+```
+
+**说明**:
+- 标题直接显示中文翻译（无括号装饰）
+- 英文标题作为副标题显示
+- HackerNews 链接作为斜体副标签显示在文章末尾，用户可点击访问原始讨论
+- 每篇文章之间用 `---` 分隔
 
 ## Important Constraints
 - **Rate Limiting**: Algolia API 有请求限制，批量大小 100 stories/batch，最多 10 页
