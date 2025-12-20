@@ -104,8 +104,8 @@ describe('html utils', () => {
       expect(result.endsWith(' ')).toBe(false);
     });
 
-    // Note: Error path (lines 26-28) is defensive code that's hard to trigger
-    // in practice as cheerio.load rarely throws. It's tested implicitly by
-    // the malformed HTML test above.
+    // Note: Error path (lines 26-28 in html.ts) is defensive code that's nearly impossible to trigger
+    // in practice as cheerio.load rarely throws with ESM, and cannot be easily mocked in ESM context.
+    // The error handling is covered indirectly by the malformed HTML test above.
   });
 });
