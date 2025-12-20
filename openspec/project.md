@@ -75,6 +75,43 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
 - **Maintenance**: 当类型定义更新时，**必须**同步更新对应的 Mock 数据
 - **Rationale**: Mock 数据不匹配会导致测试失去意义，产生误导性的测试结果
 
+### Test Quality Standards (CRITICAL)
+- **Realistic Test Scenarios**: 测试**必须**反映真实的生产场景，而非人为构造的简化情况
+  - Mock 数据必须匹配实际 API 响应结构（字段名、类型、格式）
+  - LLM mock 响应必须使用真实的翻译示例，而非通用的 "翻译：Translated text"
+  - 错误场景必须模拟真实的 API 失败模式（状态码、错误消息、限流头）
+- **Safety Guardrails**: 测试**绝对不能**影响生产数据，必须通过显式的环境检查来防止
+  - 检测生产凭据（如以 `sk-`, `ghp_` 开头的 API key）
+  - 集成测试需要显式设置 `ALLOW_INTEGRATION_TESTS=true` 才能运行
+  - Mock 环境必须使用安全的默认值（`test-` 前缀的 API keys）
+  - 测试不得调用真实的外部服务（除非显式选择加入集成测试）
+- **Strong Assertions**: 测试断言**必须**明确且非宽松，不能隐藏失败
+  - **禁止**使用可选检查隐藏失败：`if (result) { expect(...) }` 
+  - 必须明确验证预期的存在或缺失：`expect(result).toBeDefined()` 或 `expect(result).toBeNull()`
+  - 对于过滤逻辑，必须使用基于属性的断言（如 "输出中无敏感关键词"）+ 具体示例检查
+  - 错误断言必须验证错误消息内容（使用正则表达式），而非仅仅验证"抛出了某个错误"
+- **Test Scenario Documentation**: 每个测试文件**必须**清晰记录是单元测试还是集成测试
+  - `describe` 块应包含注释标明 "Unit Test" 或 "Integration Test"
+  - 集成测试必须记录使用了哪些外部服务
+  - Mock helpers 必须在 docstring 中说明真实性级别和与真实 API 的差异
+  - 部分 mock 的场景必须明确记录哪些部分是真实的，哪些是 mocked
+- **Coverage Quality Over Quantity**: 覆盖率目标必须平衡质量和实用性
+  - 不应为了达到覆盖率百分比而编写无意义的测试
+  - 重点关注有意义的场景覆盖，而非行数覆盖
+  - 100% 覆盖率不是强制要求（某些错误日志分支难以测试是可接受的）
+  - 分阶段提升覆盖率：Current: 55% → Phase 1: 70% → Phase 2: 80%
+- **Examples of Good Practices**:
+  - ✅ 使用真实翻译字典：`'Python Performance Tips' → 'Python 性能优化技巧'`
+  - ✅ 基于属性的过滤断言：`expect(filtered.every(s => !s.title.includes('sensitive')))`
+  - ✅ 明确的条件断言：`env.CRAWLER_API_URL ? expect(content).toBeDefined() : expect(content).toBeNull()`
+  - ✅ 错误消息验证：`expect(() => fn()).toThrow(/rate limit exceeded/i)`
+- **Examples of Bad Practices** (不可接受):
+  - ❌ 通用 mock 响应：`mockTranslation() → "翻译：Translated text"`
+  - ❌ 肤浅的断言：`expect(result.length).toBeGreaterThan(0)` (对过滤器测试)
+  - ❌ 可选检查隐藏失败：`if (result.data) { expect(result.data).toContain(...) }`
+  - ❌ 弱错误断言：`expect(() => fn()).toThrow()` (不验证错误类型或消息)
+- **Rationale**: 高质量的测试是防止回归和重构后功能失效的关键保障
+
 ### Architecture Patterns
 - **Directory Structure**:
   ```
@@ -192,15 +229,34 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
   - `src/__tests__/integration/` - 端到端集成测试 (daily export, publisher coordination)
 
 #### Coverage Targets & Current Status
+
+**Phased Improvement Plan**:
+- **Current (Phase 0)**: 55% lines/statements, 62% functions, 84% branches
+- **Phase 1 Target**: 70% lines/statements, 75% functions (add realistic LLM mocks, strengthen assertions)
+- **Phase 2 Target**: 80% lines/statements, 80% functions (add integration tests, unify configs)
+
+**Rationale by Module**:
+- **Utils**: 100% target (critical infrastructure, no I/O, highly testable)
+- **API**: 90%+ target (external dependencies, high business value)
+- **Services**: 85%+ target (complex logic, multiple execution paths)
+- **Worker**: 85%+ target (HTTP handlers, error scenarios)
+- **Integration**: 80%+ target (end-to-end flows, partial external mocking)
+
+**Current Status**:
 | Layer | Target | Status | Files |
 |-------|--------|--------|-------|
 | Utils | 100% | ✅ Achieved | 5 files |
 | API | 90%+ | ✅ Achieved | 3 files |
-| Services | 90%+ | ✅ Achieved | 7 files |
-| Worker | 85%+ | ✅ Achieved | 3 files |
-| Publishers | 85%+ | ✅ Achieved | 2 files |
-| Integration | 80%+ | ✅ Achieved | 2 files |
-| **Total** | **85%+** | **✅ Achieved** | **22 files, 330+ scenarios** |
+| Services | 90%+ | ⚠️ In Progress (current: ~52%) | 7 files |
+| Worker | 85%+ | ⚠️ In Progress (current: ~61%) | 3 files |
+| Publishers | 85%+ | ⚠️ Low Coverage (current: ~6-10%) | 3 files |
+| Integration | 80%+ | ❌ Not Started | 2 files |
+| **Total** | **55%+ (Phase 0)** | **✅ Current: 55%** | **22 files, 111+ tests** |
+
+**Coverage Configuration**:
+- `vitest.config.ts`: Standard config (80% thresholds for unit tests)
+- `vitest.coverage.config.ts`: Phased config (55% → 70% → 80% for integration tests)
+- See configuration files for detailed inline documentation
 
 #### Test Infrastructure
 - **Mock Strategy**: 集中管理的 mock 工厂在 `src/__tests__/helpers/`

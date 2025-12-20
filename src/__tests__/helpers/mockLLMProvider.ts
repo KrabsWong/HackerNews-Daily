@@ -21,26 +21,129 @@ export interface MockLLMResponse {
 }
 
 /**
- * Create a mock translation response
+ * Realistic translation dictionary for mock LLM responses
+ * 
+ * Maps common HackerNews titles to realistic Chinese translations
+ * that match actual LLM output patterns
+ */
+const REALISTIC_TRANSLATIONS: Record<string, string> = {
+  // Tech News & Features
+  'New JavaScript Features in ES2024': 'ES2024 中的新 JavaScript 特性',
+  'Python Performance Optimization Tips': 'Python 性能优化技巧',
+  'Rust vs Go: A Comprehensive Comparison': 'Rust 与 Go：全面对比',
+  'Understanding TypeScript Generics': '理解 TypeScript 泛型',
+  'Building Scalable Microservices with Node.js': '使用 Node.js 构建可扩展的微服务',
+  
+  // AI & Machine Learning
+  'GPT-4 Architecture Explained': 'GPT-4 架构详解',
+  'Machine Learning Best Practices': '机器学习最佳实践',
+  'Deep Learning for Computer Vision': '计算机视觉的深度学习',
+  'Introduction to Neural Networks': '神经网络入门',
+  
+  // DevOps & Infrastructure
+  'Docker Container Security': 'Docker 容器安全',
+  'Kubernetes Deployment Strategies': 'Kubernetes 部署策略',
+  'CI/CD Pipeline Automation': 'CI/CD 流水线自动化',
+  'Cloud Architecture Patterns': '云架构模式',
+  
+  // Web Development
+  'React Server Components Tutorial': 'React 服务器组件教程',
+  'Modern CSS Layout Techniques': '现代 CSS 布局技术',
+  'Web Performance Optimization': 'Web 性能优化',
+  'Progressive Web Apps Guide': '渐进式 Web 应用指南',
+  
+  // Databases & Storage
+  'PostgreSQL Query Optimization': 'PostgreSQL 查询优化',
+  'Redis Caching Strategies': 'Redis 缓存策略',
+  'Database Indexing Best Practices': '数据库索引最佳实践',
+  
+  // Security & Privacy
+  'OAuth 2.0 Implementation Guide': 'OAuth 2.0 实现指南',
+  'API Security Best Practices': 'API 安全最佳实践',
+  'GDPR Compliance for Developers': '开发者的 GDPR 合规指南',
+  
+  // Generic test cases
+  'Example HackerNews Story': '示例 HackerNews 故事',
+  'This is a test': '这是一个测试',
+  'Article summary': '文章摘要',
+  'Comment summary': '评论摘要',
+};
+
+/**
+ * Extract keywords from title to find best match in dictionary
+ * 
+ * @param text Original title
+ * @returns Array of keywords for matching
+ */
+function extractKeywords(text: string): string[] {
+  // Remove common words and split
+  const stopWords = new Set(['a', 'an', 'the', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'and', 'or']);
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !stopWords.has(word));
+}
+
+/**
+ * Find best matching translation from dictionary
+ * 
+ * @param text Text to translate
+ * @returns Best matching key from dictionary, or null if no good match
+ */
+function findBestTranslation(text: string): string | null {
+  // Exact match first
+  if (REALISTIC_TRANSLATIONS[text]) {
+    return text;
+  }
+  
+  // Keyword matching for partial matches
+  const inputKeywords = extractKeywords(text);
+  let bestMatch: { key: string; score: number } | null = null;
+  
+  for (const key of Object.keys(REALISTIC_TRANSLATIONS)) {
+    const keyKeywords = extractKeywords(key);
+    const matchCount = inputKeywords.filter(kw => keyKeywords.includes(kw)).length;
+    
+    if (matchCount > 0) {
+      const score = matchCount / Math.max(inputKeywords.length, keyKeywords.length);
+      if (!bestMatch || score > bestMatch.score) {
+        bestMatch = { key, score };
+      }
+    }
+  }
+  
+  // Return match if similarity > 30%
+  return (bestMatch && bestMatch.score > 0.3) ? bestMatch.key : null;
+}
+
+/**
+ * Create a mock translation response with realistic Chinese translations
+ * 
+ * Uses dictionary-based approach with keyword matching fallback
+ * to generate realistic translations that match actual LLM output
  */
 export function mockTranslationResponse(text: string): MockLLMResponse {
-  // Simple mock: just add Chinese characters to simulate translation
-  const translations: Record<string, string> = {
-    'Example HackerNews Story': '示例 HackerNews 故事',
-    'This is a test': '这是一个测试',
-    'Article summary': '文章摘要',
-    'Comment summary': '评论摘要',
-  };
-
-  // For generic translations, preserve numbers and structure
-  let result = translations[text] || `翻译：Translated text`;
+  let result: string;
   
-  // If the input contains numbers, try to preserve them in the mock response
-  if (text && /\d+/.test(text)) {
-    // Extract numbers from input and include them in output
-    const numbers = text.match(/\d+/g) || [];
-    if (numbers.length > 0) {
-      result = `这是一篇关于的文章 ${numbers.join(' 和 ')}`;
+  // Try exact match first
+  if (REALISTIC_TRANSLATIONS[text]) {
+    result = REALISTIC_TRANSLATIONS[text];
+  } else {
+    // Try keyword matching
+    const matchKey = findBestTranslation(text);
+    if (matchKey) {
+      result = REALISTIC_TRANSLATIONS[matchKey];
+    } else {
+      // Fallback: preserve structure with realistic pattern
+      // Instead of "翻译：Translated text", use contextual format
+      if (text.includes('?')) {
+        result = `如何${text.slice(0, 20)}...`;
+      } else if (text.length > 50) {
+        result = `关于${text.slice(0, 15)}的深入分析`;
+      } else {
+        result = `${text.slice(0, 20)}相关技术讨论`;
+      }
     }
   }
   
@@ -71,11 +174,71 @@ export function mockSummaryResponse(contentLength: number = 300): MockLLMRespons
 }
 
 /**
- * Create a mock content filter response
+ * Classify content based on keywords for realistic filtering
+ * 
+ * Simulates actual content classification logic that checks for
+ * sensitive topics
  */
-export function mockContentFilterResponse(classification: 'SAFE' | 'SENSITIVE'): MockLLMResponse {
+function classifyContent(title: string, url?: string): 'SAFE' | 'SENSITIVE' {
+  const lowerTitle = title.toLowerCase();
+  const lowerUrl = url?.toLowerCase() || '';
+  
+  // Political keywords
+  const politicalKeywords = [
+    'election', 'politics', 'government', 'congress', 'senate',
+    'president', 'minister', 'parliament', 'legislation', 'policy',
+    'democrat', 'republican', 'liberal', 'conservative',
+  ];
+  
+  // Violence/conflict keywords
+  const violenceKeywords = [
+    'war', 'attack', 'killed', 'shooting', 'bomb', 'violence',
+    'terror', 'conflict', 'military', 'weapon',
+  ];
+  
+  // Adult content keywords
+  const adultKeywords = [
+    'porn', 'nsfw', 'adult', 'explicit', 'xxx',
+  ];
+  
+  // Check for sensitive keywords
+  const allSensitiveKeywords = [
+    ...politicalKeywords,
+    ...violenceKeywords,
+    ...adultKeywords,
+  ];
+  
+  const hasSensitiveKeyword = allSensitiveKeywords.some(keyword => 
+    lowerTitle.includes(keyword) || lowerUrl.includes(keyword)
+  );
+  
+  return hasSensitiveKeyword ? 'SENSITIVE' : 'SAFE';
+}
+
+/**
+ * Create a mock content filter response with realistic classification
+ * 
+ * @param classification Explicit classification override, or 'AUTO' to detect from context
+ * @param context Optional context (title, url) for automatic classification
+ */
+export function mockContentFilterResponse(
+  classification: 'SAFE' | 'SENSITIVE' | 'AUTO' = 'SAFE',
+  context?: { title?: string; url?: string }
+): MockLLMResponse {
+  let result: 'SAFE' | 'SENSITIVE';
+  
+  if (classification === 'AUTO' && context?.title) {
+    // Automatic classification based on content
+    result = classifyContent(context.title, context.url);
+  } else if (classification === 'AUTO') {
+    // No context, default to SAFE
+    result = 'SAFE';
+  } else {
+    result = classification;
+  }
+  
   return {
-    content: classification,
+    content: result,
     model: 'deepseek-chat',
     usage: {
       prompt_tokens: 100,

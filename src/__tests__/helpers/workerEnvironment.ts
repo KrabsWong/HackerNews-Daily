@@ -7,6 +7,44 @@
 import type { Env } from '../../types/worker';
 
 /**
+ * Detect if real production credentials are present in environment
+ * 
+ * @returns true if real credentials detected, false otherwise
+ */
+function detectRealCredentials(): boolean {
+  return (
+    (!!process.env.LLM_DEEPSEEK_API_KEY && process.env.LLM_DEEPSEEK_API_KEY.startsWith('sk-')) ||
+    (!!process.env.GITHUB_TOKEN && (
+      process.env.GITHUB_TOKEN.startsWith('ghp_') || 
+      process.env.GITHUB_TOKEN.startsWith('github_pat_')
+    )) ||
+    (!!process.env.TELEGRAM_BOT_TOKEN && /^\d+:/.test(process.env.TELEGRAM_BOT_TOKEN)) ||
+    false
+  );
+}
+
+/**
+ * Get list of detected real credentials for error messaging
+ * 
+ * @returns Array of credential names that appear to be real
+ */
+function getDetectedCredentials(): string[] {
+  const detected: string[] = [];
+  
+  if (process.env.LLM_DEEPSEEK_API_KEY?.startsWith('sk-')) {
+    detected.push('LLM_DEEPSEEK_API_KEY');
+  }
+  if (process.env.GITHUB_TOKEN?.startsWith('ghp_') || process.env.GITHUB_TOKEN?.startsWith('github_pat_')) {
+    detected.push('GITHUB_TOKEN');
+  }
+  if (process.env.TELEGRAM_BOT_TOKEN?.match(/^\d+:/)) {
+    detected.push('TELEGRAM_BOT_TOKEN');
+  }
+  
+  return detected;
+}
+
+/**
  * Options for creating a mock Worker environment
  */
 export interface MockEnvOptions {
@@ -28,10 +66,32 @@ export interface MockEnvOptions {
 /**
  * Create a complete mock Worker Env object with all required properties
  * 
+ * SAFETY: This function checks for real production credentials in the environment
+ * and throws an error if found (unless ALLOW_INTEGRATION_TESTS is explicitly set).
+ * This prevents accidentally running tests against production services.
+ * 
  * @param options Configuration options for the environment
  * @returns A fully configured Env object suitable for testing
+ * @throws Error if real credentials detected without ALLOW_INTEGRATION_TESTS=true
  */
 export function createMockEnv(options?: MockEnvOptions): Env & Record<string, any> {
+  // Safety Guard: Detect and prevent use of real production credentials
+  if (detectRealCredentials() && !process.env.ALLOW_INTEGRATION_TESTS) {
+    const detectedCreds = getDetectedCredentials();
+    throw new Error(
+      '🚨 Real API credentials detected in environment!\n\n' +
+      `Detected credentials: ${detectedCreds.join(', ')}\n\n` +
+      'This is a safety measure to prevent tests from accidentally affecting production data.\n\n' +
+      'Options:\n' +
+      '1. If you intend to run integration tests with real APIs:\n' +
+      '   Set ALLOW_INTEGRATION_TESTS=true in your environment\n' +
+      '   Example: ALLOW_INTEGRATION_TESTS=true npm test\n\n' +
+      '2. If you want to run unit tests only:\n' +
+      '   Remove production credentials from your environment\n' +
+      `   Example: unset ${detectedCreds.join(' ')}\n`
+    );
+  }
+
   const {
     llmProvider = 'deepseek',
     llmDeepseekModel = 'deepseek-chat',
