@@ -14,14 +14,6 @@ export type {
   HNComment,
 } from './api';
 
-// Cache types
-export type {
-  CacheConfig,
-  CachedStory,
-  CacheData,
-  CacheResult,
-} from './cache';
-
 // Content types
 export type {
   FilterClassification,

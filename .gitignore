@@ -17,6 +17,9 @@ wrangler.toml
 .cache/
 .wrangler/
 
+# Test coverage
+coverage/
+
 # Exported markdown files
 hacknews-export/
 

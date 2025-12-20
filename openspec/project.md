@@ -45,10 +45,55 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
   - `types/index.ts` - 统一导出入口
 - **Import**: 业务代码应从 `types/` 目录导入类型，可保留 re-export 以兼容旧代码
 
+### Test Organization (CRITICAL)
+- **Location**: 所有测试文件**必须**放在 `src/__tests__/` 目录下
+- **Prohibition**: 禁止在任何其他目录（如 `src/utils/__tests__/`）中创建测试文件
+- **Structure**: 按测试类型和对应的源代码模块组织：
+  - `src/__tests__/utils/` - Utils 模块的测试
+  - `src/__tests__/api/` - API 模块的测试
+  - `src/__tests__/services/` - Services 模块的测试
+  - `src/__tests__/worker/` - Worker 模块的测试
+  - `src/__tests__/helpers/` - 测试辅助工具（mocks, fixtures）
+  - `src/__tests__/integration/` - 集成测试
+- **Naming Convention**: 测试文件使用 `.test.ts` 后缀（例如：`array.test.ts`）
+- **Import Paths**: 测试文件导入源代码时使用相对路径（例如：`import { chunk } from '../../utils/array'`）
+- **Rationale**: 集中管理所有测试文件，便于查找、维护和 CI/CD 配置
+
+### Mock Data Integrity (CRITICAL)
+- **Type Accuracy**: Mock 数据**必须**严格匹配实际的 TypeScript 类型定义
+- **Prohibition**: **绝对禁止** Mock 数据与类型定义不一致（字段名、字段类型、必填/可选属性）
+- **Verification**: 所有 Mock 工厂函数必须使用正确的类型注解，让 TypeScript 编译器验证正确性
+- **Examples of Violations** (不可接受):
+  - ❌ 使用 `score` 而实际类型定义是 `points`
+  - ❌ Mock 数据缺少必填字段（如 `rank`, `timestamp`）
+  - ❌ Mock 数据包含类型定义中不存在的字段（如 `descriptionChinese`）
+  - ❌ 字段类型不匹配（如 `num_comments: number` 而定义是 `number | null`）
+- **Enforcement**: 
+  - 所有 Mock 工厂必须在函数签名中明确返回类型（如 `(): HNStory`）
+  - 必须运行 `npx tsc --noEmit` 验证类型正确性
+  - Mock 数据必须在顶部注释中标注 "CRITICAL: Must match [TypeName] interface exactly"
+- **Maintenance**: 当类型定义更新时，**必须**同步更新对应的 Mock 数据
+- **Rationale**: Mock 数据不匹配会导致测试失去意义，产生误导性的测试结果
+
 ### Architecture Patterns
 - **Directory Structure**:
   ```
   src/
+  ├── __tests__/             # 所有测试文件 (CRITICAL: 禁止在其他目录创建测试)
+  │   ├── utils/             # Utils 模块测试
+  │   │   ├── array.test.ts
+  │   │   ├── date.test.ts
+  │   │   ├── fetch.test.ts
+  │   │   ├── html.test.ts
+  │   │   └── result.test.ts
+  │   ├── api/               # API 模块测试
+  │   ├── services/          # Services 模块测试
+  │   ├── worker/            # Worker 模块测试
+  │   ├── helpers/           # 测试辅助工具
+  │   │   ├── fixtures.ts    # 测试数据工厂
+  │   │   ├── mockHNApi.ts   # HN API mock
+  │   │   └── mockLLMProvider.ts # LLM mock
+  │   └── integration/       # 集成测试
   ├── api/
   │   ├── hackernews/        # HackerNews API 模块
   │   │   ├── algolia.ts     # Algolia Search API
@@ -134,8 +179,32 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
   ```
 
 ### Testing Strategy
-- 目前无自动化测试
-- 手动测试命令: 
+- **Framework**: Vitest 3.2.4 with Cloudflare Workers support
+- **Test Location (CRITICAL)**: 所有测试文件**必须**放在 `src/__tests__/` 目录下
+- **Test Organization**:
+  - `src/__tests__/utils/` - Utils 模块单元测试
+  - `src/__tests__/api/` - API 模块单元测试
+  - `src/__tests__/services/` - Services 模块单元测试
+  - `src/__tests__/worker/` - Worker 模块单元测试
+  - `src/__tests__/helpers/` - 测试辅助工具（mocks, fixtures）
+  - `src/__tests__/integration/` - 端到端集成测试
+- **Coverage Targets**:
+  - Utils: 100% (纯函数，易测试，关键基础)
+  - API: 90%+ (核心集成点)
+  - Services: 85%+ (业务逻辑)
+  - Publishers: 85%+ (外部集成)
+  - Worker: 80%+ (运行时复杂度)
+- **Test Commands**:
+  - `npm test` - 运行所有测试
+  - `npm run test:watch` - 监听模式
+  - `npm run test:ui` - UI 交互模式
+  - `npm run test:coverage` - 生成覆盖率报告
+- **Mock Strategy**: 
+  - 集中管理的 mock 工厂在 `src/__tests__/helpers/`
+  - `fixtures.ts` - 测试数据工厂
+  - `mockHNApi.ts` - HackerNews API mock
+  - `mockLLMProvider.ts` - LLM provider mock
+- **Manual Testing**: 
   - Worker 本地: `npm run dev:worker` + `curl -X POST http://localhost:8787/trigger-export-sync`
   - Worker 部署: `npm run deploy:worker`
 
