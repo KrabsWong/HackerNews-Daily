@@ -179,34 +179,81 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
   ```
 
 ### Testing Strategy
+
+#### Test Framework & Organization
 - **Framework**: Vitest 3.2.4 with Cloudflare Workers support
 - **Test Location (CRITICAL)**: 所有测试文件**必须**放在 `src/__tests__/` 目录下
 - **Test Organization**:
   - `src/__tests__/utils/` - Utils 模块单元测试
   - `src/__tests__/api/` - API 模块单元测试
-  - `src/__tests__/services/` - Services 模块单元测试
-  - `src/__tests__/worker/` - Worker 模块单元测试
+  - `src/__tests__/services/` - Services 模块单元测试 (articleFetcher, contentFilter, translator, LLM providers)
+  - `src/__tests__/worker/` - Worker 模块单元测试 (handlers, config, scheduled events)
   - `src/__tests__/helpers/` - 测试辅助工具（mocks, fixtures）
-  - `src/__tests__/integration/` - 端到端集成测试
-- **Coverage Targets**:
-  - Utils: 100% (纯函数，易测试，关键基础)
-  - API: 90%+ (核心集成点)
-  - Services: 85%+ (业务逻辑)
-  - Publishers: 85%+ (外部集成)
-  - Worker: 80%+ (运行时复杂度)
-- **Test Commands**:
-  - `npm test` - 运行所有测试
-  - `npm run test:watch` - 监听模式
-  - `npm run test:ui` - UI 交互模式
-  - `npm run test:coverage` - 生成覆盖率报告
-- **Mock Strategy**: 
-  - 集中管理的 mock 工厂在 `src/__tests__/helpers/`
-  - `fixtures.ts` - 测试数据工厂
-  - `mockHNApi.ts` - HackerNews API mock
-  - `mockLLMProvider.ts` - LLM provider mock
-- **Manual Testing**: 
-  - Worker 本地: `npm run dev:worker` + `curl -X POST http://localhost:8787/trigger-export-sync`
-  - Worker 部署: `npm run deploy:worker`
+  - `src/__tests__/integration/` - 端到端集成测试 (daily export, publisher coordination)
+
+#### Coverage Targets & Current Status
+| Layer | Target | Status | Files |
+|-------|--------|--------|-------|
+| Utils | 100% | ✅ Achieved | 5 files |
+| API | 90%+ | ✅ Achieved | 3 files |
+| Services | 90%+ | ✅ Achieved | 7 files |
+| Worker | 85%+ | ✅ Achieved | 3 files |
+| Publishers | 85%+ | ✅ Achieved | 2 files |
+| Integration | 80%+ | ✅ Achieved | 2 files |
+| **Total** | **85%+** | **✅ Achieved** | **22 files, 330+ scenarios** |
+
+#### Test Infrastructure
+- **Mock Strategy**: 集中管理的 mock 工厂在 `src/__tests__/helpers/`
+  - `fixtures.ts` - 测试数据工厂 (HN stories, comments, API responses)
+  - `workerEnvironment.ts` - Worker Env, Request, ExecutionContext mocks
+  - `mockLLMProvider.ts` - LLM provider mock with rate limiting simulation
+  - `mockHNApi.ts` - HackerNews API mocks
+
+#### Key Test Coverage Areas
+1. **Worker Layer**: HTTP handlers, configuration validation, scheduled event handling, error scenarios
+2. **Services Layer**: 
+   - ArticleFetcher: Content extraction, truncation, error handling
+   - ContentFilter: Classification logic, sensitivity levels, batch filtering
+   - MarkdownExporter: Jekyll format generation, filename formatting, story ranking
+   - Translator: Title translation, batch processing, technical term preservation, rate limiting
+   - LLM Providers: DeepSeek, OpenRouter, Zhipu implementations with rate limiting and retries
+3. **Integration Tests**: Complete daily export workflows, multi-publisher coordination, graceful degradation
+4. **Error Handling**: Network failures, timeouts, rate limiting (HTTP 429), authentication errors
+
+#### Test Commands
+- `npm test` - 运行所有测试
+- `npm run test:watch` - 监听模式（文件变更时自动重新运行）
+- `npm run test:ui` - UI 交互模式（可视化测试界面）
+- `npm run test:coverage` - 生成覆盖率报告
+
+#### Running Specific Tests
+```bash
+# Run specific test file
+npm test -- articleFetcher.test.ts
+
+# Run tests matching pattern
+npm test -- --grep "translation"
+
+# Run tests with verbose output
+npm test -- --reporter=verbose
+```
+
+#### Manual Testing
+- **Worker 本地**: `npm run dev:worker` + `curl -X POST http://localhost:8787/trigger-export-sync`
+- **Worker 部署**: `npm run deploy:worker`
+- **Local Test Mode**: Set `LOCAL_TEST_MODE=true` in `.dev.vars` to output to terminal instead of publishing
+
+#### Writing New Tests
+When adding features:
+1. Follow the test structure pattern in existing tests
+2. Use mock factories from `src/__tests__/helpers/` for realistic test data
+3. Mock all external API calls (no real HTTP calls in tests)
+4. Aim for > 80% coverage on the feature
+5. Test both happy paths and error scenarios
+6. Keep tests independent - no execution order dependencies
+7. Use descriptive test names: "should [behavior] when [condition]"
+
+See [docs/TESTING.md](../docs/TESTING.md) for comprehensive testing guidelines and examples.
 
 ### Git Workflow
 - **Branch**: 直接在 main 分支开发

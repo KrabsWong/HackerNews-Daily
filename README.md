@@ -301,6 +301,121 @@ Export completed: 30 stories
 
 See [Local Development Guide](./docs/local-development.md) for more details.
 
+## Testing
+
+### Test Coverage
+
+This project maintains comprehensive test coverage across all layers:
+
+- **Utils Layer**: 100% coverage (utilities, helpers, formatting)
+- **API Layer**: 90%+ coverage (Firebase, Algolia integrations)
+- **Worker Layer**: 85%+ coverage (HTTP handlers, configuration, scheduling)
+- **Services Layer**: 90%+ coverage (article fetcher, translator, content filter, LLM providers)
+- **Publishers**: 85%+ coverage (GitHub, Telegram publishing)
+- **Integration**: 80%+ coverage (complete daily export workflows)
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run specific test file
+npm test -- articleFetcher.test.ts
+
+# Generate coverage report
+npm run test:coverage
+```
+
+### Test Organization
+
+Tests are organized by module in the `src/__tests__/` directory:
+
+```
+src/__tests__/
+├── helpers/              # Shared test utilities and mock factories
+│   ├── fixtures.ts       # Mock data factories
+│   ├── workerEnvironment.ts  # Mock Worker env and utilities
+│   ├── mockLLMProvider.ts    # Mock LLM provider with rate limiting
+│   ├── mockHNApi.ts      # Mock HackerNews API responses
+│   └── ...
+├── utils/                # Utility function tests
+├── api/                  # API integration tests
+│   └── hackernews/
+├── services/             # Service layer tests
+│   ├── articleFetcher.test.ts
+│   ├── contentFilter.test.ts
+│   ├── markdownExporter.test.ts
+│   ├── translator/       # Translation service tests
+│   └── llm/              # LLM provider tests
+├── worker/               # Worker handler tests
+│   ├── handlers.test.ts
+│   ├── config.test.ts
+│   └── scheduled.test.ts
+└── integration/          # End-to-end integration tests
+    ├── dailyExport.test.ts
+    └── publishers.test.ts
+```
+
+### Mock Infrastructure
+
+The test suite provides comprehensive mocking for external services:
+
+- **Crawler API**: Mock article content extraction with realistic responses
+- **GitHub API**: Mock file create/update operations
+- **Telegram Bot API**: Mock message sending
+- **Firebase/Algolia APIs**: Mock story and comment fetching
+- **LLM Providers**: Mock translations, summaries, and content filtering with rate limiting simulation
+
+### Key Test Scenarios
+
+- **Error handling**: Network failures, timeouts, rate limiting (HTTP 429)
+- **Graceful degradation**: Fallbacks when services fail
+- **Configuration validation**: Environment variable and secret validation
+- **Batch operations**: Efficient processing of multiple items
+- **Content filtering**: Sensitivity levels and classification accuracy
+- **Translation**: Language detection and technical term preservation
+- **End-to-end workflows**: Complete daily export from fetch to publish
+
+### Writing New Tests
+
+When adding new tests:
+
+1. Use fixtures from `src/__tests__/helpers/` for mock data
+2. Mock external API calls with `vi.stubGlobal('fetch', ...)`
+3. Keep tests independent - don't rely on test execution order
+4. Use descriptive test names following the pattern: "should [behavior] when [condition]"
+5. Aim for clarity over brevity
+
+Example:
+```typescript
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { createMockEnv } from '../helpers/workerEnvironment';
+import { createMockStories } from '../helpers/fixtures';
+
+describe('Article Fetcher', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', async (url: string) => {
+      if (url.includes('crawler.api')) {
+        return new Response(JSON.stringify({ success: true, data: { content: 'Article content' } }));
+      }
+      throw new Error(`Unmocked URL: ${url}`);
+    });
+  });
+
+  it('should fetch article content when valid URL provided', async () => {
+    const fetcher = new ArticleFetcher();
+    const result = await fetcher.fetch('https://example.com/article');
+    expect(result.content).toBeDefined();
+  });
+});
+```
+
+For more detailed testing guidelines, see [docs/TESTING.md](./docs/TESTING.md).
+
 ## API Documentation
 
 - **Algolia HN Search API**: https://hn.algolia.com/api (used for fetching stories by date)

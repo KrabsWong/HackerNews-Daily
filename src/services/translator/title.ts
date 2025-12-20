@@ -24,6 +24,11 @@ export async function translateTitle(
   provider: LLMProvider,
   title: string
 ): Promise<string> {
+  // Handle empty title
+  if (!title?.trim()) {
+    return '';
+  }
+
   // Check if title is already in Chinese
   if (/[\u4e00-\u9fa5]/.test(title)) {
     return title;
