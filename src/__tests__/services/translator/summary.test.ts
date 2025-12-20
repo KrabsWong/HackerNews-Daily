@@ -39,7 +39,9 @@ describe('Content Summarization Service', () => {
 
       const result = await summarizeContent(mockProvider, content, 500);
 
-      expect(result).toBeTruthy();
+      expect(result).toBeDefined();
+      expect(result).not.toBeNull();
+      expect(typeof result).toBe('string');
       expect(result).not.toBe(content);
     });
 
@@ -63,11 +65,11 @@ describe('Content Summarization Service', () => {
 
       const result = await summarizeContent(mockProvider, content, maxLength);
 
-      expect(result).toBeTruthy();
+      expect(result).toBeDefined();
+      expect(result).not.toBeNull();
+      expect(typeof result).toBe('string');
       // Summary should be roughly around max length (exact depends on implementation)
-      if (result) {
-        expect(result.length).toBeLessThanOrEqual(maxLength * 1.5); // Allow 50% buffer
-      }
+      expect(result!.length).toBeLessThanOrEqual(maxLength * 1.5); // Allow 50% buffer
     });
 
     it('should return Chinese summary', async () => {
@@ -77,11 +79,11 @@ describe('Content Summarization Service', () => {
 
       const result = await summarizeContent(mockProvider, content, 500);
 
-      expect(result).toBeTruthy();
+      expect(result).toBeDefined();
+      expect(result).not.toBeNull();
+      expect(typeof result).toBe('string');
       // Result should have Chinese characters
-      if (result) {
-        expect(/[\u4e00-\u9fa5]/.test(result)).toBe(true);
-      }
+      expect(/[\u4e00-\u9fa5]/.test(result!)).toBe(true);
     });
 
     it('should handle very short content', async () => {
@@ -108,7 +110,9 @@ describe('Content Summarization Service', () => {
 
       const result = await summarizeContent(mockProvider, content, 300);
 
-      expect(result).toBeTruthy();
+      expect(result).toBeDefined();
+      expect(result).not.toBeNull();
+      expect(typeof result).toBe('string');
     });
 
     it('should handle content with HTML tags', async () => {
@@ -122,7 +126,9 @@ describe('Content Summarization Service', () => {
 
       const result = await summarizeContent(mockProvider, content, 300);
 
-      expect(result).toBeTruthy();
+      expect(result).toBeDefined();
+      expect(result).not.toBeNull();
+      expect(typeof result).toBe('string');
     });
 
     it('should handle rate limiting gracefully', async () => {
@@ -453,7 +459,9 @@ describe('Content Summarization Service', () => {
 
       const result = await summarizeContent(mockProvider, content, 400);
 
-      expect(result).toBeTruthy();
+      expect(result).toBeDefined();
+      expect(result).not.toBeNull();
+      expect(typeof result).toBe('string');
     });
   });
 });

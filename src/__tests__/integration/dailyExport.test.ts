@@ -128,7 +128,9 @@ describe('Daily Export Integration', () => {
 
       expect(translations).toHaveLength(2);
       translations.forEach(t => {
-        expect(t).toBeTruthy();
+        expect(t).toBeDefined();
+        expect(typeof t).toBe('string');
+        expect(t.length).toBeGreaterThan(0);
       });
     });
 
@@ -143,7 +145,8 @@ describe('Daily Export Integration', () => {
         ],
       });
 
-      expect(response.content).toBeTruthy();
+      expect(response.content).toBeDefined();
+      expect(typeof response.content).toBe('string');
       expect(response.content.length).toBeGreaterThan(0);
     });
 
@@ -207,7 +210,8 @@ describe('Daily Export Integration', () => {
       expect(processed).toHaveLength(1);
       expect(processed[0].rank).toBe(1);
       expect(processed[0].titleChinese).toBe('标题');
-      expect(processed[0].commentSummary).toBeTruthy();
+      expect(processed[0].commentSummary).toBeDefined();
+      expect(typeof processed[0].commentSummary).toBe('string');
     });
 
     it('should complete workflow without errors', async () => {
@@ -326,7 +330,9 @@ describe('Daily Export Integration', () => {
       // Fallback: use story title/meta instead of fetched description
       const description = story.title || 'No description available';
 
-      expect(description).toBeTruthy();
+      expect(description).toBeDefined();
+      expect(typeof description).toBe('string');
+      expect(description.length).toBeGreaterThan(0);
     });
 
     it('should continue on translation failure', async () => {
@@ -344,7 +350,9 @@ describe('Daily Export Integration', () => {
       }
 
       // Either translated or original
-      expect(title).toBeTruthy();
+      expect(title).toBeDefined();
+      expect(typeof title).toBe('string');
+      expect(title.length).toBeGreaterThan(0);
     });
 
     it('should handle LLM rate limiting gracefully', async () => {

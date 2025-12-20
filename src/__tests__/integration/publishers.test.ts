@@ -326,7 +326,9 @@ describe('Multi-Publisher Integration', () => {
       // Terminal publisher formats and outputs
       const output = stories.map(s => `${s.rank}. ${s.titleChinese}`).join('\n');
 
-      expect(output).toBeTruthy();
+      expect(output).toBeDefined();
+      expect(typeof output).toBe('string');
+      expect(output.length).toBeGreaterThan(0);
     });
 
     it('should format stories correctly', () => {
