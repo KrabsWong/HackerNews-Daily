@@ -419,3 +419,308 @@ export function createMockTelegramError(code: number = 400, message: string = 'B
     description: message,
   };
 }
+
+// =============================================================================
+// Malformed Data Test Helpers (Phase 1 Task 7)
+// =============================================================================
+
+/**
+ * Generate malformed HNStory with missing required fields
+ * 
+ * @param options Control which fields to corrupt
+ * @returns Partially invalid HNStory for testing error handling
+ */
+export function createMalformedHNStory(options: {
+  missingTitle?: boolean;
+  missingId?: boolean;
+  invalidType?: boolean;
+  invalidTimestamp?: boolean;
+  invalidScore?: boolean;
+  invalidUrl?: boolean;
+} = {}): Partial<HNStory> {
+  const base: any = {
+    id: options.missingId ? undefined : 12345,
+    title: options.missingTitle ? undefined : 'Example Story',
+    url: options.invalidUrl ? 'not-a-valid-url' : 'https://example.com',
+    score: options.invalidScore ? -999 : 150,
+    time: options.invalidTimestamp ? 'invalid-timestamp' as any : Math.floor(Date.now() / 1000),
+    type: options.invalidType ? 'unknown-type' as any : 'story',
+    by: 'testuser',
+  };
+
+  // Remove undefined fields to simulate missing data
+  Object.keys(base).forEach(key => {
+    if (base[key] === undefined) {
+      delete base[key];
+    }
+  });
+
+  return base;
+}
+
+/**
+ * Generate malformed AlgoliaStory with missing or invalid fields
+ * 
+ * @param options Control which fields to corrupt
+ * @returns Partially invalid AlgoliaStory for testing error handling
+ */
+export function createMalformedAlgoliaStory(options: {
+  missingObjectID?: boolean;
+  missingStoryId?: boolean;
+  missingTitle?: boolean;
+  invalidPoints?: boolean;
+  invalidTimestamp?: boolean;
+  invalidUrl?: boolean;
+  missingAuthor?: boolean;
+} = {}): Partial<AlgoliaStory> {
+  const base: any = {
+    objectID: options.missingObjectID ? undefined : '12345',
+    story_id: options.missingStoryId ? undefined : 12345,
+    title: options.missingTitle ? undefined : 'Example Story',
+    url: options.invalidUrl ? 'not-a-url' : 'https://example.com',
+    points: options.invalidPoints ? 'invalid' as any : 150,
+    created_at_i: options.invalidTimestamp ? 'not-a-number' as any : Math.floor(Date.now() / 1000),
+    author: options.missingAuthor ? undefined : 'testuser',
+    _tags: ['story'],
+  };
+
+  // Remove undefined fields
+  Object.keys(base).forEach(key => {
+    if (base[key] === undefined) {
+      delete base[key];
+    }
+  });
+
+  return base;
+}
+
+/**
+ * Generate malformed AlgoliaComment with missing or invalid fields
+ * 
+ * @param options Control which fields to corrupt
+ * @returns Partially invalid AlgoliaComment for testing error handling
+ */
+export function createMalformedAlgoliaComment(options: {
+  missingObjectID?: boolean;
+  missingText?: boolean;
+  emptyText?: boolean;
+  missingAuthor?: boolean;
+  invalidStoryId?: boolean;
+  invalidTimestamp?: boolean;
+} = {}): Partial<AlgoliaComment> {
+  const base: any = {
+    objectID: options.missingObjectID ? undefined : '12346',
+    author: options.missingAuthor ? undefined : 'commenter1',
+    comment_text: options.missingText ? undefined : (options.emptyText ? '' : 'Test comment'),
+    created_at_i: options.invalidTimestamp ? null as any : Math.floor(Date.now() / 1000),
+    story_id: options.invalidStoryId ? 'not-a-number' as any : 12345,
+    _tags: ['comment'],
+  };
+
+  // Remove undefined fields
+  Object.keys(base).forEach(key => {
+    if (base[key] === undefined) {
+      delete base[key];
+    }
+  });
+
+  return base;
+}
+
+/**
+ * Generate malformed ProcessedStory with missing or invalid fields
+ * 
+ * @param options Control which fields to corrupt
+ * @returns Partially invalid ProcessedStory for testing error handling
+ */
+export function createMalformedProcessedStory(options: {
+  missingRank?: boolean;
+  missingStoryId?: boolean;
+  missingTitles?: boolean;
+  invalidUrl?: boolean;
+  invalidScore?: boolean;
+  invalidTimestamp?: boolean;
+} = {}): Partial<ProcessedStory> {
+  const base: any = {
+    rank: options.missingRank ? undefined : 1,
+    storyId: options.missingStoryId ? undefined : 12345,
+    titleChinese: options.missingTitles ? undefined : '示例故事',
+    titleEnglish: options.missingTitles ? undefined : 'Example Story',
+    score: options.invalidScore ? 'invalid' as any : 150,
+    url: options.invalidUrl ? 'not-a-url' : 'https://example.com',
+    time: '2025-12-20 10:00:00 UTC',
+    timestamp: options.invalidTimestamp ? 'not-a-number' as any : Math.floor(Date.now() / 1000),
+  };
+
+  // Remove undefined fields
+  Object.keys(base).forEach(key => {
+    if (base[key] === undefined) {
+      delete base[key];
+    }
+  });
+
+  return base;
+}
+
+/**
+ * Create malformed API responses for testing error handling
+ */
+export const MalformedAPIResponses = {
+  /**
+   * Empty JSON object response
+   */
+  empty: {},
+
+  /**
+   * Null response
+   */
+  null: null,
+
+  /**
+   * Array instead of expected object
+   */
+  unexpectedArray: [1, 2, 3],
+
+  /**
+   * String instead of expected object
+   */
+  unexpectedString: 'not an object',
+
+  /**
+   * Response with wrong structure
+   */
+  wrongStructure: {
+    unexpected_field: 'value',
+    another_field: 123,
+  },
+
+  /**
+   * Nested data with missing critical fields
+   */
+  missingCriticalFields: {
+    data: {
+      // Missing required fields
+    },
+  },
+
+  /**
+   * Response with all null values
+   */
+  allNulls: {
+    id: null,
+    title: null,
+    url: null,
+    score: null,
+  },
+
+  /**
+   * HackerNews API response with hits but malformed items
+   */
+  algoliaHitsMalformed: {
+    hits: [
+      { objectID: '123' }, // Missing title and other required fields
+      { title: 'Story without ID' }, // Missing objectID
+      {}, // Completely empty
+    ],
+    nbHits: 3,
+    page: 0,
+    nbPages: 1,
+  },
+
+  /**
+   * GitHub API 404 Not Found error
+   */
+  githubNotFound: {
+    message: 'Not Found',
+    documentation_url: 'https://docs.github.com/rest',
+  },
+
+  /**
+   * GitHub API 422 Validation Failed error
+   */
+  githubValidationFailed: {
+    message: 'Validation Failed',
+    errors: [
+      {
+        resource: 'Repository',
+        code: 'invalid',
+        field: 'name',
+      },
+    ],
+    documentation_url: 'https://docs.github.com/rest',
+  },
+
+  /**
+   * Telegram API error response
+   */
+  telegramError: {
+    ok: false,
+    error_code: 400,
+    description: 'Bad Request: chat not found',
+  },
+
+  /**
+   * Crawler API timeout error
+   */
+  crawlerTimeout: {
+    success: false,
+    error: {
+      message: 'Request timeout',
+      code: 'TIMEOUT',
+    },
+  },
+
+  /**
+   * Malformed JSON-like string that will fail parsing
+   */
+  invalidJSON: '{"invalid": json, missing: "quotes"}',
+
+  /**
+   * HTML response when JSON expected
+   */
+  htmlInsteadOfJSON: '<!DOCTYPE html><html><body>Error 500</body></html>',
+
+  /**
+   * Response with circular reference (for JSON.stringify edge cases)
+   */
+  circularReference: (() => {
+    const obj: any = { a: 1 };
+    obj.self = obj; // Circular reference
+    return obj;
+  })(),
+};
+
+/**
+ * Helper to create batch of malformed stories for testing resilience
+ * 
+ * @param count Number of stories to generate
+ * @param corruptionRate Percentage (0-1) of stories that should be malformed
+ * @returns Mixed array of valid and malformed stories
+ */
+export function createMalformedStoryBatch(count: number, corruptionRate: number = 0.3): Array<HNStory | Partial<HNStory>> {
+  return Array.from({ length: count }, (_, i) => {
+    const shouldCorrupt = Math.random() < corruptionRate;
+    
+    if (shouldCorrupt) {
+      // Randomly choose what to corrupt
+      const corruptionType = Math.floor(Math.random() * 4);
+      switch (corruptionType) {
+        case 0:
+          return createMalformedHNStory({ missingTitle: true });
+        case 1:
+          return createMalformedHNStory({ invalidUrl: true });
+        case 2:
+          return createMalformedHNStory({ invalidTimestamp: true });
+        default:
+          return createMalformedHNStory({ missingId: true });
+      }
+    }
+    
+    return createMockHNStory({
+      id: 10000 + i,
+      title: `Test Story ${i + 1}`,
+      score: 200 - (i * 10),
+    });
+  });
+}
+

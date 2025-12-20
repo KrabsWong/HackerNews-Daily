@@ -5,7 +5,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { mapAlgoliaStoryToHNStory } from '../../../api/hackernews/mapper';
-import { createMockAlgoliaStory } from '../../helpers/fixtures';
+import { 
+  createMockAlgoliaStory,
+  createMalformedAlgoliaStory,
+} from '../../helpers/fixtures';
 
 describe('API Mapper', () => {
   describe('mapAlgoliaStoryToHNStory', () => {
@@ -159,6 +162,82 @@ describe('API Mapper', () => {
       const result = mapAlgoliaStoryToHNStory(algoliaStory);
 
       expect(result.url).toBe(complexUrl);
+    });
+  });
+
+  describe('Malformed data handling', () => {
+    it('should handle story with missing title gracefully', () => {
+      const malformed = createMalformedAlgoliaStory({ missingTitle: true });
+
+      const result = mapAlgoliaStoryToHNStory(malformed as any);
+
+      expect(result).toBeDefined();
+      expect(result.id).toBeDefined();
+      expect(result.title).toBeUndefined();
+    });
+
+    it('should handle story with missing story_id', () => {
+      const malformed = createMalformedAlgoliaStory({ missingStoryId: true });
+
+      const result = mapAlgoliaStoryToHNStory(malformed as any);
+
+      expect(result).toBeDefined();
+      expect(result.id).toBeUndefined();
+      expect(result.title).toBeDefined();
+    });
+
+    it('should handle story with invalid points field', () => {
+      const malformed = createMalformedAlgoliaStory({ invalidPoints: true });
+
+      const result = mapAlgoliaStoryToHNStory(malformed as any);
+
+      expect(result).toBeDefined();
+      expect(result.score).toBe('invalid' as any);
+    });
+
+    it('should handle story with invalid timestamp', () => {
+      const malformed = createMalformedAlgoliaStory({ invalidTimestamp: true });
+
+      const result = mapAlgoliaStoryToHNStory(malformed as any);
+
+      expect(result).toBeDefined();
+      expect(result.time).toBe('not-a-number' as any);
+    });
+
+    it('should handle story with missing author', () => {
+      const malformed = createMalformedAlgoliaStory({ missingAuthor: true });
+
+      const result = mapAlgoliaStoryToHNStory(malformed as any);
+
+      expect(result).toBeDefined();
+      expect(result.by).toBeUndefined();
+    });
+
+    it('should handle completely empty object', () => {
+      const empty = {} as any;
+
+      const result = mapAlgoliaStoryToHNStory(empty);
+
+      expect(result).toBeDefined();
+      expect(result.type).toBe('story');
+      expect(result.id).toBeUndefined();
+      expect(result.title).toBeUndefined();
+    });
+
+    it('should handle story with multiple missing fields', () => {
+      const malformed = createMalformedAlgoliaStory({
+        missingTitle: true,
+        missingAuthor: true,
+        invalidUrl: true,
+      });
+
+      const result = mapAlgoliaStoryToHNStory(malformed as any);
+
+      expect(result).toBeDefined();
+      expect(result.type).toBe('story');
+      expect(result.title).toBeUndefined();
+      expect(result.by).toBeUndefined();
+      expect(result.url).toBe('not-a-url');
     });
   });
 });
