@@ -92,6 +92,97 @@ npm run test:coverage
 # Open coverage/index.html in a browser to view coverage details
 ```
 
+## Test Quality Standards
+
+All tests in this project adhere to strict quality standards to ensure they accurately reflect production behavior and catch real bugs.
+
+### Realistic Mock Data
+
+Mock data must match actual API response structures. Never use generic mocks that don't represent real-world scenarios.
+
+```typescript
+// ❌ Bad: Generic unrealistic mock
+mockTranslation('Some Title') // Returns "翻译：Translated text"
+
+// ✅ Good: Realistic mock from dictionary
+mockTranslation('Python Performance Tips') // Returns "Python 性能优化技巧"
+```
+
+The `mockLLMProvider.ts` includes a comprehensive dictionary of realistic translations based on actual LLM outputs. This ensures tests can catch translation quality regressions.
+
+### Safety Guardrails
+
+Tests are prevented from affecting production data through explicit environment checks:
+
+```typescript
+// Guard throws error if real credentials detected without opt-in flag
+// Example of running integration tests with real APIs:
+ALLOW_INTEGRATION_TESTS=true npm test
+```
+
+The `createMockEnv()` function in `workerEnvironment.ts` automatically detects real production credentials (API keys starting with `sk-`, `ghp_`, etc.) and prevents tests from running unless you explicitly opt-in with `ALLOW_INTEGRATION_TESTS=true`.
+
+**Never commit this flag to CI/CD configurations** without explicit approval, as it could cause tests to affect production services.
+
+### Strong Assertions
+
+Always use explicit assertions that verify expected behavior:
+
+```typescript
+// ❌ Bad: Optional check hides failures
+if (result.fullContent) {
+  expect(result.fullContent).toContain('...');
+}
+
+// ✅ Good: Explicit check for expected presence/absence
+if (env.CRAWLER_API_URL) {
+  expect(result.fullContent).toBeDefined();
+  expect(result.fullContent).toContain('...');
+} else {
+  expect(result.fullContent).toBeNull();
+}
+```
+
+For filtering logic, use property-based assertions:
+
+```typescript
+// ✅ Good: Property-based assertion
+const titles = filtered.map(s => s.title.toLowerCase());
+const sensitiveKeywords = ['sensitive', 'keyword', 'list'];
+for (const title of titles) {
+  for (const keyword of sensitiveKeywords) {
+    expect(title).not.toContain(keyword);
+  }
+}
+
+// ✅ Good: Specific example verification
+expect(filtered).toContainEqual(
+  expect.objectContaining({ title: expect.stringContaining('Expected Title') })
+);
+```
+
+### Coverage Quality Over Quantity
+
+The project follows a phased coverage improvement plan:
+
+- **Phase 0 (Current)**: 55% lines/statements, 62% functions, 84% branches
+- **Phase 1 (Target)**: 70% lines/statements, 75% functions
+- **Phase 2 (Goal)**: 80% lines/statements, 80% functions
+
+Focus on meaningful scenario coverage rather than achieving arbitrary percentage targets. A well-tested critical path is better than superficial coverage of edge cases.
+
+### Error Message Validation
+
+Always verify error messages, not just that an error was thrown:
+
+```typescript
+// ❌ Bad: Weak error assertion
+await expect(provider.chatCompletion(request)).rejects.toThrow();
+
+// ✅ Good: Verify error message content
+await expect(provider.chatCompletion(request)).rejects.toThrow(/rate limit exceeded/i);
+```
+
 ## Test Infrastructure
 
 ### Mock Factories

@@ -232,8 +232,8 @@ describe('LLM Factory', () => {
     it('should provide clear error for missing API key', () => {
       expect(() => {
         createLLMProvider({
-          provider: 'deepseek',
-          env: {},
+          provider: LLMProviderType.DEEPSEEK,
+          config: { apiKey: '' },
         });
       }).toThrow(/API key|required/i);
     });
@@ -247,8 +247,8 @@ describe('LLM Factory', () => {
     it('should include provider name in error message', () => {
       try {
         createLLMProvider({
-          provider: 'openrouter',
-          env: {},
+          provider: LLMProviderType.OPENROUTER,
+          config: { apiKey: '' },
         });
         expect.fail('Should have thrown');
       } catch (error) {
@@ -298,21 +298,17 @@ describe('LLM Factory', () => {
     it('should handle empty environment object', () => {
       expect(() => {
         createLLMProvider({
-          provider: 'deepseek',
-          env: {},
+          provider: LLMProviderType.DEEPSEEK,
+          config: { apiKey: '' },
         });
       }).toThrow();
     });
 
     it('should handle undefined environment values gracefully', () => {
-      const env = {
-        LLM_DEEPSEEK_API_KEY: undefined,
-      };
-
       expect(() => {
         createLLMProvider({
-          provider: 'deepseek',
-          env: env as any,
+          provider: LLMProviderType.DEEPSEEK,
+          config: { apiKey: '' },
         });
       }).toThrow();
     });

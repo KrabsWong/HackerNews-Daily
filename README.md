@@ -314,6 +314,17 @@ This project maintains comprehensive test coverage across all layers:
 - **Publishers**: 85%+ coverage (GitHub, Telegram publishing)
 - **Integration**: 80%+ coverage (complete daily export workflows)
 
+### Test Quality Standards
+
+All tests adhere to strict quality standards to ensure they accurately reflect production behavior:
+
+- **Realistic Mock Data**: Mock data matches actual API response structures. LLM mocks use realistic translations (e.g., `'Python Performance Tips' → 'Python 性能优化技巧'`) instead of generic responses.
+- **Explicit Assertions**: Tests use clear, non-permissive assertions that verify expected behavior explicitly rather than hiding failures with optional checks.
+- **Safety First**: Environment guards prevent tests from accidentally affecting production data. Real API credentials require explicit `ALLOW_INTEGRATION_TESTS=true` opt-in.
+- **Coverage Targets**: Phased improvement plan (Current: 55% → Phase 1: 70% → Phase 2: 80%) balances quality and practicality.
+
+See `openspec/project.md` for complete test quality guidelines.
+
 ### Running Tests
 
 ```bash
