@@ -128,11 +128,12 @@ export async function summarizeComments(
         {
           role: 'user',
           content: `总结以下 HackerNews 评论中的关键讨论要点。要求：
-- 总结长度约为 100 个字符
+- 总结长度约为 ${CONTENT_CONFIG.COMMENT_SUMMARY_LENGTH} 个字符
 - 保留重要的技术术语、库名称、工具名称（如 React、TypeScript、AWS 等）
 - 捕捉评论中的主要观点和共识
-- 如果有争议观点，简要提及
-- 使用清晰、简洁的中文表达
+- 如果有争议观点,提及不同立场和论据
+- 如果讨论了具体实现、性能数据、或替代方案,尽量包含关键信息
+- 使用清晰、准确的中文表达
 
 IMPORTANT OUTPUT REQUIREMENTS:
 - Return ONLY the summary content in Chinese
@@ -551,9 +552,11 @@ export async function summarizeCommentsBatch(
 ${JSON.stringify(batchInput, null, 2)}
 
 要求：
-- 总结长度约为 100 个字符
+- 总结长度约为 ${CONTENT_CONFIG.COMMENT_SUMMARY_LENGTH} 个字符
 - 保留重要的技术术语、库名称、工具名称
 - 捕捉评论中的主要观点和共识
+- 如果有争议观点,提及不同立场和论据
+- 如果讨论了具体实现、性能数据、或替代方案,尽量包含关键信息
 - 直接输出摘要内容，不要添加"摘要1:"等任何序号或标记前缀
 - 输出格式示例：["评论讨论了某技术的优缺点...", "用户普遍认为..."]
 - 只输出 JSON 数组

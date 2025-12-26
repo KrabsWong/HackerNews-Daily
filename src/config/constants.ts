@@ -247,6 +247,8 @@ export const CONTENT_CONFIG = {
   MAX_COMMENTS_LENGTH: 5000,
   /** Minimum number of comments required for summarization */
   MIN_COMMENTS_FOR_SUMMARY: 3,
+  /** Target length for comment summaries in characters */
+  COMMENT_SUMMARY_LENGTH: 300,
 } as const;
 
 // =============================================================================

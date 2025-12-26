@@ -363,7 +363,7 @@ See [docs/TESTING.md](../docs/TESTING.md) for comprehensive testing guidelines a
 - **ProcessedStory**: 处理后的故事对象，包含中文翻译、AI 摘要、评论总结和 story ID，用于最终导出
 - **Content Filtering**: 可选的 AI 内容过滤（基于 LLM 分类为 SAFE/SENSITIVE）
 - **Article Summary**: 使用 Readability 提取正文后由 AI 生成约 300 字摘要
-- **Comment Summary**: 获取 top 10 评论并生成约 100 字 AI 摘要
+- **Comment Summary**: 获取 top 10 评论并生成约 300 字 AI 摘要（可通过 `CONTENT_CONFIG.COMMENT_SUMMARY_LENGTH` 配置）
 
 ### 数据处理流程
 
