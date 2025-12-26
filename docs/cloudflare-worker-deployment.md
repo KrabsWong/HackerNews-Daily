@@ -72,7 +72,7 @@ npx wrangler secret put CRAWLER_API_URL
 Check that `wrangler.toml` contains the correct settings:
 
 ```toml
-name = "hacknews-daily-export"
+name = "hackernews-daily-export"
 main = "dist/worker/index.js"
 compatibility_date = "2024-12-11"
 
@@ -165,13 +165,13 @@ This command:
 After deployment, you'll see output like:
 
 ```
-✅ Deployed to https://hacknews-daily-export.your-subdomain.workers.dev
+✅ Deployed to https://hackernews-daily-export.your-subdomain.workers.dev
 ```
 
 Test the health check:
 
 ```bash
-curl https://hacknews-daily-export.your-subdomain.workers.dev/
+curl https://hackernews-daily-export.your-subdomain.workers.dev/
 ```
 
 ### 3. Check Scheduled Runs
@@ -358,7 +358,7 @@ Create staging environment for testing:
 **Add to `wrangler.toml`**:
 ```toml
 [env.staging]
-name = "hacknews-daily-export-staging"
+name = "hackernews-daily-export-staging"
 vars = { TARGET_BRANCH = "staging" }
 ```
 

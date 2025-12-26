@@ -33,7 +33,7 @@ npx wrangler tail --status error
 
 1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com/)
 2. 进入 Workers & Pages
-3. 选择你的 Worker (`hacknews-daily-export`)
+3. 选择你的 Worker (`hackernews-daily-export`)
 4. 点击 "Logs" 标签
 5. 查看最近的请求日志（保留 24 小时）
 

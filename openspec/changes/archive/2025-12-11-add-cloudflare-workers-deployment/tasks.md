@@ -23,7 +23,7 @@ Tasks marked with 🔄 can be parallelized with the previous task.
 1. Install Wrangler globally: `npm install -g wrangler`
 2. Create `wrangler.toml` in project root with minimal configuration:
    ```toml
-   name = "hacknews-daily-export"
+   name = "hackernews-daily-export"
    main = "dist/worker/index.js"
    compatibility_date = "2024-12-11"
    
@@ -623,7 +623,7 @@ Tasks marked with 🔄 can be parallelized with the previous task.
    wrangler secret put DEEPSEEK_API_KEY --env staging
    wrangler secret put GITHUB_TOKEN --env staging
    ```
-3. Manually trigger export: `curl -X POST https://hacknews-daily-export-staging.workers.dev/trigger-export`
+3. Manually trigger export: `curl -X POST https://hackernews-daily-export-staging.workers.dev/trigger-export`
 4. Monitor logs: `wrangler tail --env staging`
 5. Verify Markdown file appears in tldr-hacknews-24 repository
 6. Compare output with GitHub Actions result (run both for same day)

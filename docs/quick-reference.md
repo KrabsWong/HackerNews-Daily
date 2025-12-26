@@ -267,7 +267,7 @@ curl -X POST http://localhost:8787/trigger-export-sync
 
 1. 登录 https://dash.cloudflare.com/
 2. Workers & Pages
-3. 选择 `hacknews-daily-export`
+3. 选择 `hackernews-daily-export`
 4. 点击 "Logs" 标签
 
 ## 更多资源

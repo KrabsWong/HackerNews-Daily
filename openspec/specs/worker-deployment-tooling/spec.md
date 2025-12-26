@@ -10,7 +10,7 @@ The project SHALL include a `wrangler.toml` configuration file defining the Work
 **Given** a developer initializes the Worker deployment setup  
 **When** the `wrangler.toml` file is created  
 **Then** the configuration SHALL define the following mandatory fields:  
-  - `name`: "hacknews-daily-export"  
+  - `name`: "hackernews-daily-export"  
   - `main`: "dist/worker/index.js" (path to bundled Worker script)  
   - `compatibility_date`: "2024-12-11" (Cloudflare Workers API version)  
 **And** the configuration SHALL NOT include any secrets or API keys (use Wrangler secrets instead)  
@@ -36,7 +36,7 @@ The project SHALL include a `wrangler.toml` configuration file defining the Work
 **Then** the system SHALL use Wrangler environments syntax:  
   - `[env.staging]` for staging-specific overrides  
   - `[env.production]` for production-specific overrides  
-**And** each environment SHALL have a unique `name` field (e.g., "hacknews-daily-export-staging")  
+**And** each environment SHALL have a unique `name` field (e.g., "hackernews-daily-export-staging")  
 **And** environment selection SHALL be controlled via `wrangler deploy --env staging` command
 
 ### Requirement: Build Script Integration

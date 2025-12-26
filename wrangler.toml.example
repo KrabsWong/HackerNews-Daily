@@ -1,4 +1,4 @@
-name = "hacknews-daily-export"
+name = "hackernews-daily-export"
 main = "dist/worker/index.js"
 compatibility_date = "2024-12-11"
 compatibility_flags = ["nodejs_compat"]

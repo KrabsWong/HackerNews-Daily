@@ -102,7 +102,7 @@ npx wrangler whoami
 - `CRAWLER_API_URL`: Crawler API base URL for fallback content extraction
 
 **Worker configuration (`wrangler.toml`):**
-- Worker name: `hacknews-daily-export`
+- Worker name: `hackernews-daily-export`
 - Cron schedule: `15 0 * * *` (daily at 00:15 UTC)
 - Environment variables in `[vars]` section
 - Secrets managed via `wrangler secret put`

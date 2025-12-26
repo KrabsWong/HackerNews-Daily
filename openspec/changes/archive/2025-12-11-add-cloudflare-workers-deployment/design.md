@@ -12,7 +12,7 @@ This design document outlines the architecture for replacing GitHub Actions with
 │                    Cloudflare Workers Platform                  │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │            Worker: hacknews-daily-export              │  │
+│  │            Worker: hackernews-daily-export              │  │
 │  │                                                          │  │
 │  │  ┌────────────────┐    ┌──────────────────────────┐   │  │
 │  │  │  Cron Trigger  │───▶│  Export Handler          │   │  │
@@ -172,7 +172,7 @@ export default {
 
 **Example `wrangler.toml`**:
 ```toml
-name = "hacknews-daily-export"
+name = "hackernews-daily-export"
 main = "dist/worker/index.js"
 compatibility_date = "2024-12-11"
 
