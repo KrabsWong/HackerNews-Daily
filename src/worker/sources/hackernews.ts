@@ -171,13 +171,12 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
       
       // For stories without content, translate meta descriptions
       logInfo('Processing descriptions');
-      const descriptions: string[] = [];
+      const descriptions: string[] = new Array(filteredStories.length);
       for (let i = 0; i < filteredStories.length; i++) {
         if (contentSummaries[i]) {
-          descriptions.push(contentSummaries[i]);
+          descriptions[i] = contentSummaries[i];
         } else {
-          const translated = await translator.translateDescription(metaDescriptions[i]);
-          descriptions.push(translated);
+          descriptions[i] = await translator.translateDescription(metaDescriptions[i]);
         }
       }
       
@@ -185,6 +184,31 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
       logInfo('Batch summarizing comments');
       apiCalls['deepseek_comments'] = (apiCalls['deepseek_comments'] || 0) + Math.ceil(commentsArrays.filter(c => c.length >= 3).length / llmBatchSize);
       const commentSummaries = await translator.summarizeCommentsBatch(commentsArrays, llmBatchSize);
+
+      // Phase 2.5: Validate array alignment
+      logInfo('Validating array alignment');
+      const expectedLength = filteredStories.length;
+      const arrayLengths = {
+        translatedTitles: translatedTitles.length,
+        contentSummaries: contentSummaries.length,
+        descriptions: descriptions.length,
+        commentSummaries: commentSummaries.length,
+      };
+
+      // Check all arrays have the same length
+      const allLengthsMatch = Object.values(arrayLengths).every(len => len === expectedLength);
+
+      if (!allLengthsMatch) {
+        logError('Array length mismatch detected', new Error('Alignment validation failed'), {
+          expected: expectedLength,
+          actual: arrayLengths,
+        });
+        throw new Error(
+          `Array alignment validation failed: expected ${expectedLength} items, got ${JSON.stringify(arrayLengths)}`
+        );
+      }
+
+      logInfo('Array alignment validated', arrayLengths);
 
       // Phase 3: Assemble processed stories
       logInfo('Phase 3: Assembling results');
@@ -201,8 +225,8 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
             url: story.url ?? '',
             time: formatTimestamp(story.time, true),
             timestamp: story.time,
-            description: descriptions[i] || '暂无描述',
-            commentSummary: commentSummaries[i] || '暂无评论',
+            description: descriptions[i] !== '' ? descriptions[i] : '暂无描述',
+            commentSummary: commentSummaries[i] !== '' ? commentSummaries[i] : '暂无评论',
           });
           
           successCount++;
