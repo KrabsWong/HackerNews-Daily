@@ -1,12 +1,16 @@
 /**
  * Content and comment summarization functions
  * Handles both single-item and batch summarization operations
+ * 
+ * NOTE: Batch functions use concurrent single-item processing to ensure
+ * index-to-content alignment. This is more reliable than batch prompts
+ * where LLM response order is not guaranteed.
  */
 
 import { fromPromise } from '../../utils/result';
 import { HNComment } from '../../types/api';
 import { stripHTML } from '../../utils/html';
-import { chunk, parseJsonArray, MAX_RETRIES, delay } from '../../utils/array';
+import { chunk, MAX_RETRIES, delay } from '../../utils/array';
 import { getErrorMessage } from '../../worker/logger';
 import { CONTENT_CONFIG, LLM_BATCH_CONFIG } from '../../config/constants';
 import { LLMProvider, FetchError } from '../llm';
@@ -270,19 +274,25 @@ export async function summarizeBatchSequential(
 }
 
 /**
- * Batch summarize multiple article contents in a single API call
- * Preserves array indices by keeping empty strings for null/missing content
+ * Batch summarize multiple article contents using concurrent single-item processing
+ * 
+ * This function uses concurrent single-item LLM calls instead of batch prompts.
+ * This ensures 100% reliable index-to-content mapping because:
+ * 1. Each content is processed in a separate LLM request
+ * 2. Index mapping is controlled by code, not dependent on LLM response order
+ * 3. No JSON array parsing that could reorder or lose items
+ * 
  * @param provider - LLM provider instance
  * @param contents - Array of article contents to summarize
  * @param maxLength - Target summary length in characters
- * @param batchSize - Number of articles per batch (default 10)
+ * @param concurrency - Number of concurrent LLM requests (default from config)
  * @returns Array of summaries (empty string for empty contents, preserving indices)
  */
 export async function summarizeContentBatch(
   provider: LLMProvider,
   contents: (string | null)[],
   maxLength: number,
-  batchSize: number = 10
+  concurrency: number = LLM_BATCH_CONFIG.DEFAULT_CONCURRENCY
 ): Promise<string[]> {
   if (contents.length === 0) {
     return [];
@@ -292,7 +302,7 @@ export async function summarizeContentBatch(
   const providerName = provider.getName();
   const modelName = provider.getModel();
   
-  console.log(`Starting batch content summarization: ${contents.length} articles using ${providerName}/${modelName}`);
+  console.log(`Starting content summarization: ${contents.length} articles using ${providerName}/${modelName} (concurrency: ${concurrency})`);
 
   // Build items with content only, but keep track of all indices
   const itemsToProcess: Array<{ index: number; content: string }> = [];
@@ -311,159 +321,32 @@ export async function summarizeContentBatch(
   }
 
   progress.start(contents.length);
-  const batches = chunk(itemsToProcess, batchSize);
-  let processedCount = 0;
   
   // Log alignment information for debugging
   console.log(`[Content Summary] Processing: ${contents.length} total items, ${itemsToProcess.length} with valid content, ${contents.length - itemsToProcess.length} empty/null`);
 
+  // Process items with concurrency control using chunk + Promise.all
+  const batches = chunk(itemsToProcess, concurrency);
+  let processedCount = 0;
+
   for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
     const batch = batches[batchIdx];
     
-    // Log batch start for better user visibility
-    console.log(`[Content Summary] Processing batch ${batchIdx + 1}/${batches.length}: ${batch.length} articles | Provider: ${providerName}/${modelName}`);
+    console.log(`[Content Summary] Processing batch ${batchIdx + 1}/${batches.length}: ${batch.length} articles concurrently | Provider: ${providerName}/${modelName}`);
 
-    // Prepare batch input
-    const maxContentLength = LLM_BATCH_CONFIG.MAX_CONTENT_PER_ARTICLE;
-    const batchInput = batch.map(item => ({
-      index: item.index,
-      content:
-        maxContentLength > 0
-          ? item.content.substring(0, maxContentLength)
-          : item.content,
-    }));
-
-    const result = await fromPromise(
-      provider.chatCompletion({
-        messages: [
-          {
-            role: 'user',
-            content: `请用中文总结以下文章内容。返回一个 JSON 数组，每个元素是对应文章的摘要。
-
-输入 JSON 数组：
-${JSON.stringify(batchInput, null, 2)}
-
-要求：
-- 每个摘要长度约为 ${maxLength} 个字符
-- 抓住文章的核心要点和关键见解
-- 使用清晰、简洁的中文表达
-- 直接输出摘要内容，不要添加"文章1:"、"摘要1:"等任何序号或标记前缀
-- 输出格式示例：["这是第一篇文章的摘要内容...", "这是第二篇文章的摘要内容..."]
-- 只输出 JSON 数组，不要其他说明
-
-IMPORTANT OUTPUT REQUIREMENTS:
-- Return ONLY a JSON array of summaries
-- DO NOT include any meta-information, notes, or explanations
-- DO NOT add character counts like "注:实际字符数XXX" in the summaries
-- DO NOT add prefixes like "总结:", "摘要:", "300字总结" to any summary
-- Each array element must be clean, ready-to-use Chinese content`,
-          },
-        ],
-        temperature: 0.5,
+    // Process all items in this batch concurrently
+    const batchResults = await Promise.all(
+      batch.map(async (item) => {
+        const summary = await summarizeContent(provider, item.content, maxLength);
+        return { index: item.index, summary: summary || '' };
       })
     );
 
-    // Handle API error
-    if (!result.ok) {
-      const errorMsg = getErrorMessage(result.error);
-      console.error(`[Content Summary] Batch ${batchIdx + 1}/${batches.length} failed:`, {
-        error: errorMsg,
-        batchSize: batch.length,
-        provider: providerName,
-        model: modelName,
-        fallbackStrategy: 'Processing items individually',
-      });
-      console.log(`[Content Summary] Fallback: Processing ${batch.length} items individually...`);
-      for (let i = 0; i < batch.length; i++) {
-        const item = batch[i];
-        console.log(`[Content Summary] Fallback item ${i + 1}/${batch.length} | Provider: ${providerName}/${modelName}`);
-        const summary = await summarizeContent(
-          provider,
-          item.content,
-          maxLength
-        );
-        summaries[item.index] = summary || '';
-        processedCount++;
-      }
-      
-      if (progress.update(processedCount) || progress.shouldLogByTime(30)) {
-        console.log(progress.formatMessage('content summarization', providerName, modelName));
-      }
-      continue;
-    }
-
-    const content = result.value.content;
-
-    if (!content) {
-      console.warn(`[Content Summary] Batch ${batchIdx + 1}/${batches.length} returned empty, falling back`);
-      console.log(`[Content Summary] Fallback: Processing ${batch.length} items individually...`);
-      for (let i = 0; i < batch.length; i++) {
-        const item = batch[i];
-        console.log(`[Content Summary] Fallback item ${i + 1}/${batch.length} | Provider: ${providerName}/${modelName}`);
-        const summary = await summarizeContent(
-          provider,
-          item.content,
-          maxLength
-        );
-        summaries[item.index] = summary || '';
-        processedCount++;
-      }
-      
-      if (progress.update(processedCount) || progress.shouldLogByTime(30)) {
-        console.log(progress.formatMessage('content summarization', providerName, modelName));
-      }
-      continue;
-    }
-
-    // Parse JSON array using Result pattern
-    const parseResult = parseJsonArray<string>(content, batch.length);
-
-    if (parseResult.ok) {
-      const results = parseResult.value;
-      
-      // Map results back to original indices, preserving order and length
-      batch.forEach((item, idx) => {
-        if (idx < results.length) {
-          summaries[item.index] = results[idx] || '';
-          processedCount++;
-        } else {
-          // If this item wasn't returned, log and mark for retry
-          console.warn(`Batch ${batchIdx + 1}: Missing result for item ${idx + 1}, will retry individually`);
-        }
-      });
-      
-      // Retry items that didn't get results
-      for (let idx = results.length; idx < batch.length; idx++) {
-        const item = batch[idx];
-        const summary = await summarizeContent(
-          provider,
-          item.content,
-          maxLength
-        );
-        summaries[item.index] = summary || '';
-        processedCount++;
-      }
-    } else {
-      console.error(`[Content Summary] Batch ${batchIdx + 1}/${batches.length} JSON parse failed:`, {
-        error: getErrorMessage(parseResult.error),
-        expectedItems: batch.length,
-        provider: providerName,
-        model: modelName,
-        note: 'Check parseJsonArray logs above for content preview',
-        fallbackStrategy: 'Processing items individually',
-      });
-      console.log(`[Content Summary] Fallback: Processing ${batch.length} items individually...`);
-      for (let i = 0; i < batch.length; i++) {
-        const item = batch[i];
-        console.log(`[Content Summary] Fallback item ${i + 1}/${batch.length} | Provider: ${providerName}/${modelName}`);
-        const summary = await summarizeContent(
-          provider,
-          item.content,
-          maxLength
-        );
-        summaries[item.index] = summary || '';
-        processedCount++;
-      }
+    // Map results back to original indices - this is 100% reliable because
+    // we control the index assignment in code, not depending on LLM output order
+    for (const { index, summary } of batchResults) {
+      summaries[index] = summary;
+      processedCount++;
     }
 
     if (progress.update(processedCount) || progress.shouldLogByTime(30)) {
@@ -477,17 +360,23 @@ IMPORTANT OUTPUT REQUIREMENTS:
 }
 
 /**
- * Batch summarize comments for multiple stories
- * Preserves array indices by keeping empty strings for insufficient comments
+ * Batch summarize comments for multiple stories using concurrent single-item processing
+ * 
+ * This function uses concurrent single-item LLM calls instead of batch prompts.
+ * This ensures 100% reliable index-to-content mapping because:
+ * 1. Each story's comments are processed in a separate LLM request
+ * 2. Index mapping is controlled by code, not dependent on LLM response order
+ * 3. No JSON array parsing that could reorder or lose items
+ * 
  * @param provider - LLM provider instance
  * @param commentArrays - Array of comment arrays (one per story)
- * @param batchSize - Number of stories per batch (default 10)
+ * @param concurrency - Number of concurrent LLM requests (default from config)
  * @returns Array of comment summaries (empty string for insufficient comments, preserving indices)
  */
 export async function summarizeCommentsBatch(
   provider: LLMProvider,
   commentArrays: HNComment[][],
-  batchSize: number = 10
+  concurrency: number = LLM_BATCH_CONFIG.DEFAULT_CONCURRENCY
 ): Promise<string[]> {
   if (commentArrays.length === 0) {
     return [];
@@ -497,7 +386,7 @@ export async function summarizeCommentsBatch(
   const providerName = provider.getName();
   const modelName = provider.getModel();
   
-  console.log(`Starting batch comment summarization: ${commentArrays.length} stories using ${providerName}/${modelName}`);
+  console.log(`Starting comment summarization: ${commentArrays.length} stories using ${providerName}/${modelName} (concurrency: ${concurrency})`);
 
   // Filter stories with enough comments
   const storiesToProcess: Array<{ index: number; comments: HNComment[] }> = [];
@@ -516,153 +405,32 @@ export async function summarizeCommentsBatch(
   }
 
   progress.start(commentArrays.length);
-  const batches = chunk(storiesToProcess, batchSize);
-  let processedCount = 0;
   
   // Log alignment information for debugging
   console.log(`[Comment Summary] Processing: ${commentArrays.length} total stories, ${storiesToProcess.length} with sufficient comments, ${commentArrays.length - storiesToProcess.length} insufficient`);
 
+  // Process items with concurrency control using chunk + Promise.all
+  const batches = chunk(storiesToProcess, concurrency);
+  let processedCount = 0;
+
   for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
     const batch = batches[batchIdx];
     
-    // Log batch start for better user visibility
-    console.log(`[Comment Summary] Processing batch ${batchIdx + 1}/${batches.length}: ${batch.length} stories | Provider: ${providerName}/${modelName}`);
+    console.log(`[Comment Summary] Processing batch ${batchIdx + 1}/${batches.length}: ${batch.length} stories concurrently | Provider: ${providerName}/${modelName}`);
 
-    // Prepare batch input
-    const batchInput = batch.map(item => {
-      const commentTexts = item.comments
-        .map(c => stripHTML(c.text))
-        .filter(t => t.length > 0);
-      let combined = commentTexts.join('\n---\n');
-      if (combined.length > CONTENT_CONFIG.MAX_COMMENTS_LENGTH) {
-        combined =
-          combined.substring(0, CONTENT_CONFIG.MAX_COMMENTS_LENGTH) + '...';
-      }
-      return { index: item.index, comments: combined };
-    });
-
-    const result = await fromPromise(
-      provider.chatCompletion({
-        messages: [
-          {
-            role: 'user',
-            content: `总结以下 HackerNews 评论中的关键讨论要点。返回 JSON 数组，每个元素是对应评论的摘要。
-
-输入 JSON 数组：
-${JSON.stringify(batchInput, null, 2)}
-
-要求：
-- 总结长度约为 ${CONTENT_CONFIG.COMMENT_SUMMARY_LENGTH} 个字符
-- 保留重要的技术术语、库名称、工具名称
-- 捕捉评论中的主要观点和共识
-- 如果有争议观点,提及不同立场和论据
-- 如果讨论了具体实现、性能数据、或替代方案,尽量包含关键信息
-- 直接输出摘要内容，不要添加"摘要1:"等任何序号或标记前缀
-- 输出格式示例：["评论讨论了某技术的优缺点...", "用户普遍认为..."]
-- 只输出 JSON 数组
-
-IMPORTANT OUTPUT REQUIREMENTS:
-- Return ONLY a JSON array of summaries
-- DO NOT include any meta-information, notes, or explanations  
-- DO NOT add character counts like "注:实际字符数XXX" in the summaries
-- DO NOT add prefixes like "总结:", "评论要点:", "100字总结" to any summary
-- Each array element must be clean, ready-to-use Chinese content`,
-          },
-        ],
-        temperature: 0.5,
+    // Process all items in this batch concurrently
+    const batchResults = await Promise.all(
+      batch.map(async (item) => {
+        const summary = await summarizeCommentsWithRetry(provider, item.comments);
+        return { index: item.index, summary: summary || '' };
       })
     );
 
-    // Handle API error
-    if (!result.ok) {
-      const errorMsg = getErrorMessage(result.error);
-      console.error(`[Comment Summary] Batch ${batchIdx + 1}/${batches.length} failed:`, {
-        error: errorMsg,
-        batchSize: batch.length,
-        provider: providerName,
-        model: modelName,
-        fallbackStrategy: 'Processing items individually with retry',
-      });
-      console.log(`[Comment Summary] Fallback: Processing ${batch.length} items individually...`);
-      for (let i = 0; i < batch.length; i++) {
-        const item = batch[i];
-        console.log(`[Comment Summary] Fallback item ${i + 1}/${batch.length} | Provider: ${providerName}/${modelName}`);
-        const summary = await summarizeCommentsWithRetry(provider, item.comments);
-        summaries[item.index] = summary || '';
-        processedCount++;
-      }
-      
-      if (progress.update(processedCount) || progress.shouldLogByTime(30)) {
-        console.log(progress.formatMessage('comment summarization', providerName, modelName));
-      }
-      continue;
-    }
-
-    const content = result.value.content;
-
-    if (!content) {
-      console.error(`[Comment Summary] Batch ${batchIdx + 1}/${batches.length} returned empty content`, {
-        batchSize: batch.length,
-        provider: providerName,
-        model: modelName,
-        fallbackStrategy: 'Processing items individually with retry',
-      });
-      console.log(`[Comment Summary] Fallback: Processing ${batch.length} items individually...`);
-      for (let i = 0; i < batch.length; i++) {
-        const item = batch[i];
-        console.log(`[Comment Summary] Fallback item ${i + 1}/${batch.length} | Provider: ${providerName}/${modelName}`);
-        const summary = await summarizeCommentsWithRetry(provider, item.comments);
-        summaries[item.index] = summary || '';
-        processedCount++;
-      }
-      
-      if (progress.update(processedCount) || progress.shouldLogByTime(30)) {
-        console.log(progress.formatMessage('comment summarization', providerName, modelName));
-      }
-      continue;
-    }
-
-    // Parse JSON array using Result pattern
-    const parseResult = parseJsonArray<string>(content, batch.length);
-
-    if (parseResult.ok) {
-      const results = parseResult.value;
-      
-      // Map results back to original indices, preserving order and length
-      batch.forEach((item, idx) => {
-        if (idx < results.length) {
-          summaries[item.index] = results[idx] || '';
-          processedCount++;
-        } else {
-          // If this item wasn't returned, log and mark for retry
-          console.warn(`Batch ${batchIdx + 1}: Missing result for item ${idx + 1}, will retry individually`);
-        }
-      });
-      
-      // Retry items that didn't get results
-      for (let idx = results.length; idx < batch.length; idx++) {
-        const item = batch[idx];
-        const summary = await summarizeCommentsWithRetry(provider, item.comments);
-        summaries[item.index] = summary || '';
-        processedCount++;
-      }
-    } else {
-      console.error(`[Comment Summary] Batch ${batchIdx + 1}/${batches.length} JSON parse failed:`, {
-        error: getErrorMessage(parseResult.error),
-        expectedItems: batch.length,
-        provider: providerName,
-        model: modelName,
-        note: 'Check parseJsonArray logs above for content preview',
-        fallbackStrategy: 'Processing items individually with retry',
-      });
-      console.log(`[Comment Summary] Fallback: Processing ${batch.length} items individually...`);
-      for (let i = 0; i < batch.length; i++) {
-        const item = batch[i];
-        console.log(`[Comment Summary] Fallback item ${i + 1}/${batch.length} | Provider: ${providerName}/${modelName}`);
-        const summary = await summarizeCommentsWithRetry(provider, item.comments);
-        summaries[item.index] = summary || '';
-        processedCount++;
-      }
+    // Map results back to original indices - this is 100% reliable because
+    // we control the index assignment in code, not depending on LLM output order
+    for (const { index, summary } of batchResults) {
+      summaries[index] = summary;
+      processedCount++;
     }
 
     if (progress.update(processedCount) || progress.shouldLogByTime(30)) {

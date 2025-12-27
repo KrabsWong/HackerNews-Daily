@@ -40,51 +40,45 @@ TBD - created by archiving change optimize-worker-subrequests. Update Purpose af
 **And** 系统 SHALL 返回与输入顺序相同的翻译结果
 
 ### Requirement: 批量内容摘要
-The system SHALL maintain data alignment between input articles and translated summaries when processing batches with missing content. Return arrays always have the same length as input arrays, using empty strings for null/missing content. The system SHALL use index assignment instead of `push()` operations when assembling description arrays, and SHALL use explicit empty string checks (`!== ''`) instead of falsy checks (`||`) when applying fallback values.
+The system SHALL maintain data alignment between input articles and translated summaries when processing batches with missing content. The system SHALL use concurrent single-item processing with code-controlled index mapping to ensure 100% reliable alignment.
 
-#### Scenario: 处理缺失内容的数据对齐
-- **Given** 系统有 20 篇文章需要批量摘要
-- **And** 第 13 篇文章没有内容（爬虫获取失败）
-- **When** `summarizeContentBatch` 被调用，批量大小为 10
-- **Then** 系统 SHALL 正确处理 20 篇文章输入
-- **And** 系统 SHALL 返回包含 20 个元素的 string 数组
-- **And** 第 13 个元素 SHALL 为空字符串 `''`（对应缺失内容的文章）
-- **And** 其他元素的摘要 SHALL 正确对应各自的原文章
-- **And** 返回数组长度 SHALL 始终等于输入数组长度
+#### Scenario: Concurrent single-item processing
+- **GIVEN** a batch of 30 articles to summarize
+- **AND** concurrency limit is set to 5
+- **WHEN** the batch summarization is invoked
+- **THEN** the system SHALL process 5 articles concurrently at a time
+- **AND** each article SHALL be summarized in a separate LLM request
+- **AND** results SHALL be mapped back to correct indices by code logic
 
-#### Scenario: 稀疏数组的批次处理
-- **Given** 系统有 15 篇文章需要批量翻译标题
-- **And** 其中 5 篇文章内容为空或 null
-- **When** `translateTitlesBatch` 被调用，批量处理
-- **Then** 系统 SHALL 维护原始输入顺序
-- **And** 返回的翻译结果 SHALL 与输入数组长度相同
-- **And** 缺失内容的文章对应位置 SHALL 为空字符串 `''`
-- **And** 结果数组中每个元素的位置 SHALL 精确对应输入数组中的位置
+#### Scenario: Index mapping guaranteed by code
+- **GIVEN** articles with indices [0, 1, 2, 3, 4]
+- **WHEN** concurrent summarization completes
+- **THEN** each summary SHALL be stored at its original index in the result array
+- **AND** the mapping SHALL NOT depend on the order of LLM responses
 
-#### Scenario: Building descriptions array with index assignment (NEW)
-**Given** the system has content summaries with empty strings for missing content  
-**When** the system builds the descriptions array  
-**Then** the system SHALL initialize `descriptions` as `new Array(N)` where N is the story count  
-**And** the system SHALL assign values using `descriptions[i] = value` for each index i  
-**And** the system SHALL NOT use `push()` operations  
-**And** empty strings in content summaries SHALL trigger fallback translation
-
-#### Scenario: Explicit empty string handling in assembly (NEW)
-**Given** batch results contain empty strings for missing items  
-**When** the system assembles final story objects  
-**Then** the system SHALL check `value !== ''` before applying fallback text  
-**And** the system SHALL NOT use `||` operator which treats `''` as falsy  
-**And** fallback text ("暂无描述", "暂无评论") SHALL only appear for empty strings
+#### Scenario: Partial failure handling
+- **GIVEN** a batch of 5 articles being processed concurrently
+- **WHEN** summarization for article at index 2 fails
+- **THEN** the system SHALL store empty string at index 2
+- **AND** the system SHALL continue processing other articles
+- **AND** successful results SHALL be stored at their correct indices
 
 ### Requirement: 批量评论摘要
-系统 SHALL 批量摘要评论，**prompt 中不使用序号占位符**。
+系统 SHALL 使用并发单条处理批量摘要评论，通过代码控制索引映射确保100%可靠对齐。
 
-#### Scenario: 批量摘要评论无序号标记（修改）
-**Given** 系统有多个故事的评论需要批量摘要  
-**And** `batchSize > 1`  
-**When** `summarizeCommentsBatch` 被调用  
-**Then** prompt 输出格式示例 SHALL NOT 包含 "摘要1"、"摘要2" 等序号  
-**And** 返回的摘要内容 SHALL NOT 包含序号前缀
+#### Scenario: Concurrent comment summarization
+- **GIVEN** comments for 30 stories to summarize
+- **AND** concurrency limit is set to 5
+- **WHEN** the batch comment summarization is invoked
+- **THEN** the system SHALL process 5 stories concurrently at a time
+- **AND** each story's comments SHALL be summarized in a separate LLM request
+
+#### Scenario: Stories with insufficient comments skipped
+- **GIVEN** 30 stories where 5 have fewer than 3 comments
+- **WHEN** batch comment summarization is invoked
+- **THEN** the system SHALL skip the 5 stories with insufficient comments
+- **AND** the system SHALL process the remaining 25 stories with concurrency control
+- **AND** skipped stories SHALL have empty string at their indices
 
 ### Requirement: 统一的 chunk 方法
 The system SHALL support chunking arrays while preserving positional information for sparse data.
@@ -127,4 +121,22 @@ The system SHALL validate that output arrays maintain alignment with input array
 **And** the system SHALL throw an error if any array length mismatches  
 **And** the error message SHALL include expected length and actual lengths of all arrays  
 **And** the system SHALL log the validation result for debugging
+
+### Requirement: Concurrency Configuration
+The system SHALL support configurable concurrency for LLM requests to balance throughput and rate limit compliance.
+
+#### Scenario: Default concurrency
+- **GIVEN** no LLM_CONCURRENCY environment variable is set
+- **WHEN** batch processing is invoked
+- **THEN** the system SHALL use default concurrency of 5
+
+#### Scenario: Custom concurrency
+- **GIVEN** LLM_CONCURRENCY environment variable is set to 10
+- **WHEN** batch processing is invoked
+- **THEN** the system SHALL process up to 10 items concurrently
+
+#### Scenario: Concurrency of 1 for sequential processing
+- **GIVEN** LLM_CONCURRENCY environment variable is set to 1
+- **WHEN** batch processing is invoked
+- **THEN** the system SHALL process items one at a time sequentially
 

@@ -257,8 +257,8 @@ export const CONTENT_CONFIG = {
 
 /**
  * LLM batch processing settings for translation and summarization
- * Note: Content and comment summarization functions use default batch size of 10
- * This configuration primarily affects title translation
+ * Note: Content and comment summarization use concurrent single-item processing
+ * This configuration primarily affects title translation (batch prompt) and concurrency
  */
 export const LLM_BATCH_CONFIG = {
   /** 
@@ -268,7 +268,6 @@ export const LLM_BATCH_CONFIG = {
    * Set to N>1 for batch mode (N items per API call)
    * 
    * Recommendation: Use 10 for batch mode to balance reliability and API efficiency
-   * Content/comment summarization use batch size 10 by default (defined in function signatures)
    */
   DEFAULT_BATCH_SIZE: 10,
   /** 
@@ -291,6 +290,13 @@ export const LLM_BATCH_CONFIG = {
    * Higher values = richer content but larger API payloads
    */
   MAX_CONTENT_PER_ARTICLE: 0,
+  /**
+   * Default concurrency for single-item LLM operations
+   * Controls how many LLM requests run in parallel for content/comment summarization
+   * Lower = safer for rate limits, higher = faster processing
+   * Recommended: 5 for most providers, 2 for Zhipu (due to concurrency limit)
+   */
+  DEFAULT_CONCURRENCY: 5,
 } as const;
 
 // =============================================================================

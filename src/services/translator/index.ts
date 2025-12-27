@@ -136,19 +136,21 @@ class TranslationService {
   }
 
   /**
-   * Batch summarize multiple contents in single API calls (optimized)
+   * Summarize multiple contents using concurrent single-item processing
    * Returns array with empty strings for null/missing content (preserves indices)
+   * Index-to-content alignment is guaranteed by code (not dependent on LLM response order)
+   * @param concurrency - Number of concurrent LLM requests (default 10)
    */
   async summarizeContentBatch(
     contents: (string | null)[],
     maxLength: number,
-    batchSize: number = 10
+    concurrency: number = 10
   ): Promise<string[]> {
     return summary.summarizeContentBatch(
       this.ensureProvider(),
       contents,
       maxLength,
-      batchSize
+      concurrency
     );
   }
 
@@ -178,17 +180,19 @@ class TranslationService {
   }
 
   /**
-   * Batch summarize comments for multiple stories (optimized)
+   * Summarize comments for multiple stories using concurrent single-item processing
    * Returns array with empty strings for insufficient comments (preserves indices)
+   * Index-to-content alignment is guaranteed by code (not dependent on LLM response order)
+   * @param concurrency - Number of concurrent LLM requests (default 10)
    */
   async summarizeCommentsBatch(
     commentArrays: HNComment[][],
-    batchSize: number = 10
+    concurrency: number = 10
   ): Promise<string[]> {
     return summary.summarizeCommentsBatch(
       this.ensureProvider(),
       commentArrays,
-      batchSize
+      concurrency
     );
   }
 }
