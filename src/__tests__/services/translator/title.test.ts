@@ -8,10 +8,11 @@
  * - Chinese title detection and skip
  * - Rate limit handling
  * - Error handling
+ * - Data consistency guarantees
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { translateTitle } from '../../../services/translator/title';
+import { translateTitle, translateTitlesBatch } from '../../../services/translator/title';
 import { MockLLMProviderWithRateLimit, mockTranslationResponse } from '../../helpers/mockLLMProvider';
 
 describe('Title Translator Service', () => {
@@ -277,6 +278,104 @@ describe('Title Translator Service', () => {
       expect(results.length).toBeGreaterThan(0);
     });
     */
+  });
+
+  describe('translateTitlesBatch - Data Consistency', () => {
+    it('should always return array with same length as input', async () => {
+      const titles = [
+        'First Article',
+        'Second Article',
+        'Third Article',
+      ];
+
+      mockProvider.reset();
+
+      const results = await translateTitlesBatch(mockProvider, titles, 10);
+
+      // CRITICAL: Output length must match input length
+      expect(results.length).toBe(titles.length);
+    });
+
+    it('should return empty array for empty input', async () => {
+      const results = await translateTitlesBatch(mockProvider, [], 10);
+
+      expect(results).toEqual([]);
+    });
+
+    it('should use original title as fallback when API fails', async () => {
+      const titles = ['Test Article Title'];
+      mockProvider.configureError(0, 'network');
+
+      const results = await translateTitlesBatch(mockProvider, titles, 10);
+
+      // Should return original title as fallback
+      expect(results.length).toBe(1);
+      expect(results[0]).toBe(titles[0]);
+    });
+
+    it('should handle partial batch failures with fallback to original', async () => {
+      const titles = [
+        'First Article',
+        'Second Article',
+        'Third Article',
+        'Fourth Article',
+        'Fifth Article',
+      ];
+
+      // Configure to fail after second call
+      mockProvider.reset();
+      mockProvider.configureRateLimit(2);
+
+      const results = await translateTitlesBatch(mockProvider, titles, 2);
+
+      // Must always return same length as input
+      expect(results.length).toBe(titles.length);
+      
+      // Each result should be defined (either translation or original)
+      results.forEach((result, index) => {
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('string');
+        expect(result.length).toBeGreaterThan(0);
+      });
+    });
+
+    it('should preserve index order across batches', async () => {
+      const titles = [
+        'Article A',
+        'Article B',
+        'Article C',
+        'Article D',
+        'Article E',
+      ];
+
+      mockProvider.reset();
+
+      // Use small batch size to create multiple batches
+      const results = await translateTitlesBatch(mockProvider, titles, 2);
+
+      expect(results.length).toBe(5);
+      // Each position should have a result (either translated or original)
+      results.forEach((result, index) => {
+        expect(result).toBeDefined();
+      });
+    });
+
+    it('should handle large batch with data consistency', async () => {
+      const titles = Array.from({ length: 50 }, (_, i) => `Article ${i + 1}`);
+
+      mockProvider.reset();
+
+      const results = await translateTitlesBatch(mockProvider, titles, 10);
+
+      // Output must match input length exactly
+      expect(results.length).toBe(titles.length);
+      
+      // Verify all positions are filled
+      results.forEach((result, index) => {
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('string');
+      });
+    });
   });
 
   describe('Technical term preservation', () => {

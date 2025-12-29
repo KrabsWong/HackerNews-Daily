@@ -187,14 +187,51 @@ describe('Markdown Exporter Service', () => {
       expect(markdown).toContain(commentSummary);
     });
 
-    it('should exclude comment summary when null', () => {
+    it('should show default message when comment summary is null', () => {
       const date = new Date('2025-12-20T00:00:00Z');
       const story = createMockProcessedStory({ commentSummary: null });
       const stories = [story];
 
       const markdown = generateMarkdownContent(stories, date);
 
-      expect(markdown).not.toContain('**评论要点**:');
+      // Comment section should always be present with default message
+      expect(markdown).toContain('**评论要点**:');
+      expect(markdown).toContain('暂无评论');
+    });
+
+    it('should show default message when comment summary is empty string', () => {
+      const date = new Date('2025-12-20T00:00:00Z');
+      const story = createMockProcessedStory({ commentSummary: '' });
+      const stories = [story];
+
+      const markdown = generateMarkdownContent(stories, date);
+
+      // Comment section should always be present with default message
+      expect(markdown).toContain('**评论要点**:');
+      expect(markdown).toContain('暂无评论');
+    });
+
+    it('should show default message when description is empty', () => {
+      const date = new Date('2025-12-20T00:00:00Z');
+      const story = createMockProcessedStory({ description: '' });
+      const stories = [story];
+
+      const markdown = generateMarkdownContent(stories, date);
+
+      expect(markdown).toContain('**描述**:');
+      expect(markdown).toContain('暂无描述');
+    });
+
+    it('should show default message when description is null', () => {
+      const date = new Date('2025-12-20T00:00:00Z');
+      // Force null to test the fallback
+      const story = createMockProcessedStory({ description: null as unknown as string });
+      const stories = [story];
+
+      const markdown = generateMarkdownContent(stories, date);
+
+      expect(markdown).toContain('**描述**:');
+      expect(markdown).toContain('暂无描述');
     });
 
     it('should include HackerNews link', () => {
@@ -333,7 +370,7 @@ describe('Markdown Exporter Service', () => {
           url: 'https://example.com/2',
           storyId: 2,
           time: '2025-12-20 11:00:00 UTC',
-          commentSummary: null,
+          commentSummary: '',  // Empty comment - will show default message
         }),
       ];
 

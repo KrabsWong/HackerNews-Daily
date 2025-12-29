@@ -398,11 +398,11 @@ English Title
 
 **描述**:
 
-内容摘要...
+内容摘要...（若无内容则显示"暂无描述"）
 
 **评论要点**:
 
-评论摘要...（如有）
+评论摘要...（若无评论则显示"暂无评论"）
 
 *[HackerNews](https://news.ycombinator.com/item?id={storyId})*
 
@@ -414,6 +414,7 @@ English Title
 - 英文标题作为副标题显示
 - HackerNews 链接作为斜体副标签显示在文章末尾，用户可点击访问原始讨论
 - 每篇文章之间用 `---` 分隔
+- **描述和评论区块始终存在**：即使内容为空，也会显示默认文案（"暂无描述"/"暂无评论"）
 
 ## Important Constraints
 - **Rate Limiting**: Algolia API 有请求限制，批量大小 100 stories/batch，最多 10 页

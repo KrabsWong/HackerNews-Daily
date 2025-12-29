@@ -149,11 +149,11 @@ export async function translateDescription(
 
 /**
  * Batch translate multiple titles in a single API call
- * Falls back to individual translation on failure
+ * Falls back to original titles on failure to ensure data consistency
  * @param provider - LLM provider instance
  * @param titles - Array of titles to translate
  * @param batchSize - Number of titles per batch (default 10)
- * @returns Array of translated titles in the same order
+ * @returns Array of translated titles in the same order (guaranteed same length as input)
  */
 export async function translateTitlesBatch(
   provider: LLMProvider,
@@ -173,9 +173,12 @@ export async function translateTitlesBatch(
 
   const batches = chunk(titles, batchSize);
   const allTranslations: string[] = [];
+  // Track global index offset for accurate mapping
+  let globalIndexOffset = 0;
 
   for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
     const batch = batches[batchIdx];
+    const batchStartIndex = globalIndexOffset;
 
     const result = await fromPromise(
       provider.chatCompletion({
@@ -200,6 +203,7 @@ IMPORTANT OUTPUT REQUIREMENTS:
 - DO NOT add character counts or formatting notes
 - DO NOT add prefixes like "翻译:" or "标题:" to each translation
 - Each array element must be clean, ready-to-use content
+- The output array MUST have exactly ${batch.length} elements
 
 Output format example: ["First translated title here", "Second translated title here"]`,
           },
@@ -208,15 +212,16 @@ Output format example: ["First translated title here", "Second translated title 
       })
     );
 
-    // Handle API error
+    // Handle API error - use original titles as fallback
     if (!result.ok) {
       console.warn(
-        `Batch ${batchIdx + 1}: API error, falling back: ${getErrorMessage(result.error)}`
+        `Batch ${batchIdx + 1}: API error, using original titles as fallback: ${getErrorMessage(result.error)}`
       );
-      for (const title of batch) {
-        const translated = await translateTitle(provider, title);
-        allTranslations.push(translated);
+      for (let i = 0; i < batch.length; i++) {
+        allTranslations.push(batch[i]);
+        console.log(`[Fallback] Index ${batchStartIndex + i}: "${batch[i].substring(0, 30)}..." -> (original)`);
       }
+      globalIndexOffset += batch.length;
       
       // Update progress
       if (progress.update(allTranslations.length)) {
@@ -228,11 +233,12 @@ Output format example: ["First translated title here", "Second translated title 
     const content = result.value.content;
 
     if (!content) {
-      console.warn(`Batch ${batchIdx + 1} returned empty, falling back`);
-      for (const title of batch) {
-        const translated = await translateTitle(provider, title);
-        allTranslations.push(translated);
+      console.warn(`Batch ${batchIdx + 1} returned empty, using original titles as fallback`);
+      for (let i = 0; i < batch.length; i++) {
+        allTranslations.push(batch[i]);
+        console.log(`[Fallback] Index ${batchStartIndex + i}: "${batch[i].substring(0, 30)}..." -> (original)`);
       }
+      globalIndexOffset += batch.length;
       
       // Update progress
       if (progress.update(allTranslations.length)) {
@@ -246,23 +252,31 @@ Output format example: ["First translated title here", "Second translated title 
 
     if (parseResult.ok) {
       const results = parseResult.value;
-      allTranslations.push(...results);
       
-      // If we got fewer results than expected, translate the missing ones individually
-      if (results.length < batch.length) {
-        console.warn(`Batch ${batchIdx + 1}: Got ${results.length}/${batch.length} results, translating remaining individually`);
-        for (let i = results.length; i < batch.length; i++) {
-          const translated = await translateTitle(provider, batch[i]);
-          allTranslations.push(translated);
+      // CRITICAL: Ensure exact length match for data consistency
+      if (results.length !== batch.length) {
+        console.warn(`Batch ${batchIdx + 1}: Length mismatch! Got ${results.length}/${batch.length}, using original titles for entire batch`);
+        for (let i = 0; i < batch.length; i++) {
+          allTranslations.push(batch[i]);
+          console.log(`[Fallback] Index ${batchStartIndex + i}: "${batch[i].substring(0, 30)}..." -> (original due to length mismatch)`);
+        }
+      } else {
+        // Success: add translations and log for verification
+        for (let i = 0; i < results.length; i++) {
+          const translation = results[i] || batch[i]; // Fallback to original if translation is empty
+          allTranslations.push(translation);
+          console.log(`[Translated] Index ${batchStartIndex + i}: "${batch[i].substring(0, 30)}..." -> "${translation.substring(0, 30)}..."`);
         }
       }
     } else {
-      console.warn(`Batch ${batchIdx + 1}: ${getErrorMessage(parseResult.error)}, falling back`);
-      for (const title of batch) {
-        const translated = await translateTitle(provider, title);
-        allTranslations.push(translated);
+      console.warn(`Batch ${batchIdx + 1}: ${getErrorMessage(parseResult.error)}, using original titles as fallback`);
+      for (let i = 0; i < batch.length; i++) {
+        allTranslations.push(batch[i]);
+        console.log(`[Fallback] Index ${batchStartIndex + i}: "${batch[i].substring(0, 30)}..." -> (original due to parse error)`);
       }
     }
+
+    globalIndexOffset += batch.length;
 
     // Update progress
     if (progress.update(allTranslations.length) || progress.shouldLogByTime(30)) {
@@ -270,7 +284,27 @@ Output format example: ["First translated title here", "Second translated title 
     }
   }
 
+  // Final validation: ensure output length matches input
+  if (allTranslations.length !== titles.length) {
+    console.error(`CRITICAL: Translation output length mismatch! Input: ${titles.length}, Output: ${allTranslations.length}`);
+    // Pad with original titles if somehow we got fewer translations
+    while (allTranslations.length < titles.length) {
+      const missingIndex = allTranslations.length;
+      allTranslations.push(titles[missingIndex]);
+      console.warn(`[Recovery] Padding index ${missingIndex} with original title`);
+    }
+    // Truncate if we somehow got more (shouldn't happen, but for safety)
+    if (allTranslations.length > titles.length) {
+      allTranslations.length = titles.length;
+      console.warn(`[Recovery] Truncated excess translations`);
+    }
+  }
+
   console.log(`Completed title translation: ${allTranslations.length}/${titles.length} titles in ${progress.getElapsedSeconds()}s`);
+  
+  // Log final alignment summary
+  console.log(`[Alignment Summary] Input titles: ${titles.length}, Output translations: ${allTranslations.length}, Match: ${allTranslations.length === titles.length}`);
+  
   return allTranslations;
 }
 

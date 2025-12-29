@@ -210,12 +210,49 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
 
       logInfo('Array alignment validated', arrayLengths);
 
-      // Phase 3: Assemble processed stories
-      logInfo('Phase 3: Assembling results');
+      // Phase 3: Assemble processed stories with data consistency guarantees
+      logInfo('Phase 3: Assembling results with data consistency checks');
+      
+      // Track content completeness statistics
+      let storiesWithDescription = 0;
+      let storiesWithComments = 0;
+      let storiesWithEmptyDescription = 0;
+      let storiesWithEmptyComments = 0;
+      
       for (let i = 0; i < filteredStories.length; i++) {
         const story = filteredStories[i];
         
         try {
+          // Determine description with fallback
+          const descriptionValue = descriptions[i]?.trim() || '';
+          const finalDescription = descriptionValue !== '' ? descriptionValue : '暂无描述';
+          
+          // Determine comment summary with fallback
+          const commentValue = commentSummaries[i]?.trim() || '';
+          const finalCommentSummary = commentValue !== '' ? commentValue : '暂无评论';
+          
+          // Track statistics
+          if (descriptionValue !== '') {
+            storiesWithDescription++;
+          } else {
+            storiesWithEmptyDescription++;
+          }
+          
+          if (commentValue !== '') {
+            storiesWithComments++;
+          } else {
+            storiesWithEmptyComments++;
+          }
+          
+          // Log alignment verification for each story
+          logInfo(`Story ${i + 1} alignment check`, {
+            storyId: story.id,
+            originalTitle: story.title.substring(0, 50),
+            translatedTitle: (translatedTitles[i] ?? story.title).substring(0, 50),
+            hasDescription: descriptionValue !== '',
+            hasComments: commentValue !== '',
+          });
+          
           processedStories.push({
             rank: i + 1,
             storyId: story.id,
@@ -225,8 +262,8 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
             url: story.url ?? '',
             time: formatTimestamp(story.time, true),
             timestamp: story.time,
-            description: descriptions[i] !== '' ? descriptions[i] : '暂无描述',
-            commentSummary: commentSummaries[i] !== '' ? commentSummaries[i] : '暂无评论',
+            description: finalDescription,
+            commentSummary: finalCommentSummary,
           });
           
           successCount++;
@@ -239,6 +276,15 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
           // Continue with other stories (graceful degradation)
         }
       }
+      
+      // Log content completeness metrics
+      logInfo('Content completeness statistics', {
+        total: filteredStories.length,
+        withDescription: storiesWithDescription,
+        withComments: storiesWithComments,
+        emptyDescription: storiesWithEmptyDescription,
+        emptyComments: storiesWithEmptyComments,
+      });
     } catch (error) {
       // If batch processing fails entirely, log the error
       logError('Batch processing failed', error);

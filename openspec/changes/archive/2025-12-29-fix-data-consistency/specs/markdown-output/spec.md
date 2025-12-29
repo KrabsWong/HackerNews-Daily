@@ -1,19 +1,10 @@
-# markdown-output Specification
+# markdown-output Specification Delta
 
-## Purpose
+## Overview
 
-Define markdown output formatting that removes Chinese title brackets and includes HackerNews story links for user reference and navigation to original discussions.
-## Requirements
-### Requirement: Markdown titles SHALL be formatted without Chinese brackets
+扩展 markdown 输出规范，确保空内容时显示统一的默认文案。
 
-The system SHALL generate markdown titles showing only the rank and Chinese title text, without surrounding 【】 brackets.
-
-#### Scenario: Title formatting without brackets
-
-**Given** a story with rank=1 and titleChinese="开源大型语言模型简述"  
-**When** generating markdown output  
-**Then** the title SHALL be formatted as `## 1. 开源大型语言模型简述`  
-**And** NOT as `## 1. 【开源大型语言模型简述】`
+## MODIFIED Requirements
 
 ### Requirement: Markdown output SHALL include HackerNews story link as italic secondary label
 
@@ -42,6 +33,8 @@ The system SHALL add a HackerNews link as an italic secondary label to enable us
 8. `{commentSummary}` (若为空显示 "暂无评论")
 9. `*[HackerNews](https://news.ycombinator.com/item?id={storyId})*`
 10. `---` (separator)
+
+## ADDED Requirements
 
 ### Requirement: 空描述默认值渲染
 
@@ -83,4 +76,3 @@ The system SHALL add a HackerNews link as an italic secondary label to enable us
 **When** 渲染 Markdown  
 **Then** 评论区块 (`**评论要点**:`) SHALL 始终存在于输出中  
 **And** 不得因评论为空而跳过该区块
-

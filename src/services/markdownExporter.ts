@@ -19,9 +19,38 @@ export function generateJekyllFrontMatter(date: Date): string {
   return frontMatter;
 }
 
+// Default values for empty content
+const DEFAULT_DESCRIPTION = '暂无描述';
+const DEFAULT_COMMENT_SUMMARY = '暂无评论';
+
+/**
+ * Get display value for description, with fallback to default
+ * @param description - Story description (may be empty/null/undefined)
+ * @returns Description text or default value
+ */
+function getDescriptionDisplay(description: string | null | undefined): string {
+  if (!description || description.trim() === '') {
+    return DEFAULT_DESCRIPTION;
+  }
+  return description;
+}
+
+/**
+ * Get display value for comment summary, with fallback to default
+ * @param commentSummary - Comment summary (may be empty/null/undefined)
+ * @returns Comment summary text or default value
+ */
+function getCommentSummaryDisplay(commentSummary: string | null | undefined): string {
+  if (!commentSummary || commentSummary.trim() === '') {
+    return DEFAULT_COMMENT_SUMMARY;
+  }
+  return commentSummary;
+}
+
 /**
  * Generate markdown content from processed stories with optimized hierarchy
  * Uses clear markdown structure for better readability and rendering
+ * Always renders both description and comment sections with default values if empty
  * @param stories - Array of processed stories to convert to markdown
  * @param date - Date object for the export (used for the title)
  */
@@ -42,13 +71,13 @@ export function generateMarkdownContent(stories: ProcessedStory[], date: Date): 
     content += `**发布时间**: ${story.time}\n\n`;
     content += `**链接**: [${story.url}](${story.url})\n\n`;
     
-    // Description paragraph
-    content += `**描述**:\n\n${story.description}\n\n`;
+    // Description paragraph - always rendered with fallback to default
+    const descriptionText = getDescriptionDisplay(story.description);
+    content += `**描述**:\n\n${descriptionText}\n\n`;
     
-    // Comment summary (if available)
-    if (story.commentSummary) {
-      content += `**评论要点**:\n\n${story.commentSummary}\n\n`;
-    }
+    // Comment summary - always rendered with fallback to default
+    const commentText = getCommentSummaryDisplay(story.commentSummary);
+    content += `**评论要点**:\n\n${commentText}\n\n`;
     
     // HackerNews link as italic secondary label
     content += `*[HackerNews](https://news.ycombinator.com/item?id=${story.storyId})*\n\n`;
