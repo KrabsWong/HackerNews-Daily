@@ -45,8 +45,8 @@ describe('Translation Data Alignment', () => {
           url: 'https://example.com/1',
           score: 100,
           time: Math.floor(Date.now() / 1000) - 3600,
+          type: 'story',
           by: 'user1',
-          descendants: 10,
         },
         {
           id: 1002,
@@ -54,8 +54,8 @@ describe('Translation Data Alignment', () => {
           url: 'https://example.com/2',
           score: 90,
           time: Math.floor(Date.now() / 1000) - 7200,
+          type: 'story',
           by: 'user2',
-          descendants: 5,
         },
         {
           id: 1003,
@@ -63,8 +63,8 @@ describe('Translation Data Alignment', () => {
           url: 'https://example.com/3',
           score: 80,
           time: Math.floor(Date.now() / 1000) - 10800,
+          type: 'story',
           by: 'user3',
-          descendants: 20,
         },
       ];
 
@@ -93,15 +93,15 @@ describe('Translation Data Alignment', () => {
       // Mock comments - story 2 has insufficient comments
       const mockComments: HNComment[][] = [
         [
-          { id: 2001, text: 'Comment 1 for story 1', by: 'commenter1', time: 123 },
-          { id: 2002, text: 'Comment 2 for story 1', by: 'commenter2', time: 124 },
-          { id: 2003, text: 'Comment 3 for story 1', by: 'commenter3', time: 125 },
+          { id: 2001, text: 'Comment 1 for story 1', by: 'commenter1', time: 123, parent: 1001 },
+          { id: 2002, text: 'Comment 2 for story 1', by: 'commenter2', time: 124, parent: 1001 },
+          { id: 2003, text: 'Comment 3 for story 1', by: 'commenter3', time: 125, parent: 1001 },
         ],
         [], // No comments for story 2
         [
-          { id: 3001, text: 'Comment 1 for story 3', by: 'commenter4', time: 126 },
-          { id: 3002, text: 'Comment 2 for story 3', by: 'commenter5', time: 127 },
-          { id: 3003, text: 'Comment 3 for story 3', by: 'commenter6', time: 128 },
+          { id: 3001, text: 'Comment 1 for story 3', by: 'commenter4', time: 126, parent: 1003 },
+          { id: 3002, text: 'Comment 2 for story 3', by: 'commenter5', time: 127, parent: 1003 },
+          { id: 3003, text: 'Comment 3 for story 3', by: 'commenter6', time: 128, parent: 1003 },
         ],
       ];
       vi.mocked(api.fetchCommentsBatchFromAlgolia).mockResolvedValue(mockComments);
@@ -173,8 +173,8 @@ describe('Translation Data Alignment', () => {
           url: 'https://example.com/1',
           score: 100,
           time: Math.floor(Date.now() / 1000) - 3600,
+          type: 'story',
           by: 'user1',
-          descendants: 10,
         },
       ];
 
@@ -208,8 +208,8 @@ describe('Translation Data Alignment', () => {
           url: 'https://example.com/1',
           score: 100,
           time: Math.floor(Date.now() / 1000) - 3600,
+          type: 'story',
           by: 'user1',
-          descendants: 0,
         },
       ];
 
@@ -249,8 +249,8 @@ describe('Translation Data Alignment', () => {
           url: 'https://example.com/1',
           score: 100,
           time: Math.floor(Date.now() / 1000) - 3600,
+          type: 'story',
           by: 'user1',
-          descendants: 0,
         },
         {
           id: 1002,
@@ -258,8 +258,8 @@ describe('Translation Data Alignment', () => {
           url: 'https://example.com/2',
           score: 90,
           time: Math.floor(Date.now() / 1000) - 7200,
+          type: 'story',
           by: 'user2',
-          descendants: 0,
         },
       ];
 
@@ -294,8 +294,8 @@ describe('Translation Data Alignment', () => {
           url: 'https://example.com/1',
           score: 100,
           time: Math.floor(Date.now() / 1000) - 3600,
+          type: 'story',
           by: 'user1',
-          descendants: 10,
         },
         {
           id: 1002,
@@ -303,8 +303,8 @@ describe('Translation Data Alignment', () => {
           url: 'https://example.com/2',
           score: 90,
           time: Math.floor(Date.now() / 1000) - 7200,
+          type: 'story',
           by: 'user2',
-          descendants: 5,
         },
       ];
 
@@ -314,8 +314,8 @@ describe('Translation Data Alignment', () => {
         { url: 'https://example.com/2', fullContent: 'Content 2', description: 'Desc 2' },
       ]);
       vi.mocked(api.fetchCommentsBatchFromAlgolia).mockResolvedValue([
-        [{ id: 2001, text: 'Comment 1', by: 'user', time: 123 }, { id: 2002, text: 'Comment 2', by: 'user', time: 124 }, { id: 2003, text: 'Comment 3', by: 'user', time: 125 }],
-        [{ id: 3001, text: 'Comment 1', by: 'user', time: 126 }, { id: 3002, text: 'Comment 2', by: 'user', time: 127 }, { id: 3003, text: 'Comment 3', by: 'user', time: 128 }],
+        [{ id: 2001, text: 'Comment 1', by: 'user', time: 123, parent: 1001 }, { id: 2002, text: 'Comment 2', by: 'user', time: 124, parent: 1001 }, { id: 2003, text: 'Comment 3', by: 'user', time: 125, parent: 1001 }],
+        [{ id: 3001, text: 'Comment 1', by: 'user', time: 126, parent: 1002 }, { id: 3002, text: 'Comment 2', by: 'user', time: 127, parent: 1002 }, { id: 3003, text: 'Comment 3', by: 'user', time: 128, parent: 1002 }],
       ]);
       vi.mocked(translator.init).mockReturnValue(undefined);
       vi.mocked(translator.translateTitlesBatch).mockResolvedValue(['标题1', '标题2']);

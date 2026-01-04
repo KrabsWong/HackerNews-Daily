@@ -5,6 +5,9 @@
  * - GET / (health check)
  * - POST /trigger-export (async export)
  * - POST /trigger-export-sync (sync export)
+ * - GET /task-status (task progress)
+ * - POST /retry-failed-tasks (retry failed articles)
+ * - POST /force-publish (force publish partial results)
  * - Unknown routes (404)
  */
 
@@ -27,7 +30,7 @@ describe('Worker HTTP Handlers', () => {
   });
 
   describe('GET /', () => {
-    it('should return 200 with health check message', async () => {
+    it('should return 200 with health check message and distributed mode indicator', async () => {
       const env = createMockEnv();
       const request = createMockRequest({ method: 'GET', url: 'https://example.com/' });
       const ctx = createMockExecutionContext();
@@ -36,9 +39,9 @@ describe('Worker HTTP Handlers', () => {
 
       expect(response.status).toBe(200);
       expect(response.headers.get('Content-Type')).toBe('text/plain');
-      expect(response.headers.get('X-Worker-Version')).toBe('3.0.0');
+      expect(response.headers.get('X-Worker-Version')).toBe('5.0.0');
       const text = await response.text();
-      expect(text).toBe('HackerNews Daily Export Worker');
+      expect(text).toContain('Distributed Mode');
     });
 
     it('should return same response for root path variations', async () => {
@@ -54,7 +57,7 @@ describe('Worker HTTP Handlers', () => {
 
   describe('POST /trigger-export', () => {
     it('should return 202 Accepted and trigger async export', async () => {
-      const env = createMockEnv({ localTestMode: true });
+      const env = createMockEnv({});
       const request = createMockRequest({ method: 'POST', url: 'https://example.com/trigger-export' });
       const ctx = createMockExecutionContext();
 
@@ -68,11 +71,11 @@ describe('Worker HTTP Handlers', () => {
       expect(response.status).toBe(200);
       const data = await response.json() as any;
       expect(data.success).toBe(true);
-      expect(data.message).toContain('Export started');
+      expect(data.message).toContain('Distributed export started');
     });
 
     it('should queue export using ctx.waitUntil', async () => {
-      const env = createMockEnv({ localTestMode: true });
+      const env = createMockEnv({});
       const request = createMockRequest({ method: 'POST', url: 'https://example.com/trigger-export' });
       const waitUntilCalls: Promise<any>[] = [];
       const ctx = createMockExecutionContext({
@@ -111,7 +114,7 @@ describe('Worker HTTP Handlers', () => {
     // mocking Firebase, Algolia, Crawler API, GitHub, and Telegram APIs.
     // Full integration tests are better suited to src/__tests__/integration/
     // it('should return 200 with export result on success', async () => {
-    //   const env = createMockEnv({ localTestMode: true });
+    //   const env = createMockEnv({});
     //   const request = createMockRequest({ method: 'POST', url: 'https://example.com/trigger-export-sync' });
     //   const ctx = createMockExecutionContext();
     //
@@ -146,7 +149,7 @@ describe('Worker HTTP Handlers', () => {
     // mocking Firebase, Algolia, Crawler API, GitHub, and Telegram APIs.
     // Full integration tests are better suited to src/__tests__/integration/
     // it('should wait for completion before returning', async () => {
-    //   const env = createMockEnv({ localTestMode: true });
+    //   const env = createMockEnv({});
     //   const request = createMockRequest({ method: 'POST', url: 'https://example.com/trigger-export-sync' });
     //   const ctx = createMockExecutionContext();
     //

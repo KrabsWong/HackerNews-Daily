@@ -127,26 +127,18 @@ export function resolveProviderConfig(env: ProviderEnv): ResolvedProviderConfig 
 
 /**
  * Build CreateProviderOptions from environment
- * 
+ *
  * This is the canonical way to create provider options from environment variables.
  * Used by both CLI and Worker environments.
- * 
+ *
  * @param env - Environment containing provider configuration
  * @returns CreateProviderOptions ready for use with createLLMProvider
  * @throws Error if required configuration is missing
- * 
+ *
  * @example
  * // Worker usage
  * const options = buildProviderOptions(env);
  * translator.init(options);
- * 
- * @example
- * // CLI usage
- * const options = buildProviderOptions({
- *   LLM_PROVIDER: process.env.LLM_PROVIDER,
- *   LLM_DEEPSEEK_API_KEY: process.env.LLM_DEEPSEEK_API_KEY,
- *   ...
- * });
  */
 export function buildProviderOptions(env: ProviderEnv): CreateProviderOptions {
   const resolved = resolveProviderConfig(env);
@@ -163,20 +155,23 @@ export function buildProviderOptions(env: ProviderEnv): CreateProviderOptions {
 }
 
 /**
- * Build CreateProviderOptions from process.env for CLI usage
- * 
- * Uses DEEPSEEK as the default provider when LLM_PROVIDER is not set.
+ * @deprecated This function uses process.env which is not available in Cloudflare Workers.
+ * Use buildProviderOptions(env) instead where env is passed as a parameter.
+ *
+ * Build CreateProviderOptions from process.env for CLI usage.
+ *
  * This function is specifically designed for Node.js CLI environments
  * where configuration comes from process.env.
- * 
+ *
  * @returns CreateProviderOptions ready for use with createLLMProvider
  * @throws Error if required configuration is missing
- * 
+ *
  * @example
  * const options = buildCliProviderOptions();
  * translator.init(options);
  */
 export function buildCliProviderOptions(): CreateProviderOptions {
+  console.warn('buildCliProviderOptions is deprecated and will not work in Cloudflare Workers');
   return buildProviderOptions({
     LLM_PROVIDER: process.env.LLM_PROVIDER || LLMProviderType.DEEPSEEK,
     LLM_DEEPSEEK_API_KEY: process.env.LLM_DEEPSEEK_API_KEY,

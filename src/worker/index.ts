@@ -2,139 +2,107 @@
  * Cloudflare Worker entry point for HackerNews Daily Export
  * Handles scheduled (cron) and HTTP-triggered exports
  * 
- * Simple architecture: Cron -> runDailyExport -> Push to GitHub
- * No subrequest limits with paid plan.
+ * Uses distributed task processing with D1 database for state management
+ * and incremental processing across multiple cron triggers.
  */
 
-import { HackerNewsSource } from './sources/hackernews';
-import { GitHubPublisher } from './publishers/github';
-import { TelegramPublisher } from './publishers/telegram';
-import { TerminalPublisher } from './publishers/terminal';
-import { validateWorkerConfig, isGitHubConfigValid, validateGitHubConfig, isTelegramConfigValid, validateTelegramConfig, isLocalTestModeEnabled } from './config/validation';
 import { logInfo, logError, logWarn } from './logger';
-import { LLMProviderType } from '../config/constants';
+import { createTaskExecutor } from '../services/task';
+import { formatDateForDisplay } from '../utils/date';
 import type { Env } from '../types/worker';
-import type { Publisher } from '../types/publisher';
 
 // Re-export Env type for backward compatibility
 export type { Env } from '../types/worker';
 
 /**
- * Handle the daily export process
- * Executes the export pipeline and routes to configured publishers
+ * Handle distributed task processing with state machine
+ * State transitions: init → list_fetched → processing → aggregating → published
  */
-async function handleDailyExport(env: Env): Promise<string> {
+async function handleDistributedExport(env: Env): Promise<void> {
   try {
-    logInfo('=== Daily Export Started ===');
-
-    // Validate configuration (fail fast if required vars missing)
-    validateWorkerConfig(env);
-
-    // Set environment variables for process.env access
-    (process as any).env = (process as any).env || {};
-    if (env.CRAWLER_API_URL) {
-      (process as any).env.CRAWLER_API_URL = env.CRAWLER_API_URL;
-    }
-    if (env.LLM_PROVIDER) {
-      (process as any).env.LLM_PROVIDER = env.LLM_PROVIDER;
-    }
-    if (env.LLM_DEEPSEEK_MODEL) {
-      (process as any).env.LLM_DEEPSEEK_MODEL = env.LLM_DEEPSEEK_MODEL;
-    }
-    if (env.LLM_OPENROUTER_MODEL) {
-      (process as any).env.LLM_OPENROUTER_MODEL = env.LLM_OPENROUTER_MODEL;
-    }
-    if (env.LLM_OPENROUTER_SITE_URL) {
-      (process as any).env.LLM_OPENROUTER_SITE_URL = env.LLM_OPENROUTER_SITE_URL;
-    }
-    if (env.LLM_OPENROUTER_SITE_NAME) {
-      (process as any).env.LLM_OPENROUTER_SITE_NAME = env.LLM_OPENROUTER_SITE_NAME;
-    }
-
-    // Initialize source
-    const source = new HackerNewsSource();
+    logInfo('=== Distributed Task Processing (Scheduled) ===');
     
-    // Fetch content from source
-    logInfo('Fetching content from source', { source: source.name });
-    const content = await source.fetchContent(new Date(), env);
+    // Get today's date
+    const today = new Date();
+    const taskDate = formatDateForDisplay(today);
     
-    // Build publisher list
-    const publishers: Publisher[] = [];
-    const publisherConfigs: Record<string, any> = {};
-    const publishResults: string[] = [];
+    logInfo('Task date', { taskDate });
     
-    // Check if local test mode is enabled
-    const localTestMode = isLocalTestModeEnabled(env);
+    // Initialize task executor
+    const executor = createTaskExecutor(env);
     
-    if (localTestMode) {
-      // In local test mode, use terminal publisher
-      logInfo('Local test mode enabled - using terminal publisher');
-      publishers.push(new TerminalPublisher());
-    } else {
-      // In normal mode, check for external publishers
+    // Get or create task
+    const storage = executor['storage']; // Access private field for task status check
+    const task = await storage.getOrCreateTask(taskDate);
+    
+    logInfo('Current task status', { 
+      taskDate: task.task_date, 
+      status: task.status,
+      totalArticles: task.total_articles,
+      completedArticles: task.completed_articles,
+      failedArticles: task.failed_articles
+    });
+    
+    // State machine transitions
+    switch (task.status) {
+      case 'init':
+        // Initialize task: fetch article list and store in D1
+        logInfo('State: init -> Fetching article list');
+        const initResult = await executor.initializeTask(taskDate);
+        logInfo('Task initialized', initResult);
+        break;
       
-      // Publish to GitHub (optional, enabled by default)
-      const githubWarnings = validateGitHubConfig(env);
-      for (const warning of githubWarnings) {
-        logWarn(warning);
-      }
-      
-      if (isGitHubConfigValid(env)) {
-        publishers.push(new GitHubPublisher());
-        publisherConfigs['github'] = {
-          GITHUB_TOKEN: env.GITHUB_TOKEN!,
-          TARGET_REPO: env.TARGET_REPO!,
-          TARGET_BRANCH: env.TARGET_BRANCH || 'main',
-        };
-      } else {
-        logInfo('GitHub publishing is disabled');
-      }
+      case 'list_fetched':
+      case 'processing':
+        // Process next batch of articles
+        logInfo(`State: ${task.status} -> Processing next batch`);
+        const batchSize = parseInt(env.TASK_BATCH_SIZE || '6', 10);
+        const processResult = await executor.processNextBatch(taskDate, batchSize);
 
-      // Publish to Telegram (optional)
-      const telegramWarnings = validateTelegramConfig(env);
-      for (const warning of telegramWarnings) {
-        logWarn(warning);
-      }
-      
-      if (isTelegramConfigValid(env)) {
-        publishers.push(new TelegramPublisher());
-        publisherConfigs['telegram'] = {
-          TELEGRAM_BOT_TOKEN: env.TELEGRAM_BOT_TOKEN!,
-          TELEGRAM_CHANNEL_ID: env.TELEGRAM_CHANNEL_ID!,
-        };
-      } else {
-        logInfo('Telegram publishing is disabled');
-      }
-    }
-    
-    // Execute publishers
-    for (const publisher of publishers) {
-      try {
-        logInfo('Publishing content', { publisher: publisher.name });
-        const config = publisherConfigs[publisher.name] || {};
-        await publisher.publish(content, config);
-        logInfo(`${publisher.name} publishing completed successfully`);
-        publishResults.push(publisher.name);
-      } catch (error) {
-        logError(`${publisher.name} publishing failed`, error);
-        // For GitHub, re-throw errors as they are critical when enabled
-        // For Telegram and Terminal, log but continue
-        if (publisher.name === 'github') {
-          throw error;
+        logInfo('Batch processed', processResult);
+
+        // Check if all articles are processed (no pending or processing articles)
+        if (processResult.pending === 0 && processResult.processing === 0) {
+          logInfo('All articles processed, transitioning to aggregating');
+          await storage.updateTaskStatus(taskDate, 'aggregating');
         }
-      }
+        break;
+      
+      case 'aggregating':
+        // Aggregate results and publish
+        logInfo('State: aggregating -> Aggregating and publishing');
+        const aggregateResult = await executor.aggregateResults(taskDate);
+        
+        logInfo('Results aggregated', { 
+          storyCount: aggregateResult.stories.length,
+          markdownLength: aggregateResult.markdown.length 
+        });
+        
+        // Publish results
+        const publishResult = await executor.publishResults(taskDate, aggregateResult.markdown);
+        logInfo('Results published', publishResult);
+        break;
+      
+      case 'published':
+        // Task already completed
+        logInfo('Task already published for today');
+        break;
+      
+      case 'archived':
+        logWarn('Task is archived, should have been reinitialized');
+        break;
+      
+      default:
+        logWarn('Unknown task status', { status: task.status });
     }
-
-    const successMessage = `Export completed successfully for ${content.dateStr} (published to: ${publishResults.join(', ') || 'none'})`;
-    logInfo('=== Daily Export Completed ===', { dateStr: content.dateStr });
     
-    return successMessage;
+    logInfo('=== Distributed Task Processing Completed ===');
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logError('=== Daily Export Failed ===', error);
-    throw new Error(`Export failed: ${errorMessage}`);
+    logError('Distributed task processing failed', error);
+    throw error;
   }
 }
+
 
 /**
  * Cloudflare Worker default export
@@ -152,13 +120,13 @@ export default {
   ): Promise<void> {
     logInfo('Scheduled export triggered', {
       cron: event.cron,
-      scheduledTime: new Date(event.scheduledTime).toISOString(),
+      scheduledTime: new Date(event.scheduledTime).toISOString()
     });
 
     // Run export in background to avoid timeout
     ctx.waitUntil(
-      handleDailyExport(env)
-        .then(result => logInfo('Scheduled export completed', { result }))
+      handleDistributedExport(env)
+        .then(() => logInfo('Scheduled export completed'))
         .catch(error => logError('Scheduled export failed', error))
     );
   },
@@ -176,11 +144,11 @@ export default {
 
     // Health check endpoint
     if (url.pathname === '/' && request.method === 'GET') {
-      return new Response('HackerNews Daily Export Worker', {
+      return new Response('HackerNews Daily Export Worker (Distributed Mode)', {
         status: 200,
         headers: {
           'Content-Type': 'text/plain',
-          'X-Worker-Version': '3.0.0',
+          'X-Worker-Version': '5.0.0',
         },
       });
     }
@@ -190,14 +158,14 @@ export default {
       logInfo('Manual export triggered via HTTP');
       
       ctx.waitUntil(
-        handleDailyExport(env)
-          .then(result => logInfo('Manual export completed', { result }))
+        handleDistributedExport(env)
+          .then(() => logInfo('Manual export completed'))
           .catch(error => logError('Manual export failed', error))
       );
 
       return Response.json({
         success: true,
-        message: 'Export started in background',
+        message: 'Distributed export started in background',
       });
     }
 
@@ -206,10 +174,107 @@ export default {
       logInfo('Manual sync export triggered via HTTP');
       
       try {
-        const result = await handleDailyExport(env);
+        await handleDistributedExport(env);
         return Response.json({
           success: true,
-          message: result,
+          message: 'Distributed export completed',
+        });
+      } catch (error) {
+        return Response.json({
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        }, { status: 500 });
+      }
+    }
+
+    // Task status endpoint
+    if (url.pathname === '/task-status' && request.method === 'GET') {
+      try {
+        if (!env.DB) {
+          throw new Error('D1 database binding (DB) is required');
+        }
+        
+        const executor = createTaskExecutor(env);
+        const storage = executor['storage'];
+        
+        // Get today's task date
+        const taskDate = formatDateForDisplay(new Date());
+        
+        // Get task and progress
+        const task = await storage.getOrCreateTask(taskDate);
+        const progress = await storage.getTaskProgress(taskDate);
+        
+        return Response.json({
+          success: true,
+          taskDate: task.task_date,
+          status: task.status,
+          totalArticles: task.total_articles,
+          completedArticles: task.completed_articles,
+          failedArticles: task.failed_articles,
+          progress: progress ? {
+            pendingCount: progress.pendingCount,
+            processingCount: progress.processingCount,
+          } : null,
+          createdAt: new Date(task.created_at).toISOString(),
+          updatedAt: new Date(task.updated_at).toISOString(),
+          publishedAt: task.published_at ? new Date(task.published_at).toISOString() : null,
+        });
+      } catch (error) {
+        return Response.json({
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        }, { status: 500 });
+      }
+    }
+
+    // Retry failed articles endpoint
+    if (url.pathname === '/retry-failed-tasks' && request.method === 'POST') {
+      try {
+        if (!env.DB) {
+          throw new Error('D1 database binding (DB) is required');
+        }
+        
+        const executor = createTaskExecutor(env);
+        const taskDate = formatDateForDisplay(new Date());
+        
+        const maxRetries = parseInt(env.MAX_RETRY_COUNT || '3', 10);
+        const retryCount = await executor.retryFailedArticles(taskDate, maxRetries);
+        
+        logInfo('Failed articles retry initiated', { taskDate, retryCount });
+        
+        return Response.json({
+          success: true,
+          message: `${retryCount} failed articles reset to pending`,
+          taskDate,
+          retryCount,
+        });
+      } catch (error) {
+        return Response.json({
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        }, { status: 500 });
+      }
+    }
+
+    // Force publish endpoint
+    if (url.pathname === '/force-publish' && request.method === 'POST') {
+      try {
+        if (!env.DB) {
+          throw new Error('D1 database binding (DB) is required');
+        }
+        
+        const executor = createTaskExecutor(env);
+        const taskDate = formatDateForDisplay(new Date());
+        
+        logInfo('Force publish initiated', { taskDate });
+        
+        const publishResult = await executor.forcePublish(taskDate);
+        
+        return Response.json({
+          success: true,
+          message: 'Force publish completed',
+          taskDate,
+          published: publishResult,
         });
       } catch (error) {
         return Response.json({

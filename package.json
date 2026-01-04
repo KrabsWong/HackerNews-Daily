@@ -7,7 +7,7 @@
     "build:worker": "node esbuild.worker.config.js",
     "build:worker:watch": "node esbuild.worker.config.js --watch",
     "clean:worker": "rm -rf dist/worker",
-    "dev:worker": "wrangler dev --local --persist-to .wrangler/state",
+    "dev:worker": "wrangler dev --local --persist-to .wrangler/state --env dev",
     "deploy:worker": "npm run build:worker && wrangler deploy",
     "deploy:worker:staging": "npm run build:worker && wrangler deploy --env staging",
     "logs:worker": "wrangler tail",

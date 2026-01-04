@@ -7,13 +7,6 @@ import { parseProvider, getApiKeyForProvider } from '../../services/llm';
 import type { Env } from '../index';
 
 /**
- * Check if local test mode is enabled
- */
-export function isLocalTestModeEnabled(env: Env): boolean {
-  return env.LOCAL_TEST_MODE?.toLowerCase() === 'true';
-}
-
-/**
  * Check if GitHub publishing is enabled (default: true)
  */
 export function isGitHubEnabled(env: Env): boolean {
@@ -100,6 +93,26 @@ export function isTelegramConfigValid(env: Env): boolean {
 export function validateWorkerConfig(env: Env): void {
   const errors: string[] = [];
   
+  // Validate D1 database binding (required for distributed processing)
+  if (!env.DB) {
+    errors.push('D1 database binding (DB) is required for distributed task processing');
+  }
+  
+  // Validate task processing configuration
+  if (env.TASK_BATCH_SIZE) {
+    const batchSize = parseInt(env.TASK_BATCH_SIZE, 10);
+    if (isNaN(batchSize) || batchSize < 1 || batchSize > 10) {
+      errors.push('TASK_BATCH_SIZE must be a number between 1 and 10');
+    }
+  }
+  
+  if (env.MAX_RETRY_COUNT) {
+    const retryCount = parseInt(env.MAX_RETRY_COUNT, 10);
+    if (isNaN(retryCount) || retryCount < 0) {
+      errors.push('MAX_RETRY_COUNT must be a non-negative integer');
+    }
+  }
+  
   // Validate LLM_PROVIDER and corresponding API key
   try {
     const provider = parseProvider(env.LLM_PROVIDER);
@@ -109,9 +122,6 @@ export function validateWorkerConfig(env: Env): void {
     errors.push(error instanceof Error ? error.message : String(error));
   }
   
-  // Check if local test mode is enabled
-  const localTestMode = isLocalTestModeEnabled(env);
-  
   // Validate publisher configuration
   const githubEnabled = isGitHubEnabled(env);
   const telegramEnabled = isTelegramEnabled(env);
@@ -119,36 +129,26 @@ export function validateWorkerConfig(env: Env): void {
   // Determine which publishers will be active
   let hasValidPublisher = false;
   
-  if (localTestMode) {
-    // In local test mode, terminal publisher is automatically available
+  // Check if at least one external publisher is configured
+  if (isGitHubConfigValid(env)) {
     hasValidPublisher = true;
-  } else {
-    // In normal mode, check if at least one external publisher is configured
-    if (isGitHubConfigValid(env)) {
-      hasValidPublisher = true;
-    }
-    if (isTelegramConfigValid(env)) {
-      hasValidPublisher = true;
-    }
+  }
+  if (isTelegramConfigValid(env)) {
+    hasValidPublisher = true;
   }
   
-  // Validate we have at least one valid publisher path
+  // Validate we have at least one valid publisher
   if (!hasValidPublisher) {
-    if (localTestMode) {
-      errors.push(
-        'LOCAL_TEST_MODE is enabled but other publishers are not properly configured. ' +
-        'To run in local test mode, explicitly set: GITHUB_ENABLED="false" and TELEGRAM_ENABLED="false"'
-      );
-    } else if (!githubEnabled && !telegramEnabled) {
-      errors.push('At least one publisher must be enabled (GITHUB_ENABLED or TELEGRAM_ENABLED or LOCAL_TEST_MODE)');
+    if (!githubEnabled && !telegramEnabled) {
+      errors.push('At least one publisher must be enabled (GITHUB_ENABLED or TELEGRAM_ENABLED)');
     } else {
       // GitHub or Telegram is enabled but not properly configured
-      errors.push('At least one publisher must be properly configured or LOCAL_TEST_MODE must be enabled');
+      errors.push('At least one publisher must be properly configured');
     }
   }
   
-  // Validate GitHub config if enabled (in non-local mode)
-  if (!localTestMode && githubEnabled) {
+  // Validate GitHub config if enabled
+  if (githubEnabled) {
     if (!env.TARGET_REPO) {
       errors.push('TARGET_REPO is required when GitHub publishing is enabled (format: "owner/repo")');
     }
@@ -157,8 +157,8 @@ export function validateWorkerConfig(env: Env): void {
     }
   }
   
-  // Validate Telegram config if enabled (in non-local mode)
-  if (!localTestMode && telegramEnabled) {
+  // Validate Telegram config if enabled
+  if (telegramEnabled) {
     if (!env.TELEGRAM_BOT_TOKEN) {
       errors.push('TELEGRAM_BOT_TOKEN is required when Telegram publishing is enabled');
     }

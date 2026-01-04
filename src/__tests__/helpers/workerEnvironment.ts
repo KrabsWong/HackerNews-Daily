@@ -7,6 +7,38 @@
 import type { Env } from '../../types/worker';
 
 /**
+ * Create a mock D1 database binding
+ * This is a minimal mock that satisfies TypeScript but won't execute queries
+ */
+function createMockD1Database(): D1Database {
+  const mockMeta = {
+    duration: 0,
+    size_after: 0,
+    rows_read: 0,
+    rows_written: 0,
+    last_row_id: 0,
+    changed_db: false,
+    changes: 0,
+  };
+
+  const mockPreparedStatement: any = {
+    bind: (..._args: any[]) => mockPreparedStatement,
+    all: async () => ({ results: [], success: true, meta: mockMeta }),
+    first: async () => null,
+    run: async () => ({ results: [], success: true, meta: mockMeta }),
+    raw: async () => [],
+  };
+
+  return {
+    prepare: () => mockPreparedStatement,
+    dump: async () => new ArrayBuffer(0),
+    batch: async (_statements: any[]) => [],
+    exec: async (_query: string) => ({ count: 0, duration: 0 }),
+    withSession: async (callback: any) => await callback({}),
+  } as unknown as D1Database;
+}
+
+/**
  * Detect if real production credentials are present in environment
  * 
  * @returns true if real credentials detected, false otherwise
@@ -54,7 +86,6 @@ export interface MockEnvOptions {
   llmZhipuModel?: string;
   githubEnabled?: boolean;
   telegramEnabled?: boolean;
-  localTestMode?: boolean;
   enableContentFilter?: boolean;
   contentFilterSensitivity?: 'low' | 'medium' | 'high';
   hnStoryLimit?: number;
@@ -99,7 +130,6 @@ export function createMockEnv(options?: MockEnvOptions): Env & Record<string, an
     llmZhipuModel = 'glm-4.5-flash',
     githubEnabled = true,
     telegramEnabled = false,
-    localTestMode = false,
     enableContentFilter = false,
     contentFilterSensitivity = 'medium',
     hnStoryLimit = 30,
@@ -109,6 +139,13 @@ export function createMockEnv(options?: MockEnvOptions): Env & Record<string, an
   } = options || {};
 
   const env: Env & Record<string, any> = {
+    // D1 Database binding (required)
+    DB: createMockD1Database(),
+    
+    // Distributed task processing configuration
+    TASK_BATCH_SIZE: '6',
+    MAX_RETRY_COUNT: '3',
+    
     // LLM Provider Configuration (Required)
     LLM_PROVIDER: llmProvider,
     LLM_DEEPSEEK_API_KEY: 'test-deepseek-key-12345',
@@ -135,9 +172,6 @@ export function createMockEnv(options?: MockEnvOptions): Env & Record<string, an
 
     // Crawler Configuration (Optional)
     CRAWLER_API_URL: 'https://crawler.example.com/api',
-
-    // Local Test Mode (Optional)
-    LOCAL_TEST_MODE: localTestMode ? 'true' : 'false',
 
     // Feature Flags and Configuration
     HN_STORY_LIMIT: String(hnStoryLimit),

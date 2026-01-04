@@ -38,13 +38,16 @@ export const DEEPSEEK_API = {
   REQUEST_TIMEOUT: 30000,
   /** Delay before retry on rate limit (1 second) */
   RETRY_DELAY: 1000,
-  /**
-   * Get the configured model from environment or use default
-   */
-  get MODEL(): string {
-    return process.env.LLM_DEEPSEEK_MODEL || this.DEFAULT_MODEL;
-  },
 } as const;
+
+/**
+ * Get the configured DeepSeek model from environment or use default
+ * @param env - Environment containing LLM_DEEPSEEK_MODEL
+ * @returns Model name to use
+ */
+export function getDeepSeekModel(env: { LLM_DEEPSEEK_MODEL?: string }): string {
+  return env.LLM_DEEPSEEK_MODEL || DEEPSEEK_API.DEFAULT_MODEL;
+}
 
 /**
  * OpenRouter API configuration
@@ -59,26 +62,35 @@ export const OPENROUTER_API = {
   REQUEST_TIMEOUT: 30000,
   /** Delay before retry on rate limit (1 second) */
   RETRY_DELAY: 1000,
-  /** 
-   * Get the configured model from environment or use default
-   * Format: provider/model-name (e.g., 'deepseek/deepseek-chat-v3-0324')
-   */
-  get MODEL(): string {
-    return process.env.LLM_OPENROUTER_MODEL || this.DEFAULT_MODEL;
-  },
-  /**
-   * Optional site URL for OpenRouter leaderboard attribution
-   */
-  get SITE_URL(): string | undefined {
-    return process.env.LLM_OPENROUTER_SITE_URL || undefined;
-  },
-  /**
-   * Optional site name for OpenRouter leaderboard attribution
-   */
-  get SITE_NAME(): string | undefined {
-    return process.env.LLM_OPENROUTER_SITE_NAME || undefined;
-  },
-};
+} as const;
+
+/**
+ * Get the configured OpenRouter model from environment or use default
+ * Format: provider/model-name (e.g., 'deepseek/deepseek-chat-v3-0324')
+ * @param env - Environment containing LLM_OPENROUTER_MODEL
+ * @returns Model name to use
+ */
+export function getOpenRouterModel(env: { LLM_OPENROUTER_MODEL?: string }): string {
+  return env.LLM_OPENROUTER_MODEL || OPENROUTER_API.DEFAULT_MODEL;
+}
+
+/**
+ * Get optional site URL for OpenRouter leaderboard attribution
+ * @param env - Environment containing LLM_OPENROUTER_SITE_URL
+ * @returns Site URL or undefined
+ */
+export function getOpenRouterSiteUrl(env: { LLM_OPENROUTER_SITE_URL?: string }): string | undefined {
+  return env.LLM_OPENROUTER_SITE_URL;
+}
+
+/**
+ * Get optional site name for OpenRouter leaderboard attribution
+ * @param env - Environment containing LLM_OPENROUTER_SITE_NAME
+ * @returns Site name or undefined
+ */
+export function getOpenRouterSiteName(env: { LLM_OPENROUTER_SITE_NAME?: string }): string | undefined {
+  return env.LLM_OPENROUTER_SITE_NAME;
+}
 
 /**
  * Zhipu AI API configuration
@@ -94,39 +106,38 @@ export const ZHIPU_API = {
   REQUEST_TIMEOUT: 30000,
   /** Delay before retry on rate limit (2 seconds - longer due to concurrency limit of 2) */
   RETRY_DELAY: 2000,
-  /**
-   * Get the configured model from environment or use default
-   */
-  get MODEL(): string {
-    return process.env.LLM_ZHIPU_MODEL || this.DEFAULT_MODEL;
-  },
-};
+} as const;
 
 /**
- * LLM Provider configuration
- * Determines which LLM provider to use for translation and summarization
+ * Get the configured Zhipu model from environment or use default
+ * @param env - Environment containing LLM_ZHIPU_MODEL
+ * @returns Model name to use
  */
-export const LLM_CONFIG = {
-  /**
-   * Get the configured LLM provider
-   * Defaults to DEEPSEEK for backward compatibility
-   */
-  get PROVIDER(): LLMProviderType {
-    const provider = process.env.LLM_PROVIDER?.toLowerCase();
-    switch (provider) {
-      case LLMProviderType.OPENROUTER:
-        return LLMProviderType.OPENROUTER;
-      case LLMProviderType.ZHIPU:
-        return LLMProviderType.ZHIPU;
-      case LLMProviderType.DEEPSEEK:
-      case undefined:
-        return LLMProviderType.DEEPSEEK;
-      default:
-        console.warn(`Invalid LLM_PROVIDER "${provider}", falling back to "deepseek"`);
-        return LLMProviderType.DEEPSEEK;
-    }
-  },
-};
+export function getZhipuModel(env: { LLM_ZHIPU_MODEL?: string }): string {
+  return env.LLM_ZHIPU_MODEL || ZHIPU_API.DEFAULT_MODEL;
+}
+
+/**
+ * Get the configured LLM provider from environment
+ * Defaults to DEEPSEEK for backward compatibility
+ * @param env - Environment containing LLM_PROVIDER
+ * @returns LLMProviderType to use
+ */
+export function getLLMProvider(env: { LLM_PROVIDER?: string }): LLMProviderType {
+  const provider = env.LLM_PROVIDER?.toLowerCase();
+  switch (provider) {
+    case LLMProviderType.OPENROUTER:
+      return LLMProviderType.OPENROUTER;
+    case LLMProviderType.ZHIPU:
+      return LLMProviderType.ZHIPU;
+    case LLMProviderType.DEEPSEEK:
+    case undefined:
+      return LLMProviderType.DEEPSEEK;
+    default:
+      console.warn(`Invalid LLM_PROVIDER "${provider}", falling back to "deepseek"`);
+      return LLMProviderType.DEEPSEEK;
+  }
+}
 
 /**
  * Algolia HackerNews Search API configuration
@@ -170,28 +181,28 @@ export const ARTICLE_FETCHER = {
  * All article content is fetched via Crawler API for richer, more complete data
  */
 export const CRAWLER_API = {
-  /** 
-   * Base URL for crawler API service (from CRAWLER_API_URL environment variable)
-   * Returns undefined if not configured - content fetching will be disabled
-   */
-  get BASE_URL(): string | undefined {
-    return process.env.CRAWLER_API_URL || undefined;
-  },
-  
-  /**
-   * Check if crawler API is enabled (i.e., BASE_URL is configured)
-   */
-  get ENABLED(): boolean {
-    return !!this.BASE_URL;
-  },
-  
-  /** 
-   * Request timeout in milliseconds (10 seconds)
-   * If the crawler can't complete within 10s, it's not worth waiting longer.
-   * This applies to both the headless browser rendering and content extraction.
-   */
+  /** Request timeout in milliseconds (10 seconds) */
   REQUEST_TIMEOUT: 10000,
 } as const;
+
+/**
+ * Get the base URL for crawler API service from environment
+ * Returns undefined if not configured - content fetching will be disabled
+ * @param env - Environment containing CRAWLER_API_URL
+ * @returns Base URL or undefined
+ */
+export function getCrawlerApiUrl(env: { CRAWLER_API_URL?: string }): string | undefined {
+  return env.CRAWLER_API_URL;
+}
+
+/**
+ * Check if crawler API is enabled (i.e., BASE_URL is configured)
+ * @param env - Environment containing CRAWLER_API_URL
+ * @returns true if crawler API is configured
+ */
+export function isCrawlerApiEnabled(env: { CRAWLER_API_URL?: string }): boolean {
+  return !!env.CRAWLER_API_URL;
+}
 
 // =============================================================================
 // Story Limits
@@ -326,25 +337,35 @@ export type SensitivityLevel = 'low' | 'medium' | 'high';
 
 /**
  * Content filter settings for AI-based sensitive content filtering
- * Uses getters to read environment variables at runtime (after dotenv.config())
  */
-export const CONTENT_FILTER = {
-  /** Enable/disable content filtering (default: false for backward compatibility) */
-  get ENABLED(): boolean {
-    return process.env.ENABLE_CONTENT_FILTER === 'true';
-  },
-  
-  /** Sensitivity level for content classification (low, medium, high) */
-  get SENSITIVITY(): SensitivityLevel {
-    return (process.env.CONTENT_FILTER_SENSITIVITY || 'medium') as SensitivityLevel;
-  },
-  
+export const CONTENT_FILTER_CONSTANTS = {
   /** Timeout for AI classification requests in milliseconds (15 seconds) */
   TIMEOUT: 15000,
-  
   /** Fallback behavior on error - if true, allow stories through when filter fails (fail-open) */
   FALLBACK_ON_ERROR: true,
-};
+} as const;
+
+/**
+ * Get content filter configuration from environment
+ * @param env - Environment containing ENABLE_CONTENT_FILTER and CONTENT_FILTER_SENSITIVITY
+ * @returns Content filter configuration object
+ */
+export function getContentFilterConfig(env: {
+  ENABLE_CONTENT_FILTER?: string;
+  CONTENT_FILTER_SENSITIVITY?: string;
+}): {
+  enabled: boolean;
+  sensitivity: SensitivityLevel;
+  timeout: number;
+  fallbackOnError: boolean;
+} {
+  return {
+    enabled: env.ENABLE_CONTENT_FILTER === 'true',
+    sensitivity: (env.CONTENT_FILTER_SENSITIVITY || 'medium') as SensitivityLevel,
+    timeout: CONTENT_FILTER_CONSTANTS.TIMEOUT,
+    fallbackOnError: CONTENT_FILTER_CONSTANTS.FALLBACK_ON_ERROR,
+  };
+}
 
 // =============================================================================
 // Telegram Publisher Configuration
@@ -442,3 +463,30 @@ export const ENV_DEFAULTS = {
   /** Default cache enabled state */
   CACHE_ENABLED: true,
 } as const;
+
+// =============================================================================
+// Distributed Task Processing Configuration
+// =============================================================================
+
+/**
+ * D1-based distributed task processing configuration
+ */
+export const TASK_CONFIG = {
+  /** Default batch size for processing articles (6 articles per batch) */
+  DEFAULT_BATCH_SIZE: 6,
+  /** Minimum batch size (must be at least 1) */
+  MIN_BATCH_SIZE: 1,
+  /** Maximum batch size (to stay within subrequest limits) */
+  MAX_BATCH_SIZE: 10,
+  /** Maximum retry count for failed articles */
+  DEFAULT_MAX_RETRIES: 3,
+  /** Cron interval in minutes (every 10 minutes) */
+  DEFAULT_CRON_INTERVAL: 10,
+  /** Maximum task age in days before archiving */
+  ARCHIVE_AFTER_DAYS: 7,
+  /** Subrequest budget per batch (safety threshold) */
+  SUBREQUEST_BUDGET_PER_BATCH: 30,
+  /** Total subrequest limit (Cloudflare free tier) */
+  SUBREQUEST_LIMIT: 50,
+} as const;
+

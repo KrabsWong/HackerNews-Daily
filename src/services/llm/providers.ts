@@ -79,7 +79,7 @@ export class OpenRouterProvider implements LLMProvider {
 
   constructor(
     apiKey: string,
-    model: string = OPENROUTER_API.MODEL,
+    model: string = OPENROUTER_API.DEFAULT_MODEL,
     siteUrl?: string,
     siteName?: string
   ) {

@@ -6,14 +6,55 @@ compatibility_flags = ["nodejs_compat"]
 # Enable observability features
 observability = { enabled = true }
 
-# Log level configuration (default: "log", options: "none", "error", "warn", "log", "debug")
-[env.production]
-log_level = "log"
+# =============================================================================
+# D1 Database Configuration (REQUIRED)
+# =============================================================================
+# 
+# The system requires a D1 database for distributed task processing.
+# You need to create TWO databases: one for production, one for development/testing.
+#
+# Step 1: Create production database
+#   wrangler d1 create hackernews-daily-db
+#   
+# Step 2: Create development/testing database
+#   wrangler d1 create hackernews-daily-db-dev
+#
+# Step 3: Initialize both databases with schema
+#   wrangler d1 execute hackernews-daily-db --file=./migrations/0001_create_tables.sql
+#   wrangler d1 execute hackernews-daily-db-dev --file=./migrations/0001_create_tables.sql
+#
+# Step 4: Copy the database IDs from the output and paste them below
+#
+# IMPORTANT: The dev database is used for local development and testing.
+# This ensures you never accidentally write to or corrupt production data.
+# =============================================================================
 
-[env.dev]
-log_level = "debug"
+# Production database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "hackernews-daily-db"
+database_id = "<your-production-database-id>"  # Replace with actual ID from wrangler d1 create
+
+# Development/Testing database binding (for local development)
+# This will be used when running `wrangler dev` or `npm run dev:worker`
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "hackernews-daily-db-dev"
+database_id = "<your-dev-database-id>"  # Replace with actual ID from wrangler d1 create
+
+# =============================================================================
+# Distributed Task Processing Configuration
+# =============================================================================
 
 [vars]
+# Number of articles to process per batch (1-10, default: 6)
+# Each batch consumes approximately 25 subrequests
+# Free tier limit: 50 subrequests per execution
+TASK_BATCH_SIZE = "6"
+
+# Maximum retry attempts for failed articles (default: 3)
+MAX_RETRY_COUNT = "3"
+
 # Story fetching configuration
 HN_STORY_LIMIT = "30"
 HN_TIME_WINDOW_HOURS = "24"
@@ -86,6 +127,18 @@ TARGET_BRANCH = "main"
 # =============================================================================
 
 # Scheduled triggers (cron format)
-# Default: Daily at 00:15 UTC
+# Default: Every 10 minutes for incremental processing
+# The system will process one batch (6 articles) per trigger
+# Total time to process 30 articles: ~50 minutes (5 batches)
 [triggers]
-crons = ["15 0 * * *"]
+crons = ["*/10 * * * *"]
+
+# =============================================================================
+# Environment-specific Log Levels
+# =============================================================================
+
+[env.production]
+log_level = "log"
+
+[env.dev]
+log_level = "debug"

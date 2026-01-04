@@ -27,7 +27,7 @@ describe('Multi-Publisher Integration', () => {
 
   describe('GitHub + Terminal Publishers', () => {
     it('should publish to GitHub successfully', async () => {
-      const env = createMockEnv({ githubEnabled: true, localTestMode: false });
+      const env = createMockEnv({ githubEnabled: true });
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -47,7 +47,7 @@ describe('Multi-Publisher Integration', () => {
     });
 
     it('should publish to Terminal (console output)', () => {
-      const env = createMockEnv({ localTestMode: true });
+      const env = createMockEnv({});
       const stories = [
         createMockProcessedStory({ rank: 1, titleChinese: '故事一' }),
         createMockProcessedStory({ rank: 2, titleChinese: '故事二' }),
@@ -61,7 +61,7 @@ describe('Multi-Publisher Integration', () => {
     });
 
     it('should coordinate GitHub and Terminal publishers', async () => {
-      const env = createMockEnv({ githubEnabled: true, localTestMode: true });
+      const env = createMockEnv({ githubEnabled: true });
       const stories = [createMockProcessedStory()];
 
       const publishers = [];

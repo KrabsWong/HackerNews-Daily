@@ -13,7 +13,6 @@ import {
   validateWorkerConfig,
   isGitHubConfigValid,
   isTelegramConfigValid,
-  isLocalTestModeEnabled,
   isGitHubEnabled,
   isTelegramEnabled,
   validateGitHubConfig,
@@ -25,29 +24,6 @@ import type { Env } from '../../worker';
 describe('Worker Configuration Validation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  describe('isLocalTestModeEnabled', () => {
-    it('should return true when LOCAL_TEST_MODE is "true"', () => {
-      const env = createMockEnv({ localTestMode: true });
-      expect(isLocalTestModeEnabled(env)).toBe(true);
-    });
-
-    it('should return false when LOCAL_TEST_MODE is "false"', () => {
-      const env = createMockEnv({ localTestMode: false });
-      expect(isLocalTestModeEnabled(env)).toBe(false);
-    });
-
-    it('should return false when LOCAL_TEST_MODE is undefined', () => {
-      const env = createMockEnv();
-      delete (env as any).LOCAL_TEST_MODE;
-      expect(isLocalTestModeEnabled(env)).toBe(false);
-    });
-
-    it('should be case insensitive', () => {
-      const env = { ...createMockEnv(), LOCAL_TEST_MODE: 'TRUE' };
-      expect(isLocalTestModeEnabled(env)).toBe(true);
-    });
   });
 
   describe('GitHub configuration validation', () => {
@@ -184,16 +160,6 @@ describe('Worker Configuration Validation', () => {
       expect(() => validateWorkerConfig(env)).not.toThrow();
     });
 
-    it('should pass with LOCAL_TEST_MODE enabled', () => {
-      const env = createMockEnv({
-        localTestMode: true,
-        githubEnabled: false,
-        telegramEnabled: false,
-        llmProvider: 'deepseek',
-      });
-      expect(() => validateWorkerConfig(env)).not.toThrow();
-    });
-
     it('should throw when LLM_PROVIDER is missing', () => {
       const env = createMockEnv();
       delete (env as any).LLM_PROVIDER;
@@ -206,11 +172,10 @@ describe('Worker Configuration Validation', () => {
       expect(() => validateWorkerConfig(env)).toThrow();
     });
 
-    it('should throw when no publisher is enabled and not in local test mode', () => {
+    it('should throw when no publisher is enabled', () => {
       const env = createMockEnv({
         githubEnabled: false,
         telegramEnabled: false,
-        localTestMode: false,
         llmProvider: 'deepseek',
       });
       expect(() => validateWorkerConfig(env)).toThrow();
@@ -300,26 +265,6 @@ describe('Worker Configuration Validation', () => {
         telegramEnabled: true,
         llmProvider: 'deepseek',
       });
-      expect(() => validateWorkerConfig(env)).not.toThrow();
-    });
-
-    it('should allow GitHub + local test mode', () => {
-      const env = createMockEnv({
-        githubEnabled: true,
-        localTestMode: true,
-        llmProvider: 'deepseek',
-      });
-      expect(() => validateWorkerConfig(env)).not.toThrow();
-    });
-
-    it('should require explicit publisher config in local test mode', () => {
-      const env = createMockEnv({
-        localTestMode: true,
-        githubEnabled: false,
-        telegramEnabled: false,
-        llmProvider: 'deepseek',
-      });
-      // This should pass - terminal publisher is implicit in local test mode
       expect(() => validateWorkerConfig(env)).not.toThrow();
     });
   });

@@ -48,23 +48,28 @@ export function getPreviousDayBoundaries(): DayBoundaries {
 
 /**
  * Format Unix timestamp to UTC datetime string
- * @param unixTime - Unix timestamp in seconds
+ * @param unixTime - Unix timestamp in seconds (<10000000000) or milliseconds (>=10000000000)
  * @param includeSeconds - Whether to include seconds (default: false for backward compatibility)
  * @returns Formatted string like "2024-12-11 14:30" or "2024-12-11 14:30:00 UTC"
  */
 export function formatTimestamp(unixTime: number, includeSeconds: boolean = false): string {
-  const date = new Date(unixTime * 1000);
+  // Auto-detect: if < 10000000000, treat as seconds (HackerNews API format)
+  // Otherwise, treat as milliseconds (database storage format)
+  const isSeconds = unixTime < 10000000000;
+  const timeInMs = isSeconds ? unixTime * 1000 : unixTime;
+  
+  const date = new Date(timeInMs);
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');
   const day = String(date.getUTCDate()).padStart(2, '0');
   const hours = String(date.getUTCHours()).padStart(2, '0');
   const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-  
+
   if (includeSeconds) {
     const seconds = String(date.getUTCSeconds()).padStart(2, '0');
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} UTC`;
   }
-  
+
   return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 

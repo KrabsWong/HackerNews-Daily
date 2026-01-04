@@ -23,6 +23,9 @@ coverage/
 # Exported markdown files
 hacknews-export/
 
+# DB Migrations
+migrations/
+
 # Logs
 logs/
 *.log

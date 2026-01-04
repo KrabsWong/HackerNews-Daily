@@ -1,8 +1,10 @@
-# Daily Export Capability Specification
+# daily-export Specification Delta
 
-## Purpose
-Specification for Daily Export Capability functionality.
-## Requirements
+## Overview
+修改Daily Export能力以支持分阶段增量处理，替代原有的单次同步导出模式。
+
+## MODIFIED Requirements
+
 ### Requirement: Export Command Option
 The system SHALL provide export functionality through incremental batch processing stored in D1, replacing the single-pass export mode.
 
@@ -46,14 +48,6 @@ The system SHALL filter articles to only include those created during the previo
 **And** displays time in format "YYYY-MM-DD HH:mm" in UTC  
 **And** no timezone conversion is performed
 
-### Requirement: Descending Creation Order
-The system SHALL sort exported articles by their creation timestamp in descending order (newest first).
-
-#### Scenario: Multiple articles exported
-- **WHEN** exporting 10 articles from yesterday
-- **THEN** articles are ordered from newest to oldest by creation time
-- **AND** the first article in the file is the most recent from yesterday
-
 ### Requirement: Markdown File Generation
 The system SHALL generate a markdown file with Jekyll-compatible YAML front matter using UTC dates, assembled from completed articles stored in D1.
 
@@ -72,69 +66,7 @@ The system SHALL generate a markdown file with Jekyll-compatible YAML front matt
 **And** translated titles SHALL come from `title_zh` field  
 **And** summaries SHALL come from `content_summary_zh` and `comment_summary_zh` fields
 
-### Requirement: Output Directory Management
-The system SHALL create and manage the `hacknews-export/` directory for storing exported markdown files.
-
-#### Scenario: Directory creation on first export
-- **WHEN** export command is run for the first time
-- **AND** `hacknews-export/` directory does not exist
-- **THEN** the directory is created automatically
-- **AND** export proceeds normally
-
-#### Scenario: Directory already exists
-- **WHEN** export command is run
-- **AND** `hacknews-export/` directory already exists
-- **THEN** the system uses the existing directory
-- **AND** export proceeds normally
-
-### Requirement: Filename Convention
-The system SHALL name exported files using the format `YYYY-MM-DD-daily.md` where the date represents the previous calendar day in UTC timezone and the `-daily` suffix distinguishes daily export posts.
-
-#### Scenario: Export on December 7 UTC
-**Given** export runs at 01:00 UTC on December 7, 2025  
-**When** generating the markdown filename  
-**Then** the filename SHALL be `2025-12-06-daily.md`  
-**And** the date corresponds to the previous day in UTC timezone
-
-#### Scenario: Filename uses UTC date
-**Given** the GitHub Action runs at 01:00 UTC  
-**When** generating the markdown filename  
-**Then** the system SHALL use UTC timezone date calculation  
-**And** ensure consistency between filename and article content dates using UTC
-
-#### Scenario: File overwrite behavior
-**Given** export is run  
-**When** a file with the same UTC date already exists  
-**Then** the system SHALL overwrite the existing file in the local export directory  
-**And** display a warning message indicating overwrite
-
-### Requirement: Export Success Feedback
-The system SHALL provide clear feedback about the export operation status using UTC timezone dates in the filename format.
-
-#### Scenario: Successful export with UTC date
-**Given** export completes successfully at 01:00 UTC December 7  
-**When** displaying success message  
-**Then** display message `✅ Successfully exported N stories to hacknews-export/2025-12-06-daily.md`  
-**And** show file path using UTC date in terminal
-
-#### Scenario: No articles found for UTC date
-**Given** no articles exist for the previous calendar day in UTC timezone  
-**When** displaying message  
-**Then** display message `⚠️  No stories found for 2025-12-06` using UTC date  
-**And** do not create an empty markdown file
-
-### Requirement: Existing Mode Compatibility
-The system SHALL maintain full backward compatibility with existing CLI and web modes when export mode is not active.
-
-#### Scenario: Normal CLI mode unchanged
-- **WHEN** user runs `npm run fetch` without `--export-daily` flag
-- **THEN** the system displays results in CLI terminal as before
-- **AND** no markdown file is created
-
-#### Scenario: Web mode unchanged
-- **WHEN** user runs `npm run fetch:web`
-- **THEN** the system starts web server and opens browser as before
-- **AND** no markdown file is created
+## ADDED Requirements
 
 ### Requirement: Incremental Batch Processing
 The system SHALL process articles in fixed-size batches to stay within subrequest limits.
@@ -227,4 +159,3 @@ The system SHALL handle task transitions across day boundaries.
 **Then** the system SHALL log warning about incomplete task  
 **And** create new task for current day anyway  
 **And** provide manual recovery endpoint for old task
-

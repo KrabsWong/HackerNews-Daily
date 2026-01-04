@@ -21,6 +21,18 @@ export type {
   ArticleMetadata,
 } from './content';
 
+// Database types (D1)
+export type {
+  DailyTask,
+  DailyTaskStatus,
+  Article,
+  ArticleStatus,
+  TaskBatch,
+  BatchStatus,
+  TaskProgress,
+  BatchProcessingResult,
+} from './database';
+
 // LLM types
 export type {
   ChatMessage,

@@ -17,9 +17,9 @@ export class TerminalPublisher implements Publisher {
   /**
    * Publish content to terminal (stdout)
    * @param content - Content to output
-   * @param config - Publisher configuration (not used for terminal publisher)
+   * @param _config - Publisher configuration (not used for terminal publisher)
    */
-  async publish(content: PublishContent, config: PublisherConfig): Promise<void> {
+  async publish(content: PublishContent, _config: PublisherConfig): Promise<void> {
     const output = formatTerminalOutput(content);
     console.log(output);
   }

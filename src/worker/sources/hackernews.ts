@@ -5,7 +5,7 @@
 
 import { fetchTopStoriesByScore, fetchCommentsBatchFromAlgolia } from '../../api';
 import { translator } from '../../services/translator';
-import { buildProviderOptions, CreateProviderOptions } from '../../services/llm';
+import { buildProviderOptions } from '../../services/llm';
 import { fetchArticlesBatch, ArticleMetadata } from '../../services/articleFetcher';
 import { AIContentFilter } from '../../services/contentFilter';
 import { generateMarkdownContent } from '../../services/markdownExporter';
@@ -346,10 +346,10 @@ export class HackerNewsSource implements ContentSource {
   
   /**
    * Fetch HackerNews content for a specific date
-   * @param date - Target date (typically previous day)
+   * @param _date - Target date (typically previous day) - not used, uses env.date from runDailyExport
    * @param config - Configuration from Env
    */
-  async fetchContent(date: Date, config: SourceConfig): Promise<SourceContent> {
+  async fetchContent(_date: Date, config: SourceConfig): Promise<SourceContent> {
     const env = config as Env;
     const result = await runDailyExport(env);
     

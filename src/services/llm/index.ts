@@ -5,7 +5,7 @@
  * This is the main entry point for all LLM-related functionality.
  */
 
-import { DEEPSEEK_API, OPENROUTER_API, ZHIPU_API, LLM_CONFIG, LLMProviderType } from '../../config/constants';
+import { DEEPSEEK_API, OPENROUTER_API, ZHIPU_API, LLMProviderType } from '../../config/constants';
 import { FetchError } from '../../utils/fetch';
 import { DeepSeekProvider, OpenRouterProvider, ZhipuProvider } from './providers';
 import { resolveProviderConfig } from './utils';
@@ -33,8 +33,12 @@ import type {
  * });
  */
 export function createLLMProvider(options: CreateProviderOptions): LLMProvider {
-  const providerType = options.provider ?? LLM_CONFIG.PROVIDER;
+  const providerType = options.provider;
   const { config } = options;
+
+  if (!providerType) {
+    throw new Error('provider is required in CreateProviderOptions');
+  }
 
   if (!config?.apiKey) {
     throw new Error(
@@ -47,7 +51,7 @@ export function createLLMProvider(options: CreateProviderOptions): LLMProvider {
     case LLMProviderType.OPENROUTER:
       return new OpenRouterProvider(
         config.apiKey,
-        config.model ?? OPENROUTER_API.MODEL,
+        config.model ?? OPENROUTER_API.DEFAULT_MODEL,
         config.siteUrl,
         config.siteName
       );
