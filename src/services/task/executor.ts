@@ -15,10 +15,11 @@ import { getPreviousDayBoundaries, formatTimestamp } from '../../utils/date';
 import { getContentFilterConfig, TASK_CONFIG } from '../../config/constants';
 import type { Env } from '../../types/worker';
 import type { ProcessedStory } from '../../types/shared';
-import type { ArticleStatus, BatchStatus } from '../../types/database';
+import { ArticleStatus, BatchStatus, DailyTaskStatus, DailyTask, Article, TaskProgress, BatchProcessingResult } from '../../types/database';
 import { GitHubPublisher } from '../../worker/publishers/github';
 import { TelegramPublisher } from '../../worker/publishers/telegram';
 import { TerminalPublisher } from '../../worker/publishers/terminal';
+import { PublisherType } from '../../types/publisher';
 
 /**
  * Task executor class that manages distributed article processing
@@ -44,7 +45,7 @@ export class TaskExecutor {
 
     // Check if task already exists
     const existingTask = await this.storage.getOrCreateTask(taskDate);
-    if (existingTask.status !== 'init') {
+    if (existingTask.status !== DailyTaskStatus.INIT) {
       logInfo('Task already initialized', { taskDate, status: existingTask.status });
       return { taskDate, articleCount: existingTask.total_articles };
     }
@@ -91,8 +92,8 @@ export class TaskExecutor {
       }))
     );
 
-    // Update task status to list_fetched
-    await this.storage.updateTaskStatus(taskDate, 'list_fetched', {
+    // Update task status to LIST_FETCHED
+    await this.storage.updateTaskStatus(taskDate, DailyTaskStatus.LIST_FETCHED, {
       totalArticles: filteredStories.length,
     });
 
@@ -124,7 +125,7 @@ export class TaskExecutor {
       const processing = progress?.processingCount ?? 0;
 
       if (pending === 0 && processing === 0) {
-        await this.storage.updateTaskStatus(taskDate, 'aggregating');
+        await this.storage.updateTaskStatus(taskDate, DailyTaskStatus.AGGREGATING);
         logInfo('All articles processed, transitioned to aggregating', { taskDate });
       }
 
@@ -137,14 +138,14 @@ export class TaskExecutor {
     await this.storage.updateArticlesBatch(
       pendingArticles.map((article) => ({
         id: article.id,
-        status: 'processing' as ArticleStatus,
+        status: ArticleStatus.PROCESSING,
       }))
     );
 
     // Update task status to processing if this is the first batch
     const task = await this.storage.getOrCreateTask(taskDate);
-    if (task.status === 'list_fetched') {
-      await this.storage.updateTaskStatus(taskDate, 'processing');
+    if (task.status === DailyTaskStatus.LIST_FETCHED) {
+      await this.storage.updateTaskStatus(taskDate, DailyTaskStatus.PROCESSING);
     }
 
     // Initialize translator
@@ -236,7 +237,7 @@ export class TaskExecutor {
 
         return {
           id: article.id,
-          status: isSuccess ? ('completed' as ArticleStatus) : ('failed' as ArticleStatus),
+          status: isSuccess ? ArticleStatus.COMPLETED : ArticleStatus.FAILED,
           titleZh: titleZh || '',
           contentSummaryZh: descriptionZh || '',
           commentSummaryZh: finalCommentSummary,
@@ -260,7 +261,7 @@ export class TaskExecutor {
       await this.storage.updateArticlesBatch(
         pendingArticles.map((article) => ({
           id: article.id,
-          status: 'failed' as ArticleStatus,
+          status: ArticleStatus.FAILED,
           errorMessage: error instanceof Error ? error.message : String(error),
         }))
       );
@@ -277,7 +278,7 @@ export class TaskExecutor {
     const batchIndex = Math.ceil((task2.completed_articles + task2.failed_articles) / actualBatchSize);
 
     await this.storage.recordBatch(taskDate, batchIndex, {
-      status: failedCount === 0 ? ('success' as BatchStatus) : failedCount === pendingArticles.length ? ('failed' as BatchStatus) : ('partial' as BatchStatus),
+      status: failedCount === 0 ? BatchStatus.SUCCESS : failedCount === pendingArticles.length ? BatchStatus.FAILED : BatchStatus.PARTIAL,
       articleCount: pendingArticles.length,
       subrequestCount,
       durationMs,
@@ -385,7 +386,7 @@ export class TaskExecutor {
     try {
       logInfo('Local test mode: Outputting to terminal');
       const terminalPublisher = new TerminalPublisher();
-      await terminalPublisher.publish(publishContent, {});
+      await terminalPublisher.publish(publishContent, { type: PublisherType.TERMINAL });
       logInfo('Terminal output completed');
       return true;
     } catch (error) {
@@ -414,6 +415,7 @@ export class TaskExecutor {
       logInfo('Publishing to GitHub');
       const githubPublisher = new GitHubPublisher();
       await githubPublisher.publish(publishContent, {
+        type: PublisherType.GITHUB,
         GITHUB_TOKEN: this.env.GITHUB_TOKEN,
         TARGET_REPO: this.env.TARGET_REPO,
         TARGET_BRANCH: this.env.TARGET_BRANCH,
@@ -445,6 +447,7 @@ export class TaskExecutor {
       logInfo('Publishing to Telegram');
       const telegramPublisher = new TelegramPublisher();
       await telegramPublisher.publish(publishContent, {
+        type: PublisherType.TELEGRAM,
         TELEGRAM_BOT_TOKEN: this.env.TELEGRAM_BOT_TOKEN,
         TELEGRAM_CHANNEL_ID: this.env.TELEGRAM_CHANNEL_ID,
       });
@@ -458,7 +461,7 @@ export class TaskExecutor {
 
   private async updatePublishedStatus(taskDate: string, results: { github: boolean; telegram: boolean; terminal: boolean }): Promise<void> {
     if (results.github || results.telegram || results.terminal) {
-      await this.storage.updateTaskStatus(taskDate, 'published', {
+      await this.storage.updateTaskStatus(taskDate, DailyTaskStatus.PUBLISHED, {
         publishedAt: Date.now(),
       });
       logInfo('Task marked as published', { taskDate, results });

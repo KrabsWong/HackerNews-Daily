@@ -14,7 +14,7 @@ import type { PublishContent } from '../../../types/publisher';
 export function formatTerminalOutput(content: PublishContent): string {
   const separator = '='.repeat(38);
   const title = `HackerNews Daily - ${content.dateStr}`;
-  const storyCount = content.stories.length;
+  const storyCount = content.stories?.length || 0;
   const summary = `Export completed: ${storyCount} stories`;
 
   return `${separator}

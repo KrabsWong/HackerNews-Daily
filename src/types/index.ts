@@ -93,3 +93,22 @@ export type {
   Env,
   WorkerEnv,
 } from './worker';
+
+// Error types
+export {
+  AppError,
+  APIError,
+  ServiceError,
+  ValidationError,
+  DatabaseError,
+  LLMError,
+  ContentError,
+  PublisherError,
+  NetworkError,
+  isAppError,
+  isAPIError,
+  isServiceError,
+  isNetworkError,
+  isRetryableError,
+  toAppError,
+} from './errors';

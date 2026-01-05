@@ -11,6 +11,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createMockEnv, createMockExecutionContext } from '../helpers/workerEnvironment';
 import { createMockProcessedStory, createMockGitHubCreateResponse, createMockTelegramResponse } from '../helpers/fixtures';
+import { PublisherType } from '../../types/publisher';
 
 describe('Multi-Publisher Integration', () => {
   let mockFetch: ReturnType<typeof vi.fn>;
@@ -75,10 +76,10 @@ describe('Multi-Publisher Integration', () => {
       const githubResponse = await fetch('https://api.github.com/repos/test/repo/contents/test.md', {
         method: 'PUT',
       });
-      publishers.push({ name: 'github', success: githubResponse.ok });
+      publishers.push({ name: PublisherType.GITHUB, success: githubResponse.ok });
 
       // Terminal (no network call)
-      publishers.push({ name: 'terminal', success: true });
+      publishers.push({ name: PublisherType.TERMINAL, success: true });
 
       expect(publishers).toHaveLength(2);
       expect(publishers[0].success).toBe(true);
@@ -144,7 +145,7 @@ describe('Multi-Publisher Integration', () => {
       const githubResponse = await fetch('https://api.github.com/repos/test/repo/contents/test.md', {
         method: 'PUT',
       });
-      publishers.push({ name: 'github', success: githubResponse.ok });
+      publishers.push({ name: PublisherType.GITHUB, success: githubResponse.ok });
 
       // Telegram
       mockFetch.mockResolvedValueOnce({
@@ -155,7 +156,7 @@ describe('Multi-Publisher Integration', () => {
       const telegramResponse = await fetch('https://api.telegram.org/bot123/sendMessage', {
         method: 'POST',
       });
-      publishers.push({ name: 'telegram', success: telegramResponse.ok });
+      publishers.push({ name: PublisherType.TELEGRAM, success: telegramResponse.ok });
 
       expect(publishers).toHaveLength(2);
       expect(publishers[0].success).toBe(true);
@@ -207,7 +208,7 @@ describe('Multi-Publisher Integration', () => {
       const github = await fetch('https://api.github.com/repos/test/repo/contents/test.md', {
         method: 'PUT',
       });
-      results.push({ publisher: 'github', success: github.ok });
+      results.push({ publisher: PublisherType.GITHUB, success: github.ok });
 
       // Telegram fails
       mockFetch.mockResolvedValueOnce({
@@ -218,7 +219,7 @@ describe('Multi-Publisher Integration', () => {
       const telegram = await fetch('https://api.telegram.org/bot123/sendMessage', {
         method: 'POST',
       });
-      results.push({ publisher: 'telegram', success: telegram.ok });
+      results.push({ publisher: PublisherType.TELEGRAM, success: telegram.ok });
 
       expect(results).toHaveLength(2);
       expect(results[0].success).toBe(true);
@@ -412,14 +413,14 @@ describe('Multi-Publisher Integration', () => {
 
   describe('Publisher coordination and ordering', () => {
     it('should execute publishers in sequence', async () => {
-      const executionOrder: string[] = [];
+      const executionOrder: PublisherType[] = [];
 
       mockFetch.mockImplementation(async (url: string) => {
         if (url.includes('github')) {
-          executionOrder.push('github');
+          executionOrder.push(PublisherType.GITHUB);
           return { ok: true, json: async () => createMockGitHubCreateResponse() };
         } else if (url.includes('telegram')) {
-          executionOrder.push('telegram');
+          executionOrder.push(PublisherType.TELEGRAM);
           return { ok: true, json: async () => createMockTelegramResponse() };
         }
         return { ok: false };
@@ -431,7 +432,7 @@ describe('Multi-Publisher Integration', () => {
       // Execute Telegram second
       await fetch('https://api.telegram.org/bot123/sendMessage', { method: 'POST' });
 
-      expect(executionOrder).toEqual(['github', 'telegram']);
+      expect(executionOrder).toEqual([PublisherType.GITHUB, PublisherType.TELEGRAM]);
     });
 
     it('should record publisher results', async () => {
@@ -448,22 +449,22 @@ describe('Multi-Publisher Integration', () => {
         });
 
       const github = await fetch('https://api.github.com/repos/test/repo/contents/test.md', { method: 'PUT' });
-      results.push({ publisher: 'github', success: github.ok });
+      results.push({ publisher: PublisherType.GITHUB, success: github.ok });
 
       const telegram = await fetch('https://api.telegram.org/bot123/sendMessage', { method: 'POST' });
-      results.push({ publisher: 'telegram', success: telegram.ok });
+      results.push({ publisher: PublisherType.TELEGRAM, success: telegram.ok });
 
       expect(results).toHaveLength(2);
       expect(results.every(r => r.success)).toBe(true);
     });
 
     it('should provide feedback on which publishers succeeded', () => {
-      const publishResults = ['github', 'telegram'];
+      const publishResults = [PublisherType.GITHUB, PublisherType.TELEGRAM];
 
       const message = `Export completed successfully (published to: ${publishResults.join(', ')})`;
 
-      expect(message).toContain('github');
-      expect(message).toContain('telegram');
+      expect(message).toContain(PublisherType.GITHUB);
+      expect(message).toContain(PublisherType.TELEGRAM);
     });
   });
 });

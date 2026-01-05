@@ -4,61 +4,133 @@
  */
 
 /**
- * Daily task metadata stored in D1
+ * Daily task status enum (for database storage)
+ * Using enum for better type safety and autocomplete
  */
-export interface DailyTask {
+export enum DailyTaskStatus {
+  INIT = 'init',                      // Task created, not yet started
+  LIST_FETCHED = 'list_fetched',        // Article list fetched from HN API
+  PROCESSING = 'processing',              // Processing batches of articles
+  AGGREGATING = 'aggregating',          // All articles processed, aggregating results
+  PUBLISHED = 'published',                // Content published to GitHub/Telegram
+  ARCHIVED = 'archived'                  // Task archived (old task)
+}
+
+/**
+ * Article status enum (for database storage)
+ * Using enum for better type safety and autocomplete
+ */
+export enum ArticleStatus {
+  PENDING = 'pending',                  // Waiting to be processed
+  PROCESSING = 'processing',              // Currently being processed
+  COMPLETED = 'completed',                // Processing completed successfully
+  FAILED = 'failed',                      // Processing failed
+}
+
+/**
+ * Batch status enum (for database storage)
+ * Using enum for better type safety and autocomplete
+ */
+export enum BatchStatus {
+  SUCCESS = 'success',                    // All articles processed successfully
+  PARTIAL = 'partial',                    // Some articles failed
+  FAILED = 'failed',                      // Entire batch failed
+}
+
+/**
+ * Base daily task interface
+ */
+interface DailyTaskBase {
   id: number;
   task_date: string; // YYYY-MM-DD format
-  status: DailyTaskStatus;
   total_articles: number;
   completed_articles: number;
   failed_articles: number;
   created_at: number; // Unix timestamp (milliseconds)
   updated_at: number; // Unix timestamp (milliseconds)
-  published_at: number | null; // Unix timestamp (milliseconds) when published
 }
 
 /**
- * Task status enum
+ * Discriminated union types for daily tasks based on status
+ * This provides type-safe access to status-specific fields
  */
-export type DailyTaskStatus =
-  | 'init'          // Task created, not yet started
-  | 'list_fetched'  // Article list fetched from HN API
-  | 'processing'    // Processing batches of articles
-  | 'aggregating'   // All articles processed, aggregating results
-  | 'published'     // Content published to GitHub/Telegram
-  | 'archived';     // Task archived (old task)
+export type DailyTask =
+  | (DailyTaskBase & {
+      status: DailyTaskStatus.INIT;
+      published_at: null;
+    })
+  | (DailyTaskBase & {
+      status: DailyTaskStatus.LIST_FETCHED;
+      published_at: null;
+    })
+  | (DailyTaskBase & {
+      status: DailyTaskStatus.PROCESSING;
+      published_at: null;
+    })
+  | (DailyTaskBase & {
+      status: DailyTaskStatus.AGGREGATING;
+      published_at: null;
+    })
+  | (DailyTaskBase & {
+      status: DailyTaskStatus.PUBLISHED;
+      published_at: number; // Required when published
+    })
+  | (DailyTaskBase & {
+      status: DailyTaskStatus.ARCHIVED;
+      published_at: number | null;
+    });
+
 
 /**
- * Article record stored in D1
+ * Base article interface
  */
-export interface Article {
+interface ArticleBase {
   id: number;
   task_date: string; // YYYY-MM-DD format
   story_id: number; // HackerNews story ID
   rank: number; // Ranking 1-30
   url: string;
   title_en: string; // English title
-  title_zh: string | null; // Chinese title (filled after translation)
   score: number; // HN score
   published_time: number; // Article publish time (Unix timestamp milliseconds)
-  content_summary_zh: string | null; // Content summary (Chinese)
-  comment_summary_zh: string | null; // Comment summary (Chinese)
-  status: ArticleStatus;
-  error_message: string | null; // Error message (if failed)
   retry_count: number; // Retry attempt count
   created_at: number; // Creation time
   updated_at: number; // Update time
 }
 
 /**
- * Article status enum
+ * Discriminated union types for articles based on status
+ * This provides type-safe access to status-specific fields
  */
-export type ArticleStatus =
-  | 'pending'     // Waiting to be processed
-  | 'processing'  // Currently being processed
-  | 'completed'   // Processing completed successfully
-  | 'failed';     // Processing failed
+export type Article =
+  | (ArticleBase & {
+      status: ArticleStatus.PENDING;
+      title_zh: null;
+      content_summary_zh: null;
+      comment_summary_zh: null;
+      error_message: null;
+    })
+  | (ArticleBase & {
+      status: ArticleStatus.PROCESSING;
+      title_zh: string | null;
+      content_summary_zh: string | null;
+      comment_summary_zh: string | null;
+      error_message: null;
+    })
+  | (ArticleBase & {
+      status: ArticleStatus.COMPLETED;
+      title_zh: string;
+      content_summary_zh: string;
+      comment_summary_zh: string;
+      error_message: null;
+    })
+  | (ArticleBase & {
+      status: ArticleStatus.FAILED;
+      title_zh: string | null;
+      content_summary_zh: string | null;
+      comment_summary_zh: string | null;
+      error_message: string; // Required when failed
+    });
 
 /**
  * Batch execution record for observability
@@ -75,13 +147,6 @@ export interface TaskBatch {
   created_at: number; // Batch start time
 }
 
-/**
- * Batch status enum
- */
-export type BatchStatus =
-  | 'success'  // All articles processed successfully
-  | 'partial'  // Some articles failed
-  | 'failed';  // Entire batch failed
 
 /**
  * Task progress statistics

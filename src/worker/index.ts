@@ -10,6 +10,7 @@ import { logInfo, logError, logWarn } from './logger';
 import { createTaskExecutor } from '../services/task';
 import { formatDateForDisplay } from '../utils/date';
 import type { Env } from '../types/worker';
+import { DailyTaskStatus } from '../types/database';
 
 // Re-export Env type for backward compatibility
 export type { Env } from '../types/worker';
@@ -50,15 +51,15 @@ async function handleDistributedExport(env: Env): Promise<void> {
     
     // State machine transitions
     switch (task.status) {
-      case 'init':
+      case DailyTaskStatus.INIT:
         // Initialize task: fetch article list and store in D1
         logInfo('State: init -> Fetching article list');
         const initResult = await executor.initializeTask(taskDate);
         logInfo('Task initialized', initResult);
         break;
       
-      case 'list_fetched':
-      case 'processing':
+      case DailyTaskStatus.LIST_FETCHED:
+      case DailyTaskStatus.PROCESSING:
         // Process next batch of articles
         logInfo(`State: ${task.status} -> Processing next batch`);
         const batchSize = parseInt(env.TASK_BATCH_SIZE || '6', 10);
@@ -69,11 +70,11 @@ async function handleDistributedExport(env: Env): Promise<void> {
         // Check if all articles are processed (no pending or processing articles)
         if (processResult.pending === 0 && processResult.processing === 0) {
           logInfo('All articles processed, transitioning to aggregating');
-          await storage.updateTaskStatus(taskDate, 'aggregating');
+          await storage.updateTaskStatus(taskDate, DailyTaskStatus.AGGREGATING);
         }
         break;
       
-      case 'aggregating':
+      case DailyTaskStatus.AGGREGATING:
         // Aggregate results and publish
         logInfo('State: aggregating -> Aggregating and publishing');
         const aggregateResult = await executor.aggregateResults(taskDate);
@@ -88,17 +89,14 @@ async function handleDistributedExport(env: Env): Promise<void> {
         logInfo('Results published', publishResult);
         break;
       
-      case 'published':
+      case DailyTaskStatus.PUBLISHED:
         // Task already completed
         logInfo('Task already published for today');
         break;
       
-      case 'archived':
+      case DailyTaskStatus.ARCHIVED:
         logWarn('Task is archived, should have been reinitialized');
         break;
-      
-      default:
-        logWarn('Unknown task status', { status: task.status });
     }
     
     logInfo('=== Distributed Task Processing Completed ===');

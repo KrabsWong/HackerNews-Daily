@@ -4,7 +4,8 @@
  */
 
 import { HN_API } from '../../config/constants';
-import { get, FetchError } from '../../utils/fetch';
+import { get } from '../../utils/fetch';
+import { APIError } from '../../types/errors';
 import { HNStory } from '../../types/api';
 import { mapAlgoliaStoryToHNStory } from './mapper';
 import { fetchStoriesFromAlgoliaByIds } from './algolia';
@@ -20,8 +21,14 @@ export async function fetchBestStoryIds(): Promise<number[]> {
     });
     return response.data;
   } catch (error) {
-    if (error instanceof FetchError) {
-      throw new Error(`Failed to fetch best story IDs: ${error.message}`);
+    // Add context to API errors
+    if (error instanceof APIError) {
+      throw new APIError(
+        `Failed to fetch best story IDs: ${error.message}`,
+        error.statusCode,
+        error.provider,
+        { originalError: error }
+      );
     }
     throw error;
   }
@@ -40,44 +47,33 @@ export async function fetchBestStoriesByDateAndScore(
   startTime: number,
   endTime: number
 ): Promise<HNStory[]> {
-  try {
-    // Step 1: Get best story IDs from Firebase (HN's curated "best" list)
-    console.log('Fetching best story IDs from HackerNews...');
-    const bestIds = await fetchBestStoryIds();
-    console.log(`Found ${bestIds.length} stories in HN best list`);
-    
-    // Step 2: Fetch story details from Algolia (more efficient than Firebase for bulk)
-    const { stories: allStories, errors } = await fetchStoriesFromAlgoliaByIds(bestIds);
+  // Step 1: Get best story IDs from Firebase (HN's curated "best" list)
+  console.log('Fetching best story IDs from HackerNews...');
+  const bestIds = await fetchBestStoryIds(); // Errors propagate naturally
+  console.log(`Found ${bestIds.length} stories in HN best list`);
+  
+  // Step 2: Fetch story details from Algolia (more efficient than Firebase for bulk)
+  const { stories: allStories, errors } = await fetchStoriesFromAlgoliaByIds(bestIds);
 
-    if (errors.length > 0) {
-      console.warn(`${errors.length} batch(es) failed while fetching story details`);
-    }
-
-    console.log(`Fetched details for ${allStories.length} best stories`);
-    
-    // Step 3: Filter by date range
-    const filteredStories = allStories.filter(
-      story => story.created_at_i > startTime && story.created_at_i < endTime
-    );
-    
-    console.log(`${filteredStories.length} stories match the date range`);
-    
-    // Step 4: Sort by score (points) descending
-    filteredStories.sort((a, b) => b.points - a.points);
-    
-    // Step 5: Take top N and map to HNStory format
-    const topStories = filteredStories.slice(0, limit);
-    return topStories.map(mapAlgoliaStoryToHNStory);
-    
-  } catch (error) {
-    if (error instanceof FetchError) {
-      if (error.status === 429) {
-        throw new Error('API rate limit exceeded, please try again later');
-      }
-      throw new Error(`Failed to fetch best stories: ${error.message}`);
-    }
-    throw error;
+  if (errors.length > 0) {
+    console.warn(`${errors.length} batch(es) failed while fetching story details`);
   }
+
+  console.log(`Fetched details for ${allStories.length} best stories`);
+  
+  // Step 3: Filter by date range
+  const filteredStories = allStories.filter(
+    story => story.created_at_i > startTime && story.created_at_i < endTime
+  );
+  
+  console.log(`${filteredStories.length} stories match the date range`);
+  
+  // Step 4: Sort by score (points) descending
+  filteredStories.sort((a, b) => b.points - a.points);
+  
+  // Step 5: Take top N and map to HNStory format
+  const topStories = filteredStories.slice(0, limit);
+  return topStories.map(mapAlgoliaStoryToHNStory);
 }
 
 /**

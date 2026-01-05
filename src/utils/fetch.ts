@@ -4,10 +4,15 @@
  */
 
 import type { FetchOptions } from '../types/utils';
+import { APIError, NetworkError } from '../types/errors';
 
 // Re-export type for backward compatibility
 export type { FetchOptions } from '../types/utils';
 
+/**
+ * @deprecated Use APIError or NetworkError instead
+ * Kept for backward compatibility
+ */
 export class FetchError extends Error {
   constructor(
     message: string,
@@ -59,10 +64,11 @@ export async function fetchJSON<T>(
       }
 
       if (!response.ok) {
-        throw new FetchError(
+        throw new APIError(
           `HTTP ${response.status}: ${response.statusText}`,
           response.status,
-          response.statusText
+          'fetch',
+          { url }
         );
       }
 
@@ -70,8 +76,11 @@ export async function fetchJSON<T>(
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
-        throw new FetchError(
-          `Expected JSON response but got ${contentType || 'unknown content type'}. Body: ${text.substring(0, 200)}`
+        throw new APIError(
+          `Expected JSON response but got ${contentType || 'unknown content type'}. Body: ${text.substring(0, 200)}`,
+          response.status,
+          'fetch',
+          { url, contentType, preview: text.substring(0, 200) }
         );
       }
 
@@ -80,7 +89,11 @@ export async function fetchJSON<T>(
       clearTimeout(timeoutId);
 
       if (error instanceof Error && error.name === 'AbortError') {
-        lastError = new FetchError(`Request timeout after ${timeout}ms`);
+        lastError = new NetworkError(
+          `Request timeout after ${timeout}ms`,
+          url,
+          timeout
+        );
         
         // Retry on timeout
         if (attempt < retries) {
@@ -93,20 +106,30 @@ export async function fetchJSON<T>(
         throw lastError;
       }
 
+      // If it's already an APIError, rethrow
+      if (error instanceof APIError) {
+        throw error;
+      }
+
       // For network errors, retry
       if (error instanceof TypeError && attempt < retries) {
         const waitTime = retryDelay * Math.pow(2, attempt);
         console.warn(`Network error: ${error.message}, retrying in ${waitTime}ms (attempt ${attempt + 1}/${retries + 1})`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
-        lastError = error;
+        lastError = new NetworkError(error.message, url);
         continue;
+      }
+
+      // Convert other errors to NetworkError
+      if (error instanceof TypeError) {
+        throw new NetworkError(error.message, url);
       }
 
       throw error;
     }
   }
 
-  throw lastError || new Error('Request failed after retries');
+  throw lastError || new NetworkError('Request failed after retries', url);
 }
 
 /**
@@ -165,10 +188,11 @@ export async function post<T>(
         // Ignore parsing errors, use default message
       }
       
-      throw new FetchError(
+      throw new APIError(
         errorMessage,
         response.status,
-        response.statusText
+        'fetch-post',
+        { url }
       );
     }
 
@@ -176,10 +200,11 @@ export async function post<T>(
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       const text = await response.text();
-      throw new FetchError(
+      throw new APIError(
         `Expected JSON response but got ${contentType || 'unknown content type'}. Body: ${text.substring(0, 200)}`,
         response.status,
-        response.statusText
+        'fetch-post',
+        { url, contentType, preview: text.substring(0, 200) }
       );
     }
 
@@ -189,7 +214,17 @@ export async function post<T>(
     clearTimeout(timeoutId);
 
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new FetchError(`Request timeout after ${timeout}ms`);
+      throw new NetworkError(`Request timeout after ${timeout}ms`, url, timeout);
+    }
+
+    // If it's already an APIError, rethrow
+    if (error instanceof APIError) {
+      throw error;
+    }
+
+    // Convert TypeError (network errors) to NetworkError
+    if (error instanceof TypeError) {
+      throw new NetworkError(error.message, url);
     }
 
     throw error;

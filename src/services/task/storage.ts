@@ -9,13 +9,14 @@
  * - Cleanup (archival)
  */
 
-import type {
+import {
   DailyTask,
   DailyTaskStatus,
   Article,
   ArticleStatus,
   TaskProgress,
   BatchProcessingResult,
+  BatchStatus,
 } from '../../types/database';
 
 export class TaskStorage {
@@ -30,11 +31,11 @@ export class TaskStorage {
     const now = Date.now();
     const stmt = this.db.prepare(
       `INSERT INTO daily_tasks (task_date, status, created_at, updated_at)
-       VALUES (?, 'init', ?, ?)
+       VALUES (?, ?, ?, ?)
        RETURNING *`
     );
     
-    const result = await stmt.bind(taskDate, now, now).first<DailyTask>();
+    const result = await stmt.bind(taskDate, DailyTaskStatus.INIT, now, now).first<DailyTask>();
     
     if (!result) {
       throw new Error(`Failed to create daily task for ${taskDate}`);
@@ -141,14 +142,14 @@ export class TaskStorage {
 
     const pendingCount = await this.db
       .prepare(
-        "SELECT COUNT(*) as count FROM articles WHERE task_date = ? AND status = 'pending'"
+        `SELECT COUNT(*) as count FROM articles WHERE task_date = ? AND status = ${ArticleStatus.PENDING}`
       )
       .bind(taskDate)
       .first<{ count: number }>();
 
     const processingCount = await this.db
       .prepare(
-        "SELECT COUNT(*) as count FROM articles WHERE task_date = ? AND status = 'processing'"
+        `SELECT COUNT(*) as count FROM articles WHERE task_date = ? AND status = ${ArticleStatus.PROCESSING}`
       )
       .bind(taskDate)
       .first<{ count: number }>();
@@ -188,7 +189,7 @@ export class TaskStorage {
             `INSERT INTO articles (
               task_date, story_id, rank, url, title_en, score, 
               published_time, status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ${ArticleStatus.PENDING}, ?, ?)`
           )
           .bind(
             taskDate,
@@ -214,7 +215,7 @@ export class TaskStorage {
   ): Promise<Article[]> {
     const stmt = this.db.prepare(
       `SELECT * FROM articles 
-       WHERE task_date = ? AND status = 'pending'
+       WHERE task_date = ? AND status = ${ArticleStatus.PENDING}
        ORDER BY rank ASC
        LIMIT ?`
     );
@@ -332,7 +333,7 @@ export class TaskStorage {
   async getCompletedArticles(taskDate: string): Promise<Article[]> {
     const stmt = this.db.prepare(
       `SELECT * FROM articles 
-       WHERE task_date = ? AND status = 'completed'
+       WHERE task_date = ? AND status = ${ArticleStatus.COMPLETED}
        ORDER BY rank ASC`
     );
 
@@ -346,7 +347,7 @@ export class TaskStorage {
   async getFailedArticles(taskDate: string): Promise<Article[]> {
     const stmt = this.db.prepare(
       `SELECT * FROM articles 
-       WHERE task_date = ? AND status = 'failed'
+       WHERE task_date = ? AND status = ${ArticleStatus.FAILED}
        ORDER BY rank ASC`
     );
 
@@ -401,9 +402,9 @@ export class TaskStorage {
       .prepare(
         `SELECT 
           COUNT(*) as total_batches,
-          SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success_batches,
-          SUM(CASE WHEN status = 'partial' THEN 1 ELSE 0 END) as partial_batches,
-          SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_batches,
+          SUM(CASE WHEN status = ${BatchStatus.SUCCESS} THEN 1 ELSE 0 END) as success_batches,
+          SUM(CASE WHEN status = ${BatchStatus.PARTIAL} THEN 1 ELSE 0 END) as partial_batches,
+          SUM(CASE WHEN status = ${BatchStatus.FAILED} THEN 1 ELSE 0 END) as failed_batches,
           AVG(duration_ms) as avg_duration_ms,
           SUM(subrequest_count) as total_subrequests
          FROM task_batches
@@ -441,8 +442,8 @@ export class TaskStorage {
     const now = Date.now();
     const stmt = this.db.prepare(
       `UPDATE articles 
-       SET status = 'pending', updated_at = ?
-       WHERE task_date = ? AND status = 'failed' AND retry_count < ?`
+       SET status = ${ArticleStatus.PENDING}, updated_at = ?
+       WHERE task_date = ? AND status = ${ArticleStatus.FAILED} AND retry_count < ?`
     );
 
     const result = await stmt.bind(now, taskDate, maxRetries).run();
@@ -456,7 +457,7 @@ export class TaskStorage {
     articleId: number,
     errorMessage: string
   ): Promise<void> {
-    await this.updateArticleStatus(articleId, 'failed', {
+    await this.updateArticleStatus(articleId, ArticleStatus.FAILED, {
       errorMessage,
     });
   }
@@ -472,7 +473,7 @@ export class TaskStorage {
 
     const newRetryCount = (article?.retry_count ?? 0) + 1;
 
-    await this.updateArticleStatus(articleId, 'pending', {
+    await this.updateArticleStatus(articleId, ArticleStatus.PENDING, {
       retryCount: newRetryCount,
     });
 
@@ -514,7 +515,7 @@ export class TaskStorage {
    * Mark task as archived (soft delete alternative)
    */
   async markTaskArchived(taskDate: string): Promise<void> {
-    await this.updateTaskStatus(taskDate, 'archived');
+    await this.updateTaskStatus(taskDate, DailyTaskStatus.ARCHIVED);
   }
 
   // ==================== Utility Methods ====================

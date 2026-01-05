@@ -7,12 +7,48 @@
 import type { ProcessedStory } from './shared';
 
 /**
- * Configuration options passed to publishers
- * Publishers can define their own specific configuration schemas
+ * Publisher type enum
  */
-export interface PublisherConfig {
-  [key: string]: any;
+export enum PublisherType {
+  GITHUB = 'github',
+  TELEGRAM = 'telegram',
+  TERMINAL = 'terminal',
 }
+
+/**
+ * GitHub publisher configuration
+ */
+export interface GitHubPublisherConfig {
+  type: PublisherType.GITHUB;
+  GITHUB_TOKEN: string;
+  TARGET_REPO: string;
+  TARGET_BRANCH: string;
+}
+
+/**
+ * Telegram publisher configuration
+ */
+export interface TelegramPublisherConfig {
+  type: PublisherType.TELEGRAM;
+  TELEGRAM_BOT_TOKEN: string;
+  TELEGRAM_CHANNEL_ID: string;
+}
+
+/**
+ * Terminal publisher configuration (for console output)
+ */
+export interface TerminalPublisherConfig {
+  type: PublisherType.TERMINAL;
+}
+
+/**
+ * Discriminated union of all publisher configurations
+ * The 'type' field acts as the discriminator
+ */
+export type PublisherConfig =
+  | GitHubPublisherConfig
+  | TelegramPublisherConfig
+  | TerminalPublisherConfig;
 
 /**
  * Content to be published
@@ -23,9 +59,9 @@ export interface PublishContent {
   /** Date string in YYYY-MM-DD format */
   dateStr: string;
   /** Processed stories for publishers that need structured data (e.g., Telegram) */
-  stories: ProcessedStory[];
+  stories?: ProcessedStory[];
   /** Additional metadata from the content source */
-  metadata: Record<string, any>;
+  metadata?: Record<string, any>;
 }
 
 /**
@@ -33,8 +69,9 @@ export interface PublishContent {
  * All publishers MUST implement this interface
  */
 export interface Publisher {
-  /** Unique name of the publisher (e.g., 'github', 'telegram') */
-  readonly name: string;
+  /** Unique name of the publisher (e.g., PublisherType.GITHUB, PublisherType.TELEGRAM) */
+  readonly name: PublisherType;
+
   
   /**
    * Publish content to the destination
@@ -46,9 +83,9 @@ export interface Publisher {
 }
 
 /**
- * GitHub publisher configuration
+ * Configuration for pushing files to GitHub
  */
-export interface GitHubPublisherConfig extends PublisherConfig {
+export interface PushConfig {
   GITHUB_TOKEN: string;
   TARGET_REPO: string;
   TARGET_BRANCH: string;
@@ -71,23 +108,6 @@ export interface GitHubCreateFileRequest {
   content: string; // Base64 encoded
   branch: string;
   sha?: string; // Required for updates
-}
-
-/**
- * Configuration for pushing files to GitHub
- */
-export interface PushConfig {
-  GITHUB_TOKEN: string;
-  TARGET_REPO: string;
-  TARGET_BRANCH: string;
-}
-
-/**
- * Telegram publisher configuration
- */
-export interface TelegramPublisherConfig extends PublisherConfig {
-  TELEGRAM_BOT_TOKEN: string;
-  TELEGRAM_CHANNEL_ID: string;
 }
 
 /**

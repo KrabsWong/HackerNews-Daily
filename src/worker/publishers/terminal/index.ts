@@ -4,6 +4,7 @@
  */
 
 import type { Publisher, PublishContent, PublisherConfig } from '../../../types/publisher';
+import { PublisherType } from '../../../types/publisher';
 import { formatTerminalOutput } from './formatter';
 
 /**
@@ -12,14 +13,19 @@ import { formatTerminalOutput } from './formatter';
  * Used for local development and testing
  */
 export class TerminalPublisher implements Publisher {
-  readonly name = 'terminal';
+  readonly name = PublisherType.TERMINAL;
 
   /**
    * Publish content to terminal (stdout)
    * @param content - Content to output
-   * @param _config - Publisher configuration (not used for terminal publisher)
+   * @param config - Publisher configuration
    */
-  async publish(content: PublishContent, _config: PublisherConfig): Promise<void> {
+  async publish(content: PublishContent, config: PublisherConfig): Promise<void> {
+    // Type guard: ensure config is TerminalPublisherConfig
+    if (config.type !== PublisherType.TERMINAL) {
+      throw new Error(`Invalid config type: expected '${PublisherType.TERMINAL}', got '${config.type}'`);
+    }
+    
     const output = formatTerminalOutput(content);
     console.log(output);
   }

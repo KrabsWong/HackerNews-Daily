@@ -5,6 +5,7 @@
  */
 
 import type { Publisher, PublishContent, PublisherConfig, TelegramPublisherConfig } from '../../../types/publisher';
+import { PublisherType } from '../../../types/publisher';
 import { sendMessage, delay } from './client';
 import { formatMessagesWithBatching, getMessageDelay, getBatchSize } from './formatter';
 import { logInfo, logError } from '../../logger';
@@ -15,7 +16,7 @@ import { logInfo, logError } from '../../logger';
  * Stories are merged into batches based on batch size configuration
  */
 export class TelegramPublisher implements Publisher {
-  readonly name = 'telegram';
+  readonly name = PublisherType.TELEGRAM;
   
   /**
    * Publish content to Telegram channel
@@ -24,24 +25,27 @@ export class TelegramPublisher implements Publisher {
    * @param config - Telegram-specific configuration
    */
   async publish(content: PublishContent, config: PublisherConfig): Promise<void> {
-    const telegramConfig = config as TelegramPublisherConfig;
+    // Type guard: ensure config is TelegramPublisherConfig
+    if (config.type !== PublisherType.TELEGRAM) {
+      throw new Error(`Invalid config type: expected '${PublisherType.TELEGRAM}', got '${config.type}'`);
+    }
     
     // Validate required configuration
-    if (!telegramConfig.TELEGRAM_BOT_TOKEN) {
+    if (!config.TELEGRAM_BOT_TOKEN) {
       throw new Error('TELEGRAM_BOT_TOKEN is required for Telegram publisher');
     }
-    if (!telegramConfig.TELEGRAM_CHANNEL_ID) {
+    if (!config.TELEGRAM_CHANNEL_ID) {
       throw new Error('TELEGRAM_CHANNEL_ID is required for Telegram publisher');
     }
     
     // Format content into batched messages (multiple stories per message)
     const batchSize = getBatchSize();
-    const messages = formatMessagesWithBatching(content.stories, content.dateStr, batchSize);
+    const messages = formatMessagesWithBatching(content.stories || [], content.dateStr, batchSize);
     const messageDelay = getMessageDelay();
     
     logInfo('Telegram: formatted content with batching', { 
       totalMessages: messages.length,
-      storyCount: content.stories.length,
+      storyCount: content.stories?.length || 0,
       batchSize,
       storiesPerMessage: batchSize,
       dateStr: content.dateStr
@@ -62,8 +66,8 @@ export class TelegramPublisher implements Publisher {
         });
         
         await sendMessage(
-          telegramConfig.TELEGRAM_BOT_TOKEN,
-          telegramConfig.TELEGRAM_CHANNEL_ID,
+          config.TELEGRAM_BOT_TOKEN,
+          config.TELEGRAM_CHANNEL_ID,
           message,
           'HTML'
         );
@@ -83,7 +87,7 @@ export class TelegramPublisher implements Publisher {
     }
     
     logInfo('Telegram: publishing completed', {
-      channelId: telegramConfig.TELEGRAM_CHANNEL_ID,
+      channelId: config.TELEGRAM_CHANNEL_ID,
       totalMessages: messages.length,
       successCount,
       failCount

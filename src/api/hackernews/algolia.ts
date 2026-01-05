@@ -4,7 +4,8 @@
  */
 
 import { ALGOLIA_HN_API } from '../../config/constants';
-import { get, FetchError } from '../../utils/fetch';
+import { get } from '../../utils/fetch';
+import { APIError } from '../../types/errors';
 import { Result, Ok, Err, fromPromise } from '../../utils/result';
 import { getErrorMessage } from '../../worker/logger';
 import { 
@@ -96,11 +97,22 @@ export async function fetchStoriesFromAlgolia(
     return limitedHits.map(mapAlgoliaStoryToHNStory);
     
   } catch (error) {
-    if (error instanceof FetchError) {
-      if (error.status === 429) {
-        throw new Error('Algolia API rate limit exceeded, please try again later');
+    // Add context to API errors
+    if (error instanceof APIError) {
+      if (error.statusCode === 429) {
+        throw new APIError(
+          'Algolia API rate limit exceeded, please try again later',
+          429,
+          'algolia',
+          { originalError: error }
+        );
       }
-      throw new Error(`Failed to fetch stories from Algolia HN API: ${error.message}`);
+      throw new APIError(
+        `Failed to fetch stories from Algolia HN API: ${error.message}`,
+        error.statusCode,
+        'algolia',
+        { originalError: error }
+      );
     }
     throw error;
   }
@@ -184,11 +196,22 @@ export async function fetchTopStoriesByScore(
     return topHits.map(mapAlgoliaStoryToHNStory);
     
   } catch (error) {
-    if (error instanceof FetchError) {
-      if (error.status === 429) {
-        throw new Error('Algolia API rate limit exceeded, please try again later');
+    // Add context to API errors
+    if (error instanceof APIError) {
+      if (error.statusCode === 429) {
+        throw new APIError(
+          'Algolia API rate limit exceeded, please try again later',
+          429,
+          'algolia',
+          { originalError: error }
+        );
       }
-      throw new Error(`Failed to fetch stories from Algolia HN API: ${error.message}`);
+      throw new APIError(
+        `Failed to fetch stories from Algolia HN API: ${error.message}`,
+        error.statusCode,
+        'algolia',
+        { originalError: error }
+      );
     }
     throw error;
   }

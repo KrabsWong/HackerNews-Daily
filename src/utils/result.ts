@@ -6,9 +6,35 @@
  * 2. 避免静默失败
  * 3. 强制调用者处理错误情况
  */
-export type Result<T, E = Error> =
-  | { ok: true; value: T }
-  | { ok: false; error: E };
+
+/**
+ * Success result with a value
+ */
+export type Success<T> = { ok: true; value: T };
+
+/**
+ * Error result with an error value
+ */
+export type ErrorResult<E = Error> = { ok: false; error: E };
+
+/**
+ * Result type - either success or error
+ */
+export type Result<T, E = Error> = Success<T> | ErrorResult<E>;
+
+/**
+ * Type guard to check if result is a success
+ */
+export function isSuccess<T, E>(result: Result<T, E>): result is Success<T> {
+  return result.ok;
+}
+
+/**
+ * Type guard to check if result is an error
+ */
+export function isError<T, E>(result: Result<T, E>): result is ErrorResult<E> {
+  return !result.ok;
+}
 
 /**
  * 创建成功结果

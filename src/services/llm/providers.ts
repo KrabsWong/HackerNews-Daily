@@ -6,6 +6,7 @@
 
 import { DEEPSEEK_API, OPENROUTER_API, ZHIPU_API } from '../../config/constants';
 import { post } from '../../utils/fetch';
+import { LLMError } from '../../types/errors';
 import type {
   LLMProvider,
   ChatCompletionRequest,
@@ -57,7 +58,13 @@ export class DeepSeekProvider implements LLMProvider {
     const content = response.data.choices[0]?.message?.content?.trim();
     
     if (!content) {
-      throw new Error('Empty response from DeepSeek API');
+      throw new LLMError(
+        'Empty response from DeepSeek API',
+        'chatCompletion',
+        'deepseek',
+        this.model,
+        { response: response.data }
+      );
     }
 
     return {
@@ -130,7 +137,13 @@ export class OpenRouterProvider implements LLMProvider {
     const content = response.data.choices[0]?.message?.content?.trim();
     
     if (!content) {
-      throw new Error('Empty response from OpenRouter API');
+      throw new LLMError(
+        'Empty response from OpenRouter API',
+        'chatCompletion',
+        'openrouter',
+        this.model,
+        { response: response.data }
+      );
     }
 
     return {
@@ -189,7 +202,13 @@ export class ZhipuProvider implements LLMProvider {
     const content = response.data.choices[0]?.message?.content?.trim();
     
     if (!content) {
-      throw new Error('Empty response from Zhipu API');
+      throw new LLMError(
+        'Empty response from Zhipu API',
+        'chatCompletion',
+        'zhipu',
+        this.model,
+        { response: response.data }
+      );
     }
 
     return {
