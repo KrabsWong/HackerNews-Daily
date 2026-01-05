@@ -5,13 +5,15 @@ import { fetchWithCrawlerAPI } from './crawler';
  * Fetch article metadata using Crawler API
  * Returns content and description extracted by the crawler service
  * @param url - Article URL to fetch
- * @param crawlerApiUrl - Crawler API base URL (from env.CRAWLER_API_URL)
+ * @param crawlerApiUrl - Full crawler endpoint URL (from env.CRAWLER_API_URL)
+ * @param crawlerApiToken - Optional Bearer token for authentication (from env.CRAWLER_API_TOKEN)
  */
 export async function fetchArticleMetadata(
   url: string,
-  crawlerApiUrl?: string
+  crawlerApiUrl?: string,
+  crawlerApiToken?: string
 ): Promise<ArticleMetadata> {
-  const { content, description } = await fetchWithCrawlerAPI(url, crawlerApiUrl);
+  const { content, description } = await fetchWithCrawlerAPI(url, crawlerApiUrl, crawlerApiToken);
 
   return {
     url,
@@ -25,11 +27,13 @@ export async function fetchArticleMetadata(
  * Serial processing avoids overwhelming the crawler service
  * All content is fetched via Crawler API for richer, more complete data
  * @param urls - Array of URLs to fetch
- * @param crawlerApiUrl - Crawler API base URL (from env.CRAWLER_API_URL)
+ * @param crawlerApiUrl - Full crawler endpoint URL (from env.CRAWLER_API_URL)
+ * @param crawlerApiToken - Optional Bearer token for authentication (from env.CRAWLER_API_TOKEN)
  */
 export async function fetchArticlesBatch(
   urls: string[],
-  crawlerApiUrl?: string
+  crawlerApiUrl?: string,
+  crawlerApiToken?: string
 ): Promise<ArticleMetadata[]> {
   console.log(
     `🔍 CRAWLER_API_URL: ${
@@ -54,7 +58,7 @@ export async function fetchArticlesBatch(
     console.log(`${progress} ${url}`);
 
     if (crawlerApiUrl) {
-      const result = await fetchArticleMetadata(url, crawlerApiUrl);
+      const result = await fetchArticleMetadata(url, crawlerApiUrl, crawlerApiToken);
       results.push(result);
 
       if (result.fullContent) {

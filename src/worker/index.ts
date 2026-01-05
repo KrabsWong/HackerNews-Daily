@@ -22,6 +22,11 @@ async function handleDistributedExport(env: Env): Promise<void> {
   try {
     logInfo('=== Distributed Task Processing (Scheduled) ===');
     
+    // Debug: Log environment configuration
+    console.log('🔍 Environment Check:');
+    console.log(`   CRAWLER_API_URL: ${env.CRAWLER_API_URL ? env.CRAWLER_API_URL.substring(0, 50) + '...' : 'NOT SET'}`);
+    console.log(`   CRAWLER_API_TOKEN: ${env.CRAWLER_API_TOKEN ? 'SET (' + env.CRAWLER_API_TOKEN.substring(0, 10) + '...)' : 'NOT SET'}`);
+    
     // Get today's date
     const today = new Date();
     const taskDate = formatDateForDisplay(today);
@@ -150,6 +155,31 @@ export default {
           'Content-Type': 'text/plain',
           'X-Worker-Version': '5.0.0',
         },
+      });
+    }
+
+    // Debug endpoint to check environment variables
+    if (url.pathname === '/debug-env' && request.method === 'GET') {
+      const debugInfo = {
+        timestamp: new Date().toISOString(),
+        crawler: {
+          url: {
+            configured: !!env.CRAWLER_API_URL,
+            preview: env.CRAWLER_API_URL ? env.CRAWLER_API_URL.substring(0, 60) : 'NOT SET',
+            length: env.CRAWLER_API_URL?.length || 0,
+            hasQuotes: env.CRAWLER_API_URL?.includes('"') || false,
+          },
+          token: {
+            configured: !!env.CRAWLER_API_TOKEN,
+            preview: env.CRAWLER_API_TOKEN ? env.CRAWLER_API_TOKEN.substring(0, 10) + '...' : 'NOT SET',
+            length: env.CRAWLER_API_TOKEN?.length || 0,
+            hasQuotes: env.CRAWLER_API_TOKEN?.includes('"') || false,
+          },
+        },
+      };
+      
+      return Response.json(debugInfo, {
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 

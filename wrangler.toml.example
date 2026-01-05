@@ -123,6 +123,7 @@ TARGET_BRANCH = "main"
 #
 # Optional:
 #   wrangler secret put CRAWLER_API_URL
+#   wrangler secret put CRAWLER_API_TOKEN  # Required for private HF Spaces crawler
 #
 # =============================================================================
 

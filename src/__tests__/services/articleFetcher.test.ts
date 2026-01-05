@@ -32,8 +32,8 @@ function createMockResponse(data: any) {
 // Mock fetch at module level before importing constants
 let mockFetch: ReturnType<typeof vi.fn>;
 
-vi.stubGlobal('fetch', vi.fn((url: string) => {
-  return mockFetch(url);
+vi.stubGlobal('fetch', vi.fn((url: string, options?: any) => {
+  return mockFetch(url, options);
 }));
 
 describe('Article Fetcher Service', () => {
@@ -49,8 +49,8 @@ describe('Article Fetcher Service', () => {
     });
     
     mockFetch = vi.fn();
-    vi.mocked(global.fetch).mockImplementation((url: any) => {
-      return mockFetch(url);
+    vi.mocked(global.fetch).mockImplementation((url: any, options?: any) => {
+      return mockFetch(url, options);
     });
   });
 
@@ -443,4 +443,72 @@ describe('Article Fetcher Service', () => {
       }
     });
   });
+
+  describe('Authentication Header Tests', () => {
+    it('should include Authorization header when token is provided', async () => {
+      const url = 'https://example.com/article';
+      const content = 'Test article content';
+      const crawlerApiUrl = 'https://yiiiiiha-tiny-crawl.hf.space';
+      const crawlerApiToken = 'test-token-12345';
+
+      // Track fetch calls
+      let capturedHeaders: any = null;
+      mockFetch.mockImplementation(async (url: string, options?: any) => {
+        capturedHeaders = options?.headers;
+        return createMockResponse({
+          success: true,
+          markdown: content,
+        });
+      });
+
+      await fetchArticleMetadata(url, crawlerApiUrl, crawlerApiToken);
+
+      // Verify Authorization header was included
+      expect(capturedHeaders).toBeDefined();
+      expect(capturedHeaders['Authorization']).toBe(`Bearer ${crawlerApiToken}`);
+      expect(capturedHeaders['Content-Type']).toBe('application/json');
+    });
+
+    it('should work without Authorization header when token not provided', async () => {
+      const url = 'https://example.com/article';
+      const content = 'Test article content';
+      const crawlerApiUrl = 'https://yiiiiiha-tiny-crawl.hf.space';
+
+      // Track fetch calls
+      let capturedHeaders: any = null;
+      mockFetch.mockImplementation(async (url: string, options?: any) => {
+        capturedHeaders = options?.headers;
+        return createMockResponse({
+          success: true,
+          markdown: content,
+        });
+      });
+
+      await fetchArticleMetadata(url, crawlerApiUrl); // No token provided
+
+      // Verify Authorization header was NOT included
+      expect(capturedHeaders).toBeDefined();
+      expect(capturedHeaders['Authorization']).toBeUndefined();
+      expect(capturedHeaders['Content-Type']).toBe('application/json');
+    });
+
+    it('should handle authentication failures gracefully', async () => {
+      const url = 'https://example.com/article';
+      const crawlerApiUrl = 'https://yiiiiiha-tiny-crawl.hf.space';
+      const crawlerApiToken = 'invalid-token';
+
+      mockFetch.mockRejectedValueOnce(
+        Object.assign(new Error('Authentication failed: 401 Unauthorized'), {
+          name: 'FetchError',
+        })
+      );
+
+      const result = await fetchArticleMetadata(url, crawlerApiUrl, crawlerApiToken);
+
+      // Should return null content on auth failure (graceful degradation)
+      expect(result.fullContent).toBeNull();
+      expect(result.description).toBeNull();
+    });
+  });
 });
+

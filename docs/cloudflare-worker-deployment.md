@@ -60,9 +60,12 @@ npx wrangler secret put LLM_OPENROUTER_API_KEY
 npx wrangler secret put GITHUB_TOKEN  
 # Enter your GitHub token when prompted
 
-# Optional: Crawler API URL
+# Optional: Crawler API Configuration
 npx wrangler secret put CRAWLER_API_URL
-# Enter your crawler API URL when prompted (or leave empty)
+# Enter the full endpoint URL: https://your-crawl-url
+
+npx wrangler secret put CRAWLER_API_TOKEN
+# Enter your authentication token (e.g., Hugging Face token for private Spaces)
 ```
 
 **Note**: Secrets are stored encrypted and only accessible to your Worker at runtime.
@@ -111,7 +114,10 @@ LLM_DEEPSEEK_API_KEY=your_deepseek_key_here
 # LLM_OPENROUTER_API_KEY=your_openrouter_key_here
 
 GITHUB_TOKEN=your_github_token_here
-CRAWLER_API_URL=https://your-crawler-api.com
+
+# Optional: Crawler API (use complete endpoint URL)
+CRAWLER_API_URL=https://your-crawl-url
+CRAWLER_API_TOKEN=your_hf_token_here
 ```
 
 ### 2. Build the Worker Bundle

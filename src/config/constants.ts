@@ -186,17 +186,18 @@ export const CRAWLER_API = {
 } as const;
 
 /**
- * Get the base URL for crawler API service from environment
+ * Get the full crawler API endpoint URL from environment
  * Returns undefined if not configured - content fetching will be disabled
  * @param env - Environment containing CRAWLER_API_URL
- * @returns Base URL or undefined
+ * @returns Full endpoint URL (including path) or undefined
+ * @example getCrawlerApiUrl(env) => "https://your-crawl-url"
  */
 export function getCrawlerApiUrl(env: { CRAWLER_API_URL?: string }): string | undefined {
   return env.CRAWLER_API_URL;
 }
 
 /**
- * Check if crawler API is enabled (i.e., BASE_URL is configured)
+ * Check if crawler API is enabled (i.e., endpoint URL is configured)
  * @param env - Environment containing CRAWLER_API_URL
  * @returns true if crawler API is configured
  */

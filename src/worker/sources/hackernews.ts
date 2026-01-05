@@ -117,7 +117,11 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
     logInfo('Fetching article content via Crawler API');
     const urls = filteredStories.map(story => story.url).filter((url): url is string => !!url);
     
-    const articleMetadata = await fetchArticlesBatch(urls);
+    const articleMetadata = await fetchArticlesBatch(
+      urls,
+      env.CRAWLER_API_URL,
+      env.CRAWLER_API_TOKEN
+    );
     
     // Count crawler API calls
     const crawlerCalls = articleMetadata.filter(m => m.fullContent !== null).length;

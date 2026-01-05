@@ -361,18 +361,39 @@ wrangler secret put TELEGRAM_CHANNEL_ID
 
 ### Crawler API Configuration
 
-**Environment Variable**: `CRAWLER_API_URL` (optional)
+**Environment Variables**: 
+- `CRAWLER_API_URL` (optional) - Full crawler endpoint URL (including path)
+- `CRAWLER_API_TOKEN` (optional) - Bearer token for authentication
 
-External crawler service for article content extraction.
+Crawler service for article content extraction (e.g., Hugging Face Spaces).
 
-```toml
-[vars]
-CRAWLER_API_URL = "https://your-crawler-api.com/api"
+**Setup via wrangler secrets** (recommended for production):
+```bash
+npx wrangler secret put CRAWLER_API_URL
+# Enter the full endpoint URL: https://your-crawl-url
+
+npx wrangler secret put CRAWLER_API_TOKEN
+# Enter your authentication token (e.g., Hugging Face token)
 ```
 
+**For local development** (`.dev.vars`):
+```bash
+# Use the complete endpoint URL including the path
+CRAWLER_API_URL=https://your-crawl-url
+CRAWLER_API_TOKEN=your_hf_token_here
+```
+
+**Important Notes**:
+- Use the **complete endpoint URL** - the code will not append any path
+- Different crawler services may use different paths (e.g., `/crawl`, `/api/extract`, etc.)
+- Configure the exact URL your crawler service expects
+
 **Behavior**:
-- If set: Uses crawler API for rich content
+- If both URL and token are set: Uses authenticated crawler API for rich content
+- If only URL is set: Attempts unauthenticated requests (may fail for private services)
 - If not set: Returns empty content (graceful degradation)
+
+**Security Note**: Never commit tokens to git. Always use Cloudflare secrets for production.
 
 ---
 

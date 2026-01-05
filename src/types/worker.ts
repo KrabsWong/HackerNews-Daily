@@ -40,7 +40,8 @@ export interface Env {
   LLM_OPENROUTER_SITE_NAME?: string;
   
   // Optional configuration
-  CRAWLER_API_URL?: string;
+  CRAWLER_API_URL?: string;       // Full crawler endpoint URL for content extraction (e.g., https://your-crawl-url)
+  CRAWLER_API_TOKEN?: string;     // Bearer token for private crawler API authentication
   LOCAL_TEST_MODE?: string;       // "true" to output to terminal instead of publishing
 
   // Telegram publisher configuration (optional)

@@ -27,6 +27,7 @@ GITHUB_TOKEN=your_github_token_here
 # Optional Configuration
 # =============================================================================
 
-# Crawler API URL (optional)
-# Fallback content extraction service
-# CRAWLER_API_URL=https://your-crawler-api.com
+# Crawler API Configuration (optional)
+# Full endpoint URL for the crawler service (including path)
+# CRAWLER_API_URL=https://your-crawler-service.com/api/crawl
+# CRAWLER_API_TOKEN=your_token_here

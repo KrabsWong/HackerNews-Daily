@@ -499,6 +499,14 @@ LLM_OPENROUTER_API_KEY=<your-api-key>
 - `ENABLE_CONTENT_FILTER`: 启用 AI 内容过滤（默认 false）
 - `CONTENT_FILTER_SENSITIVITY`: 过滤敏感度（low/medium/high，默认 medium）
 
+### Crawler API 配置 (可选)
+- `CRAWLER_API_URL`: 完整的爬虫服务 endpoint URL（包含路径，如 https://your-crawl-url）
+- `CRAWLER_API_TOKEN`: Bearer token 用于身份验证
+  - 必须使用 Cloudflare secret 存储: `npx wrangler secret put CRAWLER_API_TOKEN`
+  - 用于私有爬虫服务（如 HF Spaces）的身份验证
+  - 如果未设置，爬虫请求将不包含认证信息
+  - **重要**: URL 应该是完整的 endpoint，代码不会自动添加路径
+
 **配置验证**: Worker 启动时会验证所有必需配置，提供清晰的错误消息
 
 ## OpenSpec Conventions

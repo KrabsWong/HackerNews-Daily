@@ -160,7 +160,8 @@ export class TaskExecutor {
       logInfo('Fetching article content', { count: pendingArticles.length });
       const articleMetadata = await fetchArticlesBatch(
         pendingArticles.map((a) => a.url),
-        this.env.CRAWLER_API_URL
+        this.env.CRAWLER_API_URL,
+        this.env.CRAWLER_API_TOKEN
       );
       subrequestCount += pendingArticles.length; // Each article = 1 subrequest
 
