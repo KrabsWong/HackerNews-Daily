@@ -10,7 +10,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchArticleMetadata, fetchArticlesBatch } from '../../services/articleFetcher';
+import { fetchArticleMetadata } from '../../services/articleFetcher/metadata';
+import { fetchArticlesBatch } from '../../services/articleFetcher';
 import { createMockCrawlerResponse, createMockCrawlerError, MOCK_ARTICLE_HTML } from '../helpers/fixtures';
 import { createMockEnv } from '../helpers/workerEnvironment';
 

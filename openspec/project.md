@@ -145,8 +145,16 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
   │   │   ├── index.ts       # 翻译服务入口
   │   │   ├── summary.ts     # 摘要翻译
   │   │   └── title.ts       # 标题翻译
-  │   ├── articleFetcher.ts  # 文章抓取
-  │   ├── contentFilter.ts   # 内容过滤
+  │   ├── articleFetcher/    # 文章抓取服务
+  │   │   ├── index.ts       # 导出入口 (向后兼容)
+  │   │   ├── crawler.ts     # Crawler API 集成
+  │   │   ├── truncation.ts  # 内容截断逻辑
+  │   │   └── metadata.ts   # 文章元数据处理
+  │   ├── contentFilter/     # 内容过滤服务
+  │   │   ├── index.ts       # 导出入口和 AIContentFilter 类
+  │   │   ├── classifier.ts  # AI 分类逻辑
+  │   │   ├── prompt.ts      # LLM 提示词构建
+  │   │   └── parser.ts      # 响应解析和验证
   │   └── markdownExporter.ts
   ├── types/                 # 类型定义 (所有可导出类型必须在此目录)
   │   ├── index.ts           # 统一导出入口
