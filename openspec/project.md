@@ -5,12 +5,14 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
 
 ## Tech Stack
 - **Runtime**: Cloudflare Workers
+- **Database**: Cloudflare D1 (SQLite-based distributed database)
 - **Language**: TypeScript 5.3+ (strict mode)
 - **Build**: esbuild (Worker)
 - **Content Extraction**: Mozilla Readability, Crawler API
 - **LLM Provider**: DeepSeek API / OpenRouter / Zhipu AI (翻译、摘要、内容过滤)
 - **HTTP Client**: Native fetch (utils/fetch.ts 封装)
 - **HTML Parsing**: Cheerio, linkedom, @mozilla/readability
+- **Testing**: Vitest 3.2+ with @cloudflare/vitest-pool-workers
 - **Environment**: Cloudflare secrets (.dev.vars for local)
 
 ## Project Conventions
@@ -24,7 +26,12 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
   - 函数/变量: camelCase (e.g., `fetchTopStories`, `filterStories`)
   - 常量: SCREAMING_SNAKE_CASE (e.g., `HN_API`, `ENABLE_CONTENT_FILTER`)
 - **Exports**: 优先使用 named exports
-- **Error Handling**: 使用 try-catch 并返回 null 或空数组，避免抛出异常中断流程
+- **Error Handling**: 
+  - 使用自定义错误类型 (AppError, APIError, ServiceError, ValidationError)
+  - 通过 ErrorHandler 统一处理错误
+  - 支持重试的操作使用 ErrorHandler.retry()
+  - 避免直接抛出 Error，使用类型化的错误类
+  - 记录错误时包含上下文信息 (service, operation, metadata)
 - **Graceful Degradation**: 单个请求失败不应阻断整体流程（如内容提取失败回退到 meta description）
 
 ### Type Organization (IMPORTANT)
@@ -118,9 +125,11 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
   src/
   ├── __tests__/             # 所有测试文件 (CRITICAL: 禁止在其他目录创建测试)
   │   ├── config/            # Config 模块测试
+  │   ├── types/             # Types 模块测试
   │   ├── utils/             # Utils 模块测试
   │   │   ├── array.test.ts
   │   │   ├── date.test.ts
+  │   │   ├── errorHandler.test.ts
   │   │   ├── fetch.test.ts
   │   │   ├── html.test.ts
   │   │   └── result.test.ts
@@ -133,7 +142,8 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
   │   ├── helpers/           # 测试辅助工具
   │   │   ├── fixtures.ts    # 测试数据工厂
   │   │   ├── mockHNApi.ts   # HN API mock
-  │   │   └── mockLLMProvider.ts # LLM mock
+  │   │   ├── mockLLMProvider.ts # LLM mock
+  │   │   └── workerEnvironment.ts # Worker 环境 mock
   │   └── integration/       # 集成测试
   ├── api/
   │   ├── hackernews/        # HackerNews API 模块
@@ -156,14 +166,14 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
   │   │   └── index.ts       # LLM 服务导出
   │   ├── translator/        # 翻译服务
   │   │   ├── index.ts       # 翻译服务入口
+  │   │   ├── progress.ts    # 进度跟踪
   │   │   ├── summary.ts     # 摘要翻译
   │   │   └── title.ts       # 标题翻译
   │   ├── articleFetcher/    # 文章抓取服务
-  │   │   ├── index.ts       # 导出入口 (向后兼容)
+  │   │   ├── index.ts       # 导出入口
   │   │   ├── crawler.ts     # Crawler API 集成
-  │   │   ├── direct.ts      # 直接 HTML 解析
   │   │   ├── truncation.ts  # 内容截断逻辑
-  │   │   └── metadata.ts   # 文章元数据处理
+  │   │   └── metadata.ts    # 文章元数据处理
   │   ├── contentFilter/     # 内容过滤服务
   │   │   ├── index.ts       # 导出入口和 AIContentFilter 类
   │   │   ├── classifier.ts  # AI 分类逻辑
@@ -173,12 +183,13 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
   │   │   ├── executor.ts    # TaskExecutor - 任务编排和状态机
   │   │   ├── storage.ts     # TaskStorage - D1 数据库操作
   │   │   └── index.ts       # Task 服务导出
-  │   └── markdownExporter.ts
+  │   └── markdownExporter.ts # Markdown 生成器
   ├── types/                 # 类型定义 (所有可导出类型必须在此目录)
   │   ├── index.ts           # 统一导出入口
   │   ├── api.ts             # API 相关类型
   │   ├── content.ts         # 内容过滤/文章相关类型
   │   ├── database.ts        # D1 数据库类型 (带枚举: DailyTaskStatus, ArticleStatus, BatchStatus)
+  │   ├── errors.ts          # 错误类型 (AppError, APIError, ServiceError, ValidationError)
   │   ├── llm.ts             # LLM provider 类型
   │   ├── logger.ts          # 日志相关类型
   │   ├── publisher.ts       # 发布器相关类型
@@ -189,12 +200,16 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
   │   └── worker.ts          # Worker 环境类型
   ├── utils/                 # 工具函数
   │   ├── array.ts           # 数组工具
+  │   ├── d1.ts              # D1 数据库工具
   │   ├── date.ts            # 日期工具
+  │   ├── errorHandler.ts    # 错误处理工具
   │   ├── fetch.ts           # HTTP 请求封装
   │   ├── html.ts            # HTML 处理
   │   └── result.ts          # Result 类型
   └── worker/                # Cloudflare Worker
       ├── index.ts           # Worker 入口 (简化到 < 100 行)
+      ├── config/            # Worker 配置
+      │   └── validation.ts  # 环境变量验证
       ├── routes/            # HTTP 路由层
       │   └── index.ts       # Router 实现和端点定义
       ├── statemachine/      # 状态机逻辑
@@ -213,8 +228,7 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
       │   └── terminal/      # Terminal 发布器 (本地测试)
       │       ├── index.ts   # TerminalPublisher 实现
       │       └── formatter.ts # 终端输出格式化
-      ├── logger.ts          # 日志工具
-      └── stubs/             # Worker 存根
+      └── logger.ts          # 日志工具
   ```
 - **Worker Architecture**:
   - **ContentSource 抽象**: 定义统一接口支持多个内容源
@@ -238,20 +252,45 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
       - Provider-specific 配置根据启用状态验证 (如 deepseek 启用时需要 API key)
       - 失败时提供清晰的错误消息
     - **Caching**: 配置在首次访问时验证并缓存，避免重复验证
+- **Distributed Task Processing**: 基于 D1 数据库的分布式任务系统
+  - **Task Executor** (`services/task/executor.ts`): 
+    - 任务编排和状态机逻辑
+    - 支持多阶段处理 (init → list_fetched → processing → aggregating → published)
+    - 增量批次处理以避免超出 Worker 子请求限制
+    - 幂等操作支持安全重试
+  - **Task Storage** (`services/task/storage.ts`):
+    - D1 数据库操作封装
+    - 任务状态持久化
+    - 文章和批次记录管理
+  - **State Machine** (`worker/statemachine/index.ts`):
+    - 状态转换逻辑
+    - 每个阶段的处理函数
+    - 错误恢复和重试机制
+  - **Database Schema**:
+    - `daily_tasks`: 每日任务状态跟踪
+    - `articles`: 文章处理记录
+    - `task_batches`: 批次执行记录
 - **Error Handling**: 标准化错误处理模式
   - **Error Types** (`types/errors.ts`): 
-    - `AppError`: 基础错误类
-    - `APIError`: API 请求错误 (包含状态码、请求 ID)
-    - `ServiceError`: 服务层错误
-    - `ValidationError`: 配置验证错误
+    - `AppError`: 基础错误类，所有自定义错误的基类
+    - `APIError`: API 请求错误 (包含状态码、请求 ID、响应数据)
+    - `ServiceError`: 服务层错误 (用于业务逻辑错误)
+    - `ValidationError`: 配置验证错误 (包含验证失败的字段信息)
   - **Error Handler** (`utils/errorHandler.ts`):
-    - `ErrorHandler.handle()`: 统一错误处理入口
-    - `ErrorHandler.retry()`: 指数退避重试逻辑
-    - `ErrorHandler.logError()`: 结构化错误日志
+    - `ErrorHandler.handle()`: 统一错误处理入口，根据错误类型返回合适的响应
+    - `ErrorHandler.retry()`: 指数退避重试逻辑，支持自定义重试策略
+    - `ErrorHandler.logError()`: 结构化错误日志，包含上下文信息
+    - `ErrorHandler.isRetryableError()`: 判断错误是否可重试
   - **LLM Provider Base Class** (`services/llm/base.ts`):
     - `BaseLLMProvider`: 抽象基类，提供通用错误处理和重试逻辑
     - 各 Provider 实现继承基类，避免代码重复
+    - 统一的 API 调用包装和错误转换
   - **SQL Query Safety**: 所有 SQL 查询中的枚举值必须使用引号 (如 `'${ArticleStatus.PENDING}'`)
+  - **Graceful Degradation**: 单个组件失败不应阻断整体流程
+    - 内容提取失败 → 回退到 meta description
+    - AI 内容过滤失败 → 回退到不过滤 (fail-open)
+    - 翻译失败 → 显示原文
+    - 单个发布器失败 → 不影响其他发布器
 - **Type Safety Enhancements**:
   - **Discriminated Unions**: 状态机类型使用 discriminated unions (types/database.ts)
   - **Enums**: 使用 TypeScript 枚举替代字符串字面量
@@ -427,15 +466,36 @@ See [docs/TESTING.md](../docs/TESTING.md) for comprehensive testing guidelines a
 ### 数据处理流程
 
 #### Daily Export 模式 (前一天 00:00-23:59 UTC)
-1. 从 Firebase 获取 best stories ID 列表
-2. 使用 Algolia 批量获取 story 详情
-3. 按日期范围过滤（昨天）
-4. 按 score 降序排序，取 top N（默认 30）
-5. **可选**: AI 内容过滤（移除 SENSITIVE 标题）
-6. 抓取文章全文（Mozilla Readability）
-7. 生成 AI 摘要（文章内容和评论）
-8. 翻译标题和摘要到中文
-9. 发布到 GitHub 和/或 Telegram
+
+**Distributed Processing with State Machine**:
+1. **Init Stage**: Cron trigger 创建 daily task (status: init)
+2. **List Fetched Stage**: 
+   - 从 Firebase 获取 best stories ID 列表
+   - 使用 Algolia 批量获取 story 详情
+   - 按日期范围过滤（昨天）
+   - 按 score 降序排序，取 top N（默认 30）
+   - 存储文章列表到 D1 数据库 (status: list_fetched)
+3. **Processing Stage** (增量处理):
+   - 每次 cron trigger 处理一批文章（默认 6 篇）
+   - **可选**: AI 内容过滤（移除 SENSITIVE 标题）
+   - 抓取文章全文（Crawler API）
+   - 生成 AI 摘要（文章内容）
+   - 获取并总结 top 10 评论
+   - 更新文章状态到 D1 (status: processing)
+   - 重复直到所有文章处理完成
+4. **Aggregating Stage**:
+   - 收集所有已处理的文章
+   - 批量翻译标题和摘要到中文
+   - 生成最终 Markdown 文件 (status: aggregating)
+5. **Published Stage**:
+   - 发布到 GitHub 和/或 Telegram
+   - 标记任务完成 (status: published)
+
+**Key Characteristics**:
+- **Idempotent**: 每个阶段可以安全重试
+- **Incremental**: 避免超出 Worker 子请求限制 (50/execution)
+- **Resilient**: 单个文章失败不影响整体流程
+- **Observable**: 通过 D1 数据库跟踪进度和状态
 
 #### Markdown 输出格式
 最终生成的 Markdown 文件（Jekyll 兼容）包含以下结构：

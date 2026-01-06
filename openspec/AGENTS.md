@@ -52,10 +52,12 @@ Track these steps as TODOs and complete them one by one.
 2. **Read design.md** (if exists) - Review technical decisions
 3. **Read tasks.md** - Get implementation checklist
 4. **Implement tasks sequentially** - Complete in order
-5. **Update documentation** - REQUIRED: Check and update affected docs (see Documentation Update Checklist below)
-6. **Confirm completion** - Ensure every item in `tasks.md` is finished before updating statuses
-7. **Update checklist** - After all work is done, set every task to `- [x]` so the list reflects reality
-8. **Approval gate** - Do not start implementation until the proposal is reviewed and approved
+5. **Verify compilation** - REQUIRED: Run `npx tsc --noEmit` after each significant change to catch type errors and ESLint issues early
+6. **Update documentation** - REQUIRED: Check and update affected docs (see Documentation Update Checklist below)
+7. **Confirm completion** - Ensure every item in `tasks.md` is finished before updating statuses
+8. **Update checklist** - After all work is done, set every task to `- [x]` so the list reflects reality
+9. **Final compilation check** - REQUIRED: Run `npx tsc --noEmit` before marking implementation complete to ensure no type errors
+10. **Approval gate** - Do not start implementation until the proposal is reviewed and approved
 
 ### Documentation Update Checklist
 
@@ -93,6 +95,38 @@ After completing code changes, ALWAYS check and update the following if affected
 - Internal refactoring with no API changes
 - Dependency updates (non-breaking)
 
+### Compilation Verification (CRITICAL)
+
+**REQUIRED after every code change:**
+
+All code changes MUST be verified to compile successfully before being considered complete. This prevents runtime failures due to TypeScript type errors or ESLint issues.
+
+**Verification Commands:**
+```bash
+# Check TypeScript compilation (no output files)
+npx tsc --noEmit
+
+# Optionally: Run build to verify the entire build process
+npm run build:worker
+```
+
+**When to verify:**
+- After implementing each significant feature or change
+- Before marking a task as complete
+- Before committing code
+- Before marking the entire implementation as done
+
+**What to check:**
+- No TypeScript type errors
+- No ESLint errors (if configured)
+- All imports resolve correctly
+- No missing or incorrect type annotations
+
+**If compilation fails:**
+- Fix all errors before proceeding
+- Do not mark tasks as complete with compilation errors
+- Do not commit code that doesn't compile
+
 ### Stage 3: Archiving Changes
 After deployment, create separate PR to:
 - Move `changes/[name]/` → `changes/archive/YYYY-MM-DD-[name]/`
@@ -102,10 +136,22 @@ After deployment, create separate PR to:
 
 ## Before Any Task
 
+**CRITICAL: Always Read project.md First**
+
+Before starting any work, you MUST read `openspec/project.md` to understand:
+- Project architecture and directory structure
+- Code conventions and patterns
+- Technology stack and dependencies
+- Error handling patterns
+- Testing strategy and requirements
+- Configuration management
+
+This provides essential context and prevents misunderstandings about the project structure.
+
 **Context Checklist:**
+- [ ] **Read `openspec/project.md` for project architecture and conventions** (REQUIRED)
 - [ ] Read relevant specs in `specs/[capability]/spec.md`
 - [ ] Check pending changes in `changes/` for conflicts
-- [ ] Read `openspec/project.md` for conventions
 - [ ] Run `openspec list` to see active changes
 - [ ] Run `openspec list --specs` to see existing capabilities
 
