@@ -117,6 +117,7 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
   ```
   src/
   ├── __tests__/             # 所有测试文件 (CRITICAL: 禁止在其他目录创建测试)
+  │   ├── config/            # Config 模块测试
   │   ├── utils/             # Utils 模块测试
   │   │   ├── array.test.ts
   │   │   ├── date.test.ts
@@ -126,6 +127,9 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
   │   ├── api/               # API 模块测试
   │   ├── services/          # Services 模块测试
   │   ├── worker/            # Worker 模块测试
+  │   │   ├── routes/        # HTTP 路由测试
+  │   │   ├── statemachine/  # 状态机测试
+  │   │   └── publishers/    # 发布器测试
   │   ├── helpers/           # 测试辅助工具
   │   │   ├── fixtures.ts    # 测试数据工厂
   │   │   ├── mockHNApi.ts   # HN API mock
@@ -138,9 +142,18 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
   │   │   ├── index.ts       # 统一导出
   │   │   └── mapper.ts      # 数据映射
   │   └── index.ts           # API 统一导出
-  ├── config/
-  │   └── constants.ts       # 配置常量 (包含 LLMProviderType 导出)
+  ├── config/                # 配置管理模块
+  │   ├── constants.ts       # API 常量和枚举 (LLMProviderType, API endpoints)
+  │   ├── schema.ts          # 配置接口定义 (AppConfig, ValidationResult)
+  │   ├── builder.ts         # 配置构建器 (buildConfig)
+  │   ├── validation.ts      # 配置验证逻辑 (validateConfig)
+  │   └── index.ts           # 配置统一导出 (getConfig, clearConfigCache)
   ├── services/
+  │   ├── llm/               # LLM Provider 抽象
+  │   │   ├── base.ts        # BaseLLMProvider 基类
+  │   │   ├── providers.ts   # DeepSeek/OpenRouter/Zhipu 实现
+  │   │   ├── utils.ts       # Provider 工具函数
+  │   │   └── index.ts       # LLM 服务导出
   │   ├── translator/        # 翻译服务
   │   │   ├── index.ts       # 翻译服务入口
   │   │   ├── summary.ts     # 摘要翻译
@@ -148,6 +161,7 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
   │   ├── articleFetcher/    # 文章抓取服务
   │   │   ├── index.ts       # 导出入口 (向后兼容)
   │   │   ├── crawler.ts     # Crawler API 集成
+  │   │   ├── direct.ts      # 直接 HTML 解析
   │   │   ├── truncation.ts  # 内容截断逻辑
   │   │   └── metadata.ts   # 文章元数据处理
   │   ├── contentFilter/     # 内容过滤服务
@@ -155,11 +169,16 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
   │   │   ├── classifier.ts  # AI 分类逻辑
   │   │   ├── prompt.ts      # LLM 提示词构建
   │   │   └── parser.ts      # 响应解析和验证
+  │   ├── task/              # 分布式任务处理
+  │   │   ├── executor.ts    # TaskExecutor - 任务编排和状态机
+  │   │   ├── storage.ts     # TaskStorage - D1 数据库操作
+  │   │   └── index.ts       # Task 服务导出
   │   └── markdownExporter.ts
   ├── types/                 # 类型定义 (所有可导出类型必须在此目录)
   │   ├── index.ts           # 统一导出入口
   │   ├── api.ts             # API 相关类型
   │   ├── content.ts         # 内容过滤/文章相关类型
+  │   ├── database.ts        # D1 数据库类型 (带枚举: DailyTaskStatus, ArticleStatus, BatchStatus)
   │   ├── llm.ts             # LLM provider 类型
   │   ├── logger.ts          # 日志相关类型
   │   ├── publisher.ts       # 发布器相关类型
@@ -175,9 +194,11 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
   │   ├── html.ts            # HTML 处理
   │   └── result.ts          # Result 类型
   └── worker/                # Cloudflare Worker
-      ├── index.ts           # Worker 入口
-      ├── config/            # 配置验证
-      │   └── validation.ts  # 配置验证逻辑
+      ├── index.ts           # Worker 入口 (简化到 < 100 行)
+      ├── routes/            # HTTP 路由层
+      │   └── index.ts       # Router 实现和端点定义
+      ├── statemachine/      # 状态机逻辑
+      │   └── index.ts       # executeStateMachine 和状态处理
       ├── sources/           # 内容源实现
       │   └── hackernews.ts  # HackerNews 源实现
       ├── publishers/        # 发布渠道抽象
@@ -205,11 +226,41 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
     - 当前实现: `GitHubPublisher` (支持自动版本控制), `TelegramPublisher` (可选), `TerminalPublisher` (本地测试)
     - `TerminalPublisher`: 用于本地开发测试，将 Markdown 输出到终端而不是发布到外部服务
     - 未来可扩展: RSS, Email 等
-  - **Configuration Validation**: 启动时验证必需配置
-    - `LLM_PROVIDER` 必须显式设置
-    - 至少一个发布器必须启用 (GitHub, Telegram 或 LOCAL_TEST_MODE)
-    - 提供者特定的配置根据启用状态验证
-    - 失败时提供清晰的错误消息
+  - **Configuration Management**: 统一配置系统 (`config/` 模块)
+    - **API Constants** (`config/constants.ts`): API endpoints, timeouts, limits (不依赖环境变量)
+    - **Configuration Schema** (`config/schema.ts`): TypeScript 接口定义 (AppConfig, LLMConfig, etc.)
+    - **Configuration Builder** (`config/builder.ts`): 从环境变量构建配置
+    - **Configuration Validation** (`config/validation.ts`): 验证配置完整性和正确性
+    - **Configuration Access** (`config/index.ts`): 通过 `getConfig(env)` 获取类型安全的配置
+    - **Validation Rules**: 
+      - `LLM_PROVIDER` 必须显式设置
+      - 至少一个发布器必须启用 (GitHub, Telegram 或 LOCAL_TEST_MODE)
+      - Provider-specific 配置根据启用状态验证 (如 deepseek 启用时需要 API key)
+      - 失败时提供清晰的错误消息
+    - **Caching**: 配置在首次访问时验证并缓存，避免重复验证
+- **Error Handling**: 标准化错误处理模式
+  - **Error Types** (`types/errors.ts`): 
+    - `AppError`: 基础错误类
+    - `APIError`: API 请求错误 (包含状态码、请求 ID)
+    - `ServiceError`: 服务层错误
+    - `ValidationError`: 配置验证错误
+  - **Error Handler** (`utils/errorHandler.ts`):
+    - `ErrorHandler.handle()`: 统一错误处理入口
+    - `ErrorHandler.retry()`: 指数退避重试逻辑
+    - `ErrorHandler.logError()`: 结构化错误日志
+  - **LLM Provider Base Class** (`services/llm/base.ts`):
+    - `BaseLLMProvider`: 抽象基类，提供通用错误处理和重试逻辑
+    - 各 Provider 实现继承基类，避免代码重复
+  - **SQL Query Safety**: 所有 SQL 查询中的枚举值必须使用引号 (如 `'${ArticleStatus.PENDING}'`)
+- **Type Safety Enhancements**:
+  - **Discriminated Unions**: 状态机类型使用 discriminated unions (types/database.ts)
+  - **Enums**: 使用 TypeScript 枚举替代字符串字面量
+    - `DailyTaskStatus`: init, list_fetched, processing, aggregating, published, archived
+    - `ArticleStatus`: pending, processing, completed, failed
+    - `BatchStatus`: success, partial, failed
+    - `PublisherType`: github, telegram, terminal
+  - **Type Guards**: 优先使用 type guards 替代类型断言
+  - **Explicit Return Types**: 所有公共 API 函数必须显式标注返回类型
 - **API Pattern**: 
   - 混合策略: Firebase (best story IDs) + Algolia (批量查询详情和评论)
   - 使用原生 fetch 进行 HTTP 请求 (utils/fetch.ts 封装)

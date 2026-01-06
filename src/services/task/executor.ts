@@ -12,7 +12,7 @@ import { generateMarkdownContent } from '../markdownExporter';
 import { createTaskStorage, TaskStorage } from './storage';
 import { logInfo, logError, logWarn } from '../../worker/logger';
 import { getPreviousDayBoundaries, formatTimestamp } from '../../utils/date';
-import { getContentFilterConfig, TASK_CONFIG } from '../../config/constants';
+import { getConfig } from '../../config';
 import type { Env } from '../../types/worker';
 import type { ProcessedStory } from '../../types/shared';
 import { ArticleStatus, BatchStatus, DailyTaskStatus, DailyTask, Article, TaskProgress, BatchProcessingResult } from '../../types/database';
@@ -52,7 +52,8 @@ export class TaskExecutor {
 
     // Calculate date range for article fetching
     const { start, end } = getPreviousDayBoundaries();
-    const storyLimit = parseInt(this.env.HN_STORY_LIMIT || '30', 10);
+    const config = getConfig(this.env);
+    const storyLimit = config.hn.storyLimit;
 
     // Fetch top stories from HackerNews
     logInfo('Fetching stories from HackerNews API', { storyLimit, start, end });
@@ -67,7 +68,7 @@ export class TaskExecutor {
 
     // Apply content filter if enabled
     let filteredStories = stories;
-    const contentFilterConfig = getContentFilterConfig(this.env);
+    const contentFilterConfig = config.contentFilter;
     if (contentFilterConfig.enabled) {
       logInfo('Applying content filter');
       const providerOptions = buildProviderOptions(this.env);
@@ -109,7 +110,8 @@ export class TaskExecutor {
     taskDate: string,
     batchSize?: number
   ): Promise<{ processed: number; failed: number; pending: number; processing: number }> {
-    const actualBatchSize = batchSize || parseInt(this.env.TASK_BATCH_SIZE || String(TASK_CONFIG.DEFAULT_BATCH_SIZE), 10);
+    const config = getConfig(this.env);
+    const actualBatchSize = batchSize || config.task.batchSize;
     const startTime = Date.now();
 
     logInfo('Processing next batch', { taskDate, batchSize: actualBatchSize });

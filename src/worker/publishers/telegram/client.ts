@@ -4,9 +4,9 @@
  */
 
 import type { TelegramMessageResponse } from '../../../types/publisher';
+import { TIMEOUT_CONFIG } from '../../../config/constants';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
-const REQUEST_TIMEOUT = 30000; // 30 seconds
 
 /**
  * Send a message to a Telegram chat/channel
@@ -25,7 +25,7 @@ export async function sendMessage(
   const url = `${TELEGRAM_API_BASE}${botToken}/sendMessage`;
   
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_CONFIG.TELEGRAM_API);
   
   try {
     const response = await fetch(url, {

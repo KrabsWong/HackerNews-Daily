@@ -56,6 +56,7 @@ export interface Env {
   ENABLE_CONTENT_FILTER: string;
   CONTENT_FILTER_SENSITIVITY: string;
   CACHE_ENABLED: string;
+  CACHE_TTL_MINUTES?: string;  // Cache TTL in minutes
   TARGET_BRANCH: string;
   LLM_BATCH_SIZE: string;
 }

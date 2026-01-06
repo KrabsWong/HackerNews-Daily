@@ -234,23 +234,32 @@ Comprehensive documentation is available in the `docs/` directory:
 src/
 ├── api/                      # External API integrations
 │   └── hackernews/           # HackerNews APIs (Firebase + Algolia)
-├── config/
-│   └── constants.ts          # Configuration constants & enums
+├── config/                   # Configuration management
+│   ├── constants.ts          # API constants & enums
+│   ├── schema.ts            # Configuration schema & types
+│   ├── builder.ts           # Configuration builder
+│   ├── validation.ts        # Configuration validation
+│   └── index.ts             # Configuration exports
 ├── services/
 │   ├── llm/                  # LLM provider abstraction
+│   │   ├── base.ts          # Base LLM provider class
 │   │   ├── providers.ts      # DeepSeek, OpenRouter, Zhipu implementations
 │   │   ├── utils.ts          # Provider utilities
 │   │   └── index.ts          # Factory & exports
 │   ├── translator/           # Translation & summarization
-│   ├── articleFetcher.ts     # Article content extraction
-│   ├── contentFilter.ts      # AI content filtering
-│   ├── task/               # Distributed task processing
+│   ├── articleFetcher/       # Article content extraction
+│   │   ├── crawler.ts       # Crawler API integration
+│   │   ├── direct.ts        # Direct HTML parsing
+│   │   └── index.ts         # Fetcher exports
+│   ├── contentFilter/        # AI content filtering
+│   ├── task/                 # Distributed task processing
 │   │   ├── executor.ts      # Task orchestration & state machine
 │   │   ├── storage.ts       # D1 database operations
-│   │   └── index.ts        # Task service exports
+│   │   └── index.ts         # Task service exports
 │   └── markdownExporter.ts   # Markdown generation
 ├── types/                    # TypeScript type definitions
-│   ├── database.ts           # D1 database types
+│   ├── database.ts           # D1 database types (with enums)
+│   ├── publisher.ts          # Publisher types
 │   └── ...                   # Other type definitions
 ├── utils/                    # Utility functions
 │   ├── array.ts             # Array utilities
@@ -258,9 +267,10 @@ src/
 │   ├── fetch.ts             # HTTP client wrapper
 │   └── ...                   # Other utilities
 └── worker/                   # Cloudflare Worker
+    ├── routes/               # HTTP route handlers
+    ├── statemachine/         # State machine logic
     ├── sources/              # Content source abstraction
     ├── publishers/           # Publishing abstraction
-    ├── config/               # Worker configuration
     └── logger.ts            # Logging utilities
 ```
 

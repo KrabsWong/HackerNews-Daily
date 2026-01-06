@@ -5,6 +5,7 @@
 
 import type { FetchOptions } from '../types/utils';
 import { APIError, NetworkError } from '../types/errors';
+import { TIMEOUT_CONFIG } from '../config/constants';
 
 // Re-export type for backward compatibility
 export type { FetchOptions } from '../types/utils';
@@ -32,7 +33,7 @@ export async function fetchJSON<T>(
   options: FetchOptions = {}
 ): Promise<T> {
   const { 
-    timeout = 10000, 
+    timeout = TIMEOUT_CONFIG.DEFAULT, 
     headers = {}, 
     retries = 0,
     retryDelay = 1000 
@@ -151,7 +152,7 @@ export async function post<T>(
   body: any,
   options: FetchOptions = {}
 ): Promise<{ data: T }> {
-  const { timeout = 10000, headers = {} } = options;
+  const { timeout = TIMEOUT_CONFIG.DEFAULT, headers = {} } = options;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);

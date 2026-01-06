@@ -1,76 +1,37 @@
 /**
  * LLM Provider Implementations
- * 
- * Concrete implementations of the LLMProvider interface for different providers
+ *
+ * Concrete implementations of LLMProvider interface for different providers
  */
 
 import { DEEPSEEK_API, OPENROUTER_API, ZHIPU_API } from '../../config/constants';
-import { post } from '../../utils/fetch';
-import { LLMError } from '../../types/errors';
+import { BaseLLMProvider } from './base';
 import type {
-  LLMProvider,
   ChatCompletionRequest,
   ChatCompletionResponse,
-  OpenAIStyleResponse,
 } from '../../types/llm';
 
 // =============================================================================
 // DeepSeek Provider
 // =============================================================================
 
-export class DeepSeekProvider implements LLMProvider {
-  private apiKey: string;
-  private model: string;
-
+/**
+ * DeepSeek AI LLM Provider
+ * High-performance Chinese LLM provider
+ */
+export class DeepSeekProvider extends BaseLLMProvider {
   constructor(apiKey: string, model: string = DEEPSEEK_API.DEFAULT_MODEL) {
-    this.apiKey = apiKey;
-    this.model = model;
+    super(
+      apiKey,
+      model,
+      DEEPSEEK_API.BASE_URL,
+      DEEPSEEK_API.REQUEST_TIMEOUT,
+      DEEPSEEK_API.RETRY_DELAY
+    );
   }
 
   getName(): string {
     return 'deepseek';
-  }
-
-  getModel(): string {
-    return this.model;
-  }
-
-  getRetryDelay(): number {
-    return DEEPSEEK_API.RETRY_DELAY;
-  }
-
-  async chatCompletion(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {
-    const response = await post<OpenAIStyleResponse>(
-      `${DEEPSEEK_API.BASE_URL}/chat/completions`,
-      {
-        model: this.model,
-        messages: request.messages,
-        temperature: request.temperature,
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
-        timeout: DEEPSEEK_API.REQUEST_TIMEOUT,
-      }
-    );
-
-    const content = response.data.choices[0]?.message?.content?.trim();
-    
-    if (!content) {
-      throw new LLMError(
-        'Empty response from DeepSeek API',
-        'chatCompletion',
-        'deepseek',
-        this.model,
-        { response: response.data }
-      );
-    }
-
-    return {
-      content,
-      usage: response.data.usage,
-    };
   }
 }
 
@@ -78,9 +39,11 @@ export class DeepSeekProvider implements LLMProvider {
 // OpenRouter Provider
 // =============================================================================
 
-export class OpenRouterProvider implements LLMProvider {
-  private apiKey: string;
-  private model: string;
+/**
+ * OpenRouter LLM Provider
+ * Unified API for hundreds of AI models
+ */
+export class OpenRouterProvider extends BaseLLMProvider {
   private siteUrl?: string;
   private siteName?: string;
 
@@ -90,8 +53,13 @@ export class OpenRouterProvider implements LLMProvider {
     siteUrl?: string,
     siteName?: string
   ) {
-    this.apiKey = apiKey;
-    this.model = model;
+    super(
+      apiKey,
+      model,
+      OPENROUTER_API.BASE_URL,
+      OPENROUTER_API.REQUEST_TIMEOUT,
+      OPENROUTER_API.RETRY_DELAY
+    );
     this.siteUrl = siteUrl;
     this.siteName = siteName;
   }
@@ -100,20 +68,13 @@ export class OpenRouterProvider implements LLMProvider {
     return 'openrouter';
   }
 
-  getModel(): string {
-    return this.model;
-  }
+  /**
+   * Add OpenRouter-specific headers for attribution
+   */
+  protected buildHeaders(): Record<string, string> {
+    const headers = super.buildHeaders();
 
-  getRetryDelay(): number {
-    return OPENROUTER_API.RETRY_DELAY;
-  }
-
-  async chatCompletion(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {
-    const headers: Record<string, string> = {
-      'Authorization': `Bearer ${this.apiKey}`,
-    };
-
-    // Add optional attribution headers
+    // Add optional attribution headers for OpenRouter leaderboard
     if (this.siteUrl) {
       headers['HTTP-Referer'] = this.siteUrl;
     }
@@ -121,35 +82,7 @@ export class OpenRouterProvider implements LLMProvider {
       headers['X-Title'] = this.siteName;
     }
 
-    const response = await post<OpenAIStyleResponse>(
-      `${OPENROUTER_API.BASE_URL}/chat/completions`,
-      {
-        model: this.model,
-        messages: request.messages,
-        temperature: request.temperature,
-      },
-      {
-        headers,
-        timeout: OPENROUTER_API.REQUEST_TIMEOUT,
-      }
-    );
-
-    const content = response.data.choices[0]?.message?.content?.trim();
-    
-    if (!content) {
-      throw new LLMError(
-        'Empty response from OpenRouter API',
-        'chatCompletion',
-        'openrouter',
-        this.model,
-        { response: response.data }
-      );
-    }
-
-    return {
-      content,
-      usage: response.data.usage,
-    };
+    return headers;
   }
 }
 
@@ -158,62 +91,22 @@ export class OpenRouterProvider implements LLMProvider {
 // =============================================================================
 
 /**
- * Zhipu AI Provider
- * Uses GLM series models with OpenAI-compatible API
+ * Zhipu AI LLM Provider
+ * GLM series models with OpenAI-compatible API
  * Note: glm-4.5-flash has a concurrency limit of 2
  */
-export class ZhipuProvider implements LLMProvider {
-  private apiKey: string;
-  private model: string;
-
+export class ZhipuProvider extends BaseLLMProvider {
   constructor(apiKey: string, model: string = ZHIPU_API.DEFAULT_MODEL) {
-    this.apiKey = apiKey;
-    this.model = model;
+    super(
+      apiKey,
+      model,
+      ZHIPU_API.BASE_URL,
+      ZHIPU_API.REQUEST_TIMEOUT,
+      ZHIPU_API.RETRY_DELAY
+    );
   }
 
   getName(): string {
     return 'zhipu';
-  }
-
-  getModel(): string {
-    return this.model;
-  }
-
-  getRetryDelay(): number {
-    return ZHIPU_API.RETRY_DELAY;
-  }
-
-  async chatCompletion(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {
-    const response = await post<OpenAIStyleResponse>(
-      `${ZHIPU_API.BASE_URL}/chat/completions`,
-      {
-        model: this.model,
-        messages: request.messages,
-        temperature: request.temperature,
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
-        timeout: ZHIPU_API.REQUEST_TIMEOUT,
-      }
-    );
-
-    const content = response.data.choices[0]?.message?.content?.trim();
-    
-    if (!content) {
-      throw new LLMError(
-        'Empty response from Zhipu API',
-        'chatCompletion',
-        'zhipu',
-        this.model,
-        { response: response.data }
-      );
-    }
-
-    return {
-      content,
-      usage: response.data.usage,
-    };
   }
 }

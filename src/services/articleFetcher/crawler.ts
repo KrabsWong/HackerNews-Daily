@@ -1,4 +1,4 @@
-import { CONTENT_CONFIG } from '../../config/constants';
+import { CRAWLER_API, CONTENT_CONFIG } from '../../config/constants';
 import { post, FetchError } from '../../utils/fetch';
 import { truncateContent } from './truncation';
 
@@ -43,7 +43,7 @@ export async function fetchWithCrawlerAPI(
       crawlerApiUrl,
       { url },
       {
-        timeout: 10000, // 10 seconds timeout
+        timeout: CRAWLER_API.REQUEST_TIMEOUT,
         headers,
       }
     );

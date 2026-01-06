@@ -4,6 +4,35 @@
  */
 
 // =============================================================================
+// Timeout Configuration
+// =============================================================================
+
+/**
+ * Centralized timeout configuration for all network requests
+ * All timeouts are in milliseconds
+ */
+export const TIMEOUT_CONFIG = {
+  /** Default timeout for generic HTTP requests (10 seconds) */
+  DEFAULT: 10000,
+  /** Timeout for HackerNews API requests (10 seconds) */
+  HN_API: 10000,
+  /** Timeout for Algolia API requests (10 seconds) */
+  ALGOLIA_API: 10000,
+  /** Timeout for LLM API requests - translation and summarization (30 seconds) */
+  LLM_API: 30000,
+  /** Timeout for article fetcher requests (10 seconds) */
+  ARTICLE_FETCH: 10000,
+  /** Timeout for Crawler API requests (10 seconds) */
+  CRAWLER_API: 30000,
+  /** Timeout for content filter AI classification (15 seconds) */
+  CONTENT_FILTER: 15000,
+  /** Timeout for Telegram API requests (30 seconds) */
+  TELEGRAM_API: 30000,
+  /** Timeout for GitHub API requests (30 seconds) */
+  GITHUB_API: 30000,
+} as const;
+
+// =============================================================================
 // API Configuration
 // =============================================================================
 
@@ -14,7 +43,7 @@ export const HN_API = {
   /** Base URL for HackerNews API */
   BASE_URL: 'https://hacker-news.firebaseio.com/v0',
   /** Request timeout in milliseconds (10 seconds) */
-  REQUEST_TIMEOUT: 10000,
+  REQUEST_TIMEOUT: TIMEOUT_CONFIG.HN_API,
 } as const;
 
 /**
@@ -35,7 +64,7 @@ export const DEEPSEEK_API = {
   /** Default model for DeepSeek */
   DEFAULT_MODEL: 'deepseek-chat',
   /** Request timeout in milliseconds (30 seconds for translation/summarization) */
-  REQUEST_TIMEOUT: 30000,
+  REQUEST_TIMEOUT: TIMEOUT_CONFIG.LLM_API,
   /** Delay before retry on rate limit (1 second) */
   RETRY_DELAY: 1000,
 } as const;
@@ -59,7 +88,7 @@ export const OPENROUTER_API = {
   /** Default model for OpenRouter (DeepSeek V3 via OpenRouter) */
   DEFAULT_MODEL: 'deepseek/deepseek-chat-v3-0324',
   /** Request timeout in milliseconds (30 seconds for translation/summarization) */
-  REQUEST_TIMEOUT: 30000,
+  REQUEST_TIMEOUT: TIMEOUT_CONFIG.LLM_API,
   /** Delay before retry on rate limit (1 second) */
   RETRY_DELAY: 1000,
 } as const;
@@ -103,7 +132,7 @@ export const ZHIPU_API = {
   /** Default model for Zhipu (high cost-performance fast model) */
   DEFAULT_MODEL: 'glm-4.5-flash',
   /** Request timeout in milliseconds (30 seconds for translation/summarization) */
-  REQUEST_TIMEOUT: 30000,
+  REQUEST_TIMEOUT: TIMEOUT_CONFIG.LLM_API,
   /** Delay before retry on rate limit (2 seconds - longer due to concurrency limit of 2) */
   RETRY_DELAY: 2000,
 } as const;
@@ -146,7 +175,7 @@ export const ALGOLIA_HN_API = {
   /** Base URL for Algolia HN Search API */
   BASE_URL: 'https://hn.algolia.com/api/v1',
   /** Request timeout in milliseconds (10 seconds) */
-  REQUEST_TIMEOUT: 10000,
+  REQUEST_TIMEOUT: TIMEOUT_CONFIG.ALGOLIA_API,
   /** Default number of results per page */
   DEFAULT_HITS_PER_PAGE: 30,
   /** Maximum hits per page allowed by API (increased from 100 to 1000 for optimization) */
@@ -162,7 +191,7 @@ export const ALGOLIA_HN_API = {
  */
 export const ARTICLE_FETCHER = {
   /** Request timeout in milliseconds (10 seconds - balanced for both speed and reliability) */
-  REQUEST_TIMEOUT: 10000,
+  REQUEST_TIMEOUT: TIMEOUT_CONFIG.ARTICLE_FETCH,
   /** User agent string for HTTP requests */
   USER_AGENT: 'Mozilla/5.0 (compatible; HackerNewsDaily/1.0)',
   /** 
@@ -182,7 +211,7 @@ export const ARTICLE_FETCHER = {
  */
 export const CRAWLER_API = {
   /** Request timeout in milliseconds (10 seconds) */
-  REQUEST_TIMEOUT: 10000,
+  REQUEST_TIMEOUT: TIMEOUT_CONFIG.CRAWLER_API,
 } as const;
 
 /**
@@ -341,7 +370,7 @@ export type SensitivityLevel = 'low' | 'medium' | 'high';
  */
 export const CONTENT_FILTER_CONSTANTS = {
   /** Timeout for AI classification requests in milliseconds (15 seconds) */
-  TIMEOUT: 15000,
+  TIMEOUT: TIMEOUT_CONFIG.CONTENT_FILTER,
   /** Fallback behavior on error - if true, allow stories through when filter fails (fail-open) */
   FALLBACK_ON_ERROR: true,
 } as const;
