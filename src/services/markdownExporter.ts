@@ -51,6 +51,7 @@ function getCommentSummaryDisplay(commentSummary: string | null | undefined): st
  * Generate markdown content from processed stories with optimized hierarchy
  * Uses clear markdown structure for better readability and rendering
  * Always renders both description and comment sections with default values if empty
+ * Note: Rank is not displayed in markdown titles (rank field is kept for internal tracking only)
  * @param stories - Array of processed stories to convert to markdown
  * @param date - Date object for the export (used for the title)
  */
@@ -61,8 +62,8 @@ export function generateMarkdownContent(stories: ProcessedStory[], date: Date): 
   content += generateJekyllFrontMatter(date);
   
   for (const story of stories) {
-    // Article heading (H2) with rank and Chinese title (no brackets)
-    content += `## ${story.rank}. ${story.titleChinese}\n\n`;
+    // Article heading (H2) with Chinese title (no brackets, no rank)
+    content += `## ${story.titleChinese}\n\n`;
     
     // English title as plain text
     content += `${story.titleEnglish}\n\n`;

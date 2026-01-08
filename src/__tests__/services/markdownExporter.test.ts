@@ -115,7 +115,7 @@ describe('Markdown Exporter Service', () => {
       expect(markdown).toContain('HackerNews Daily');
     });
 
-    it('should include story rank and Chinese title', () => {
+    it('should include Chinese title without rank', () => {
       const date = new Date('2025-12-20T00:00:00Z');
       const story = createMockProcessedStory({
         rank: 1,
@@ -125,7 +125,8 @@ describe('Markdown Exporter Service', () => {
 
       const markdown = generateMarkdownContent(stories, date);
 
-      expect(markdown).toContain('## 1. 示例 HackerNews 故事');
+      expect(markdown).toContain('## 示例 HackerNews 故事');
+      expect(markdown).not.toContain('## 1. 示例 HackerNews 故事');
     });
 
     it('should include English title', () => {
@@ -286,7 +287,7 @@ describe('Markdown Exporter Service', () => {
 
       const markdown = generateMarkdownContent([story], date);
 
-      expect(markdown).toContain('## 1. 示例故事');
+      expect(markdown).toContain('## 示例故事');
       expect(markdown).toContain('Example Story');
       expect(markdown).toContain('This is an example');
       expect(markdown).toContain('Great discussion');
@@ -294,7 +295,7 @@ describe('Markdown Exporter Service', () => {
       expect(markdown).toContain('https://news.ycombinator.com/item?id=12345');
     });
 
-    it('should rank stories correctly', () => {
+    it('should display stories without rank in titles', () => {
       const date = new Date('2025-12-20T00:00:00Z');
       const stories = [
         createMockProcessedStory({ rank: 1, titleChinese: '第一名' }),
@@ -304,9 +305,13 @@ describe('Markdown Exporter Service', () => {
 
       const markdown = generateMarkdownContent(stories, date);
 
-      expect(markdown).toContain('## 1. 第一名');
-      expect(markdown).toContain('## 2. 第二名');
-      expect(markdown).toContain('## 3. 第三名');
+      expect(markdown).toContain('## 第一名');
+      expect(markdown).toContain('## 第二名');
+      expect(markdown).toContain('## 第三名');
+      // Verify rank is not in titles
+      expect(markdown).not.toContain('## 1.');
+      expect(markdown).not.toContain('## 2.');
+      expect(markdown).not.toContain('## 3.');
     });
 
     it('should handle stories without article URL', () => {
@@ -381,8 +386,8 @@ describe('Markdown Exporter Service', () => {
       // Verify all components
       expect(markdown.startsWith(frontMatter)).toBe(true);
       expect(filename).toBe('2025-12-20-daily.md');
-      expect(markdown).toContain('## 1. 故事一');
-      expect(markdown).toContain('## 2. 故事二');
+      expect(markdown).toContain('## 故事一');
+      expect(markdown).toContain('## 故事二');
     });
   });
 });

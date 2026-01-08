@@ -507,7 +507,7 @@ title: HackerNews Daily - YYYY-MM-DD
 date: YYYY-MM-DD
 ---
 
-## 1. 标题（中文翻译）
+## 标题（中文翻译）
 
 English Title
 
@@ -529,11 +529,12 @@ English Title
 ```
 
 **说明**:
-- 标题直接显示中文翻译（无括号装饰）
+- 标题直接显示中文翻译（无编号、无括号装饰）
 - 英文标题作为副标题显示
 - HackerNews 链接作为斜体副标签显示在文章末尾，用户可点击访问原始讨论
 - 每篇文章之间用 `---` 分隔
 - **描述和评论区块始终存在**：即使内容为空，也会显示默认文案（"暂无描述"/"暂无评论"）
+- **注**: 文章顺序按 HackerNews 分数排序，不显示排名编号（HackerNews API 不提供官方排名）
 
 ## Important Constraints
 - **Rate Limiting**: Algolia API 有请求限制，批量大小 100 stories/batch，最多 10 页

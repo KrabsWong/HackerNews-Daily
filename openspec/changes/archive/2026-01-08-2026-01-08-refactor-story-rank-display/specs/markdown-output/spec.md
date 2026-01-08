@@ -1,9 +1,11 @@
-# markdown-output Specification
+# markdown-output Specification Delta
 
-## Purpose
+## Overview
 
-Define markdown output formatting that removes Chinese title brackets and includes HackerNews story links for user reference and navigation to original discussions.
-## Requirements
+Remove rank display from markdown article titles since rank is merely an array index with no intrinsic meaning from HackerNews API. This change makes the output more honest and reduces visual clutter.
+
+## MODIFIED Requirements
+
 ### Requirement: Markdown titles SHALL be formatted without Chinese brackets
 
 The system SHALL generate markdown titles showing only the Chinese title text, without rank numbers or surrounding 【】 brackets.
@@ -92,4 +94,3 @@ The system SHALL add a HackerNews link as an italic secondary label to enable us
 **When** 渲染 Markdown  
 **Then** 评论区块 (`**评论要点**:`) SHALL 始终存在于输出中  
 **And** 不得因评论为空而跳过该区块
-
