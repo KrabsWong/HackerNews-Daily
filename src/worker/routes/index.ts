@@ -4,6 +4,16 @@
  */
 
 import type { Env } from '../../types/worker';
+import type {
+  CreateBookmarkResponse,
+  BookmarkQueryResponse,
+  BookmarkErrorResponse,
+} from '../../types/bookmark';
+import {
+  createBookmarkStorage,
+  validateCreateBookmarkRequest,
+  validateUrlQueryParam,
+} from '../../services/bookmark';
 
 /**
  * Route handler function type
@@ -26,6 +36,37 @@ interface Route {
 /**
  * HTTP Router
  */
+/**
+ * CORS headers for cross-origin requests (Chrome extension support)
+ */
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+/**
+ * Add CORS headers to a response
+ */
+function withCors(response: Response): Response {
+  const newHeaders = new Headers(response.headers);
+  Object.entries(CORS_HEADERS).forEach(([key, value]) => {
+    newHeaders.set(key, value);
+  });
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: newHeaders,
+  });
+}
+
+/**
+ * Create a JSON response with CORS headers
+ */
+function jsonResponse<T>(data: T, status = 200): Response {
+  return withCors(Response.json(data, { status }));
+}
+
 export class Router {
   private routes: Route[] = [];
 
@@ -48,6 +89,13 @@ export class Router {
    */
   post(path: string, handler: RouteHandler): void {
     this.register('POST', path, handler);
+  }
+
+  /**
+   * Register an OPTIONS route (for CORS preflight)
+   */
+  options(path: string, handler: RouteHandler): void {
+    this.register('OPTIONS', path, handler);
   }
 
   /**
@@ -196,6 +244,171 @@ export function createRouter(): Router {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       }, { status: 500 });
+    }
+  });
+
+  // ==================== Bookmark API Endpoints ====================
+
+  // CORS preflight handler for /api/bookmarks
+  router.options('/api/bookmarks', async () => {
+    return new Response(null, {
+      status: 204,
+      headers: CORS_HEADERS,
+    });
+  });
+
+  // POST /api/bookmarks - Create a new bookmark
+  router.post('/api/bookmarks', async (req, env) => {
+    try {
+      // Check database binding
+      if (!env.DB) {
+        const errorResponse: BookmarkErrorResponse = {
+          success: false,
+          error: {
+            code: 'DATABASE_ERROR',
+            message: 'Database not configured',
+          },
+        };
+        return jsonResponse(errorResponse, 500);
+      }
+
+      // Parse request body
+      let body: unknown;
+      try {
+        body = await req.json();
+      } catch {
+        const errorResponse: BookmarkErrorResponse = {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid JSON in request body',
+          },
+        };
+        return jsonResponse(errorResponse, 400);
+      }
+
+      // Validate request
+      const validation = validateCreateBookmarkRequest(body);
+      if (!validation.valid || !validation.data) {
+        const errorResponse: BookmarkErrorResponse = {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid request body',
+            details: validation.errors.map(e => e.message),
+          },
+        };
+        return jsonResponse(errorResponse, 400);
+      }
+
+      const storage = createBookmarkStorage(env.DB);
+
+      // Check for duplicate URL
+      const existingId = await storage.checkDuplicate(validation.data.url);
+      if (existingId !== null) {
+        const errorResponse: BookmarkErrorResponse = {
+          success: false,
+          error: {
+            code: 'DUPLICATE_URL',
+            message: 'Bookmark with this URL already exists',
+            existing_id: existingId,
+          },
+        };
+        return jsonResponse(errorResponse, 409);
+      }
+
+      // Create bookmark
+      const bookmark = await storage.createBookmark(validation.data);
+
+      const successResponse: CreateBookmarkResponse = {
+        success: true,
+        data: {
+          id: bookmark.id,
+          url: bookmark.url,
+          title: bookmark.title,
+          description: bookmark.description,
+          summary: bookmark.summary,
+          summary_zh: bookmark.summary_zh,
+          tags: bookmark.tags,
+          created_at: bookmark.created_at,
+        },
+      };
+
+      return jsonResponse(successResponse, 201);
+    } catch (error) {
+      console.error('Error creating bookmark:', error);
+      const errorResponse: BookmarkErrorResponse = {
+        success: false,
+        error: {
+          code: 'DATABASE_ERROR',
+          message: error instanceof Error ? error.message : 'Unknown database error',
+        },
+      };
+      return jsonResponse(errorResponse, 500);
+    }
+  });
+
+  // GET /api/bookmarks - Query bookmark by URL
+  router.get('/api/bookmarks', async (_req, env, url) => {
+    try {
+      // Check database binding
+      if (!env.DB) {
+        const errorResponse: BookmarkErrorResponse = {
+          success: false,
+          error: {
+            code: 'DATABASE_ERROR',
+            message: 'Database not configured',
+          },
+        };
+        return jsonResponse(errorResponse, 500);
+      }
+
+      // Get and validate URL parameter
+      const urlParam = url.searchParams.get('url');
+      const validation = validateUrlQueryParam(urlParam);
+      if (!validation.valid) {
+        const errorResponse: BookmarkErrorResponse = {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: validation.errors[0]?.message || 'url query parameter is required',
+          },
+        };
+        return jsonResponse(errorResponse, 400);
+      }
+
+      const storage = createBookmarkStorage(env.DB);
+
+      // Query bookmark
+      const bookmark = await storage.getBookmarkWithTags(urlParam!);
+
+      if (!bookmark) {
+        const errorResponse: BookmarkErrorResponse = {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'No bookmark found for this URL',
+          },
+        };
+        return jsonResponse(errorResponse, 404);
+      }
+
+      const successResponse: BookmarkQueryResponse = {
+        success: true,
+        data: bookmark,
+      };
+
+      return jsonResponse(successResponse, 200);
+    } catch (error) {
+      console.error('Error querying bookmark:', error);
+      const errorResponse: BookmarkErrorResponse = {
+        success: false,
+        error: {
+          code: 'DATABASE_ERROR',
+          message: error instanceof Error ? error.message : 'Unknown database error',
+        },
+      };
+      return jsonResponse(errorResponse, 500);
     }
   });
 

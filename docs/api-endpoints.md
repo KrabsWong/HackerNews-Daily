@@ -208,6 +208,162 @@ curl -X POST https://your-worker.workers.dev/force-publish
 
 ---
 
+## Bookmark API
+
+The Bookmark API allows Chrome extensions and other clients to save and query bookmarks. It supports CORS for cross-origin requests.
+
+### Create Bookmark
+
+**Endpoint**: `POST /api/bookmarks`
+
+**Description**: Create a new bookmark with tags.
+
+**Request Headers**:
+```http
+Content-Type: application/json
+```
+
+**Request Body**:
+```json
+{
+  "url": "https://example.com/article",
+  "title": "Article Title",
+  "description": "Optional description",
+  "summary": "AI-generated summary of the article",
+  "summary_zh": "文章的中文摘要",
+  "tags": ["tech", "ai", "programming"]
+}
+```
+
+**Required Fields**:
+- `url` - Article URL (must be http:// or https://)
+- `title` - Article title
+- `summary` - AI-generated summary
+- `summary_zh` - Chinese translation of summary
+- `tags` - Array of tags (can be empty)
+
+**Optional Fields**:
+- `description` - Article description
+
+**Response (201 Created)**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 123,
+    "url": "https://example.com/article",
+    "title": "Article Title",
+    "description": "Optional description",
+    "summary": "AI-generated summary",
+    "summary_zh": "文章的中文摘要",
+    "tags": ["tech", "ai", "programming"],
+    "created_at": 1705968000000
+  }
+}
+```
+
+**Error Responses**:
+
+*400 Bad Request* (Validation Error):
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid request body",
+    "details": ["url is required", "summary is required"]
+  }
+}
+```
+
+*409 Conflict* (Duplicate URL):
+```json
+{
+  "success": false,
+  "error": {
+    "code": "DUPLICATE_URL",
+    "message": "Bookmark with this URL already exists",
+    "existing_id": 42
+  }
+}
+```
+
+---
+
+### Query Bookmark by URL
+
+**Endpoint**: `GET /api/bookmarks?url=<encoded_url>`
+
+**Description**: Query a bookmark by its URL.
+
+**Query Parameters**:
+- `url` (required) - URL-encoded article URL
+
+**Request**:
+```bash
+curl "https://your-worker.workers.dev/api/bookmarks?url=https%3A%2F%2Fexample.com%2Farticle"
+```
+
+**Response (200 OK)**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 123,
+    "url": "https://example.com/article",
+    "title": "Article Title",
+    "description": "Optional description",
+    "summary": "AI-generated summary",
+    "summary_zh": "文章的中文摘要",
+    "tags": ["tech", "ai", "programming"],
+    "created_at": 1705968000000,
+    "updated_at": 1705968000000
+  }
+}
+```
+
+**Error Responses**:
+
+*400 Bad Request* (Missing URL parameter):
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "url query parameter is required"
+  }
+}
+```
+
+*404 Not Found*:
+```json
+{
+  "success": false,
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "No bookmark found for this URL"
+  }
+}
+```
+
+---
+
+### CORS Preflight
+
+**Endpoint**: `OPTIONS /api/bookmarks`
+
+**Description**: CORS preflight request handler.
+
+**Response (204 No Content)**:
+```http
+HTTP/1.1 204 No Content
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET, POST, OPTIONS
+Access-Control-Allow-Headers: Content-Type
+```
+
+---
+
 ## Error Responses
 
 All endpoints may return error responses:

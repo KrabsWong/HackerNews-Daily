@@ -183,10 +183,15 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
   │   │   ├── executor.ts    # TaskExecutor - 任务编排和状态机
   │   │   ├── storage.ts     # TaskStorage - D1 数据库操作
   │   │   └── index.ts       # Task 服务导出
+  │   ├── bookmark/          # 书签存储服务
+  │   │   ├── storage.ts     # BookmarkStorage - 书签 CRUD 操作
+  │   │   ├── validation.ts  # 请求验证逻辑
+  │   │   └── index.ts       # Bookmark 服务导出
   │   └── markdownExporter.ts # Markdown 生成器
   ├── types/                 # 类型定义 (所有可导出类型必须在此目录)
   │   ├── index.ts           # 统一导出入口
   │   ├── api.ts             # API 相关类型
+  │   ├── bookmark.ts        # 书签相关类型 (Bookmark, CreateBookmarkRequest, etc.)
   │   ├── content.ts         # 内容过滤/文章相关类型
   │   ├── database.ts        # D1 数据库类型 (带枚举: DailyTaskStatus, ArticleStatus, BatchStatus)
   │   ├── errors.ts          # 错误类型 (AppError, APIError, ServiceError, ValidationError)
@@ -270,6 +275,8 @@ HackerNews Daily 是一个 Cloudflare Worker，用于抓取 HackerNews 的精选
     - `daily_tasks`: 每日任务状态跟踪
     - `articles`: 文章处理记录
     - `task_batches`: 批次执行记录
+    - `bookmarks`: 书签存储（URL、标题、摘要、中文翻译）
+    - `bookmark_tags`: 书签标签关联表
 - **Error Handling**: 标准化错误处理模式
   - **Error Types** (`types/errors.ts`): 
     - `AppError`: 基础错误类，所有自定义错误的基类
