@@ -94,19 +94,6 @@ export type {
   WorkerEnv,
 } from './worker';
 
-// Bookmark types
-export type {
-  Bookmark,
-  BookmarkTag,
-  BookmarkWithTags,
-  CreateBookmarkRequest,
-  CreateBookmarkResponse,
-  BookmarkQueryResponse,
-  BookmarkErrorCode,
-  BookmarkErrorResponse,
-  ValidationError as BookmarkValidationError,
-} from './bookmark';
-
 // Error types
 export {
   AppError,
