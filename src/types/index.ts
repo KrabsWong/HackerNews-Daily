@@ -15,6 +15,9 @@ export type {
 } from './api';
 
 // Content types
+export {
+  ContentClassification,
+} from './content';
 export type {
   FilterClassification,
   ContentFilter,
@@ -76,6 +79,9 @@ export type {
 } from './source';
 
 // Task types
+export {
+  TaskExecutionStatus,
+} from './task';
 export type {
   BatchTask,
   BatchResult,

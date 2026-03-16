@@ -1,4 +1,4 @@
-import type { FilterClassification } from '../../types/content';
+import { ContentClassification, FilterClassification } from '../../types/content';
 
 /**
  * Parse AI classification response
@@ -33,7 +33,7 @@ export function parseClassificationResponse(
     if (typeof item.index !== 'number') {
       throw new Error(`Invalid classification: missing or invalid index`);
     }
-    if (!['SAFE', 'SENSITIVE'].includes(item.classification)) {
+    if (!Object.values(ContentClassification).includes(item.classification)) {
       throw new Error(`Invalid classification value: ${item.classification}`);
     }
   }

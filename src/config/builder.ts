@@ -13,6 +13,7 @@ import {
   getZhipuModel,
   getLLMProvider,
   getCrawlerProvider,
+  CrawlerProviderType,
   ENV_DEFAULTS,
   TASK_CONFIG,
   CONTENT_FILTER_CONSTANTS,
@@ -140,7 +141,7 @@ function buildCrawlerConfig(env: Env): AppConfig['crawler'] {
     provider,
     apiUrl: env.CRAWLER_API_URL,
     apiToken: env.CRAWLER_API_TOKEN,
-    enabled: provider === 'jina' ? true : !!env.CRAWLER_API_URL,
+    enabled: provider === CrawlerProviderType.JINA ? true : !!env.CRAWLER_API_URL,
   };
 }
 

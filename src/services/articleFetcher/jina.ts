@@ -12,7 +12,7 @@ export async function fetchWithJinaAPI(
   url: string
 ): Promise<{ content: string | null; description: string | null }> {
   // Build jina.ai URL: https://r.jina.ai/https://example.com
-  const jinaUrl = `${JINA_API.BASE_URL}/${encodeURIComponent(url)}`;
+  const jinaUrl = `${JINA_API.BASE_URL}/${url}`;
 
   console.log(`  📤 Request: GET ${jinaUrl.substring(0, 60)}...`);
 
