@@ -1,7 +1,9 @@
 /**
  * Article Fetcher Service
- * Fetches article content using Crawler API with truncation and metadata processing
+ * Fetches article content using configured crawler provider (Crawler API or jina.ai)
  */
 
-export { fetchArticlesBatch } from './metadata';
+export { fetchArticlesBatch, fetchArticleMetadata } from './metadata';
+export { fetchWithJinaAPI } from './jina';
+export { fetchWithCrawlerAPI } from './crawler';
 export type { ArticleMetadata } from '../../types/content';
