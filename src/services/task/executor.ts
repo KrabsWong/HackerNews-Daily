@@ -7,6 +7,7 @@ import { fetchTopStoriesByScore, fetchCommentsBatchFromAlgolia } from '../../api
 import { translator } from '../translator';
 import { buildProviderOptions } from '../llm';
 import { fetchArticlesBatch } from '../articleFetcher';
+import { getCrawlerProvider } from '../../config/constants';
 import { AIContentFilter } from '../contentFilter';
 import { generateMarkdownContent } from '../markdownExporter';
 import { createTaskStorage, TaskStorage } from './storage';
@@ -161,8 +162,10 @@ export class TaskExecutor {
     try {
       // Step 1: Fetch article content
       logInfo('Fetching article content', { count: pendingArticles.length });
+      const crawlerProvider = getCrawlerProvider(this.env);
       const articleMetadata = await fetchArticlesBatch(
         pendingArticles.map((a) => a.url),
+        crawlerProvider,
         this.env.CRAWLER_API_URL,
         this.env.CRAWLER_API_TOKEN
       );

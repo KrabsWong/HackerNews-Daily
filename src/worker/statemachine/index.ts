@@ -9,6 +9,7 @@ import { formatDateForDisplay } from '../../utils/date';
 import { logInfo, logError } from '../logger';
 import type { Env } from '../../types/worker';
 import { DailyTaskStatus } from '../../types/database';
+import { getCrawlerProvider } from '../../config/constants';
 
 /**
  * State transition handlers
@@ -127,7 +128,9 @@ export async function executeStateMachine(env: Env): Promise<void> {
     logInfo('=== Distributed Task Processing (Scheduled) ===');
 
     // Debug: Log environment configuration
+    const crawlerProvider = getCrawlerProvider(env);
     console.log('🔍 Environment Check:');
+    console.log(`   CRAWLER_PROVIDER: ${crawlerProvider}`);
     console.log(`   CRAWLER_API_URL: ${env.CRAWLER_API_URL ? env.CRAWLER_API_URL.substring(0, 50) + '...' : 'NOT SET'}`);
     console.log(`   CRAWLER_API_TOKEN: ${env.CRAWLER_API_TOKEN ? 'SET (' + env.CRAWLER_API_TOKEN.substring(0, 10) + '...)' : 'NOT SET'}`);
 

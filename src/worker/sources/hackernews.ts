@@ -10,7 +10,7 @@ import { fetchArticlesBatch, ArticleMetadata } from '../../services/articleFetch
 import { AIContentFilter } from '../../services/contentFilter';
 import { generateMarkdownContent } from '../../services/markdownExporter';
 import { logInfo, logError, logWarn, logMetrics } from '../logger';
-import { LLM_BATCH_CONFIG } from '../../config/constants';
+import { LLM_BATCH_CONFIG, getCrawlerProvider, CrawlerProviderType } from '../../config/constants';
 import { ProcessedStory } from '../../types/shared';
 import { getPreviousDayBoundaries, formatTimestamp, formatDateForDisplay } from '../../utils/date';
 import type { Env } from '../index';
@@ -116,9 +116,11 @@ export async function runDailyExport(env: Env): Promise<{ markdown: string; date
     // Step 3: Fetch article content via Crawler API
     logInfo('Fetching article content via Crawler API');
     const urls = filteredStories.map(story => story.url).filter((url): url is string => !!url);
-    
+    const crawlerProvider = getCrawlerProvider(env);
+
     const articleMetadata = await fetchArticlesBatch(
       urls,
+      crawlerProvider,
       env.CRAWLER_API_URL,
       env.CRAWLER_API_TOKEN
     );
