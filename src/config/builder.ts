@@ -12,6 +12,7 @@ import {
   getOpenRouterSiteName,
   getZhipuModel,
   getLLMProvider,
+  getCrawlerProvider,
   ENV_DEFAULTS,
   TASK_CONFIG,
   CONTENT_FILTER_CONSTANTS,
@@ -134,10 +135,12 @@ function buildTelegramConfig(env: Env): AppConfig['telegram'] {
  * Build crawler API configuration from environment
  */
 function buildCrawlerConfig(env: Env): AppConfig['crawler'] {
+  const provider = getCrawlerProvider(env);
   return {
+    provider,
     apiUrl: env.CRAWLER_API_URL,
     apiToken: env.CRAWLER_API_TOKEN,
-    enabled: !!env.CRAWLER_API_URL,
+    enabled: provider === 'jina' ? true : !!env.CRAWLER_API_URL,
   };
 }
 
