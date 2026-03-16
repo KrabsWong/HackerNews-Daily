@@ -4,6 +4,7 @@
  */
 
 import type { Env } from '../types/worker';
+import { CrawlerProviderType } from './constants';
 import { LLMProviderType } from './constants';
 
 /**
@@ -132,9 +133,11 @@ export interface TelegramConfig {
  * Crawler API Configuration
  */
 export interface CrawlerConfig {
-  /** Crawler API endpoint URL */
+  /** Crawler provider type (crawler or jina) */
+  provider: CrawlerProviderType;
+  /** Crawler API endpoint URL (required when provider='crawler') */
   apiUrl?: string;
-  /** Crawler API authentication token */
+  /** Crawler API authentication token (used when provider='crawler') */
   apiToken?: string;
   /** Whether crawler is enabled */
   enabled: boolean;
