@@ -359,9 +359,43 @@ wrangler secret put TELEGRAM_CHANNEL_ID
 
 ## Article Content Extraction
 
+The system supports two crawler providers for article content extraction:
+1. **Self-hosted Crawler API** (default) - Your own crawler service (e.g., Hugging Face Spaces)
+2. **jina.ai Reader** - Zero-setup managed service (https://r.jina.ai)
+
+### Provider Selection
+
+**Environment Variable**: `CRAWLER_PROVIDER` (optional)
+- `crawler` (default) - Use self-hosted Crawler API
+- `jina` - Use jina.ai Reader API (no additional setup required)
+
+```bash
+# Use jina.ai (zero-setup)
+CRAWLER_PROVIDER=jina
+
+# Use self-hosted crawler (default)
+CRAWLER_PROVIDER=crawler
+```
+
+### jina.ai Configuration
+
+**No additional configuration required!**
+
+Simply set `CRAWLER_PROVIDER=jina` and the system will use jina.ai's free service.
+
+**Rate Limits**:
+- Free tier: ~200 requests/minute
+- If you hit rate limits, the system will gracefully skip content extraction for that article
+
+**When to use jina.ai**:
+- Quick setup without deploying infrastructure
+- Testing or development environments
+- When you don't want to manage a crawler service
+
 ### Crawler API Configuration
 
-**Environment Variables**: 
+**Environment Variables**:
+- `CRAWLER_PROVIDER=crawler` (or leave unset for default)
 - `CRAWLER_API_URL` (optional) - Full crawler endpoint URL (including path)
 - `CRAWLER_API_TOKEN` (optional) - Bearer token for authentication
 

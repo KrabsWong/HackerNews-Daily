@@ -70,6 +70,9 @@ CACHE_ENABLED = "false"
 # LLM batch processing
 LLM_BATCH_SIZE = "15"
 
+# Crawler Provider: "crawler" (default, self-hosted) or "jina" (zero-setup)
+# CRAWLER_PROVIDER = "crawler"
+
 # =============================================================================
 # REQUIRED: You MUST set these variables before deploying
 # =============================================================================
@@ -122,8 +125,9 @@ TARGET_BRANCH = "main"
 #     wrangler secret put GITHUB_TOKEN
 #
 # Optional:
-#   wrangler secret put CRAWLER_API_URL
-#   wrangler secret put CRAWLER_API_TOKEN  # Required for private HF Spaces crawler
+#   wrangler secret put CRAWLER_PROVIDER     # 'crawler' (default) or 'jina'
+#   wrangler secret put CRAWLER_API_URL      # Required when CRAWLER_PROVIDER=crawler
+#   wrangler secret put CRAWLER_API_TOKEN    # Required for private HF Spaces crawler
 #
 # =============================================================================
 
