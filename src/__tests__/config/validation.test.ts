@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { validateConfig } from '../../config/validation';
 import type { AppConfig } from '../../config/schema';
-import { LLMProviderType } from '../../config/constants';
+import { LLMProviderType, CrawlerProviderType } from '../../config/constants';
 
 describe('Config Validation', () => {
   const buildValidConfig = (): AppConfig => ({
@@ -51,6 +51,7 @@ describe('Config Validation', () => {
       enabled: false,
     } as any,
     crawler: {
+      provider: CrawlerProviderType.CRAWLER,
       enabled: false,
     },
     testMode: {

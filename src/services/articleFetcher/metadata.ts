@@ -1,19 +1,35 @@
 import type { ArticleMetadata } from '../../types/content';
+import { CrawlerProviderType } from '../../config/constants';
 import { fetchWithCrawlerAPI } from './crawler';
+import { fetchWithJinaAPI } from './jina';
 
 /**
- * Fetch article metadata using Crawler API
- * Returns content and description extracted by the crawler service
+ * Fetch article metadata using configured crawler provider
+ * Returns content and description extracted by the selected service
  * @param url - Article URL to fetch
- * @param crawlerApiUrl - Full crawler endpoint URL (from env.CRAWLER_API_URL)
- * @param crawlerApiToken - Optional Bearer token for authentication (from env.CRAWLER_API_TOKEN)
+ * @param provider - Crawler provider to use ('crawler' or 'jina')
+ * @param crawlerApiUrl - Full crawler endpoint URL (required when provider='crawler')
+ * @param crawlerApiToken - Optional Bearer token for authentication (used when provider='crawler')
  */
 export async function fetchArticleMetadata(
   url: string,
+  provider: CrawlerProviderType,
   crawlerApiUrl?: string,
   crawlerApiToken?: string
 ): Promise<ArticleMetadata> {
-  const { content, description } = await fetchWithCrawlerAPI(url, crawlerApiUrl, crawlerApiToken);
+  let content: string | null = null;
+  let description: string | null = null;
+
+  if (provider === CrawlerProviderType.JINA) {
+    const result = await fetchWithJinaAPI(url);
+    content = result.content;
+    description = result.description;
+  } else {
+    // Default to crawler API
+    const result = await fetchWithCrawlerAPI(url, crawlerApiUrl, crawlerApiToken);
+    content = result.content;
+    description = result.description;
+  }
 
   return {
     url,
@@ -25,28 +41,36 @@ export async function fetchArticleMetadata(
 /**
  * Fetch metadata for multiple articles SERIALLY (one at a time)
  * Serial processing avoids overwhelming the crawler service
- * All content is fetched via Crawler API for richer, more complete data
  * @param urls - Array of URLs to fetch
- * @param crawlerApiUrl - Full crawler endpoint URL (from env.CRAWLER_API_URL)
- * @param crawlerApiToken - Optional Bearer token for authentication (from env.CRAWLER_API_TOKEN)
+ * @param provider - Crawler provider to use ('crawler' or 'jina')
+ * @param crawlerApiUrl - Full crawler endpoint URL (required when provider='crawler')
+ * @param crawlerApiToken - Optional Bearer token for authentication (used when provider='crawler')
  */
 export async function fetchArticlesBatch(
   urls: string[],
+  provider: CrawlerProviderType,
   crawlerApiUrl?: string,
   crawlerApiToken?: string
 ): Promise<ArticleMetadata[]> {
-  console.log(
-    `🔍 CRAWLER_API_URL: ${
-      crawlerApiUrl
-        ? 'CONFIGURED: ' + crawlerApiUrl.substring(0, 30) + '...'
-        : 'NOT CONFIGURED'
-    }`
-  );
+  const isJina = provider === CrawlerProviderType.JINA;
+  const providerName = isJina ? 'jina.ai' : 'Crawler API';
+
+  if (isJina) {
+    console.log(`🔍 Using jina.ai Reader API (zero-setup crawler)`);
+  } else {
+    console.log(
+      `🔍 CRAWLER_API_URL: ${
+        crawlerApiUrl
+          ? 'CONFIGURED: ' + crawlerApiUrl.substring(0, 30) + '...'
+          : 'NOT CONFIGURED'
+      }`
+    );
+  }
 
   const results: ArticleMetadata[] = [];
   const total = urls.length;
 
-  console.log(`\n📦 Fetching ${total} articles via Crawler API...\n`);
+  console.log(`\n📦 Fetching ${total} articles via ${providerName}...\n`);
 
   let successCount = 0;
   let emptyCount = 0;
@@ -57,13 +81,13 @@ export async function fetchArticlesBatch(
 
     console.log(`${progress} ${url}`);
 
-    if (crawlerApiUrl) {
-      const result = await fetchArticleMetadata(url, crawlerApiUrl, crawlerApiToken);
+    if (isJina || crawlerApiUrl) {
+      const result = await fetchArticleMetadata(url, provider, crawlerApiUrl, crawlerApiToken);
       results.push(result);
 
       if (result.fullContent) {
         successCount++;
-        console.log(`${progress} ✅ Crawler API (${result.fullContent.length} chars)\n`);
+        console.log(`${progress} ✅ ${providerName} (${result.fullContent.length} chars)\n`);
       } else {
         emptyCount++;
         console.log(`${progress} ⚠️  No content\n`);

@@ -1,4 +1,15 @@
 import { ProcessedStory } from './shared';
+import { ArticleStatus } from './database';
+
+/**
+ * Task execution status enum
+ * For tracking overall task execution state
+ */
+export enum TaskExecutionStatus {
+  RUNNING = 'running',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+}
 
 /**
  * 批次任务元数据
@@ -8,7 +19,7 @@ export interface BatchTask {
   taskId: string;
   batchIndex: number;
   batchSize: number;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: ArticleStatus;
   startTime?: number;
   endTime?: number;
 }
@@ -33,5 +44,5 @@ export interface TaskMetadata {
   totalBatches: number;
   completedBatches: number;
   createdAt: number;
-  status: 'running' | 'completed' | 'failed';
+  status: TaskExecutionStatus;
 }

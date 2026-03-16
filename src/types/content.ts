@@ -8,13 +8,22 @@ import { HNStory } from './api';
 import { SensitivityLevel } from '../config/constants';
 
 /**
+ * Content classification result enum
+ * Used for AI-based content filtering
+ */
+export enum ContentClassification {
+  SAFE = 'SAFE',
+  SENSITIVE = 'SENSITIVE',
+}
+
+/**
  * Classification result for a single story title
  */
 export interface FilterClassification {
   /** Index of the story in the original array */
   index: number;
   /** Classification result: SAFE or SENSITIVE */
-  classification: 'SAFE' | 'SENSITIVE';
+  classification: ContentClassification;
   /** Optional confidence score for future use */
   confidence?: number;
 }

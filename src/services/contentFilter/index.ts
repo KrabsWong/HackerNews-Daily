@@ -3,7 +3,7 @@ import { CONTENT_FILTER_CONSTANTS, SensitivityLevel } from '../../config/constan
 import { LLMProvider, createLLMProvider, CreateProviderOptions } from '../llm';
 import { classifyTitles } from './classifier';
 import { buildClassificationPrompt } from './prompt';
-import type { FilterClassification, ContentFilter } from '../../types/content';
+import { ContentClassification, FilterClassification, ContentFilter } from '../../types/content';
 import { getErrorMessage } from '../../worker/logger';
 
 /**
@@ -102,7 +102,7 @@ export class AIContentFilter implements ContentFilter {
     // Filter stories: keep only SAFE ones (no try-catch needed for synchronous filter)
     const filteredStories = stories.filter((_, index) => {
       const classification = classifications.find(c => c.index === index);
-      return classification?.classification === 'SAFE';
+      return classification?.classification === ContentClassification.SAFE;
     });
 
     // Log filtering statistics

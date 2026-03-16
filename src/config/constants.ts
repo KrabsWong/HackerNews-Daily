@@ -56,6 +56,34 @@ export enum LLMProviderType {
 }
 
 /**
+ * Crawler Provider enumeration
+ */
+export enum CrawlerProviderType {
+  CRAWLER = 'crawler',
+  JINA = 'jina',
+}
+
+/**
+ * Get the configured crawler provider from environment
+ * Defaults to CRAWLER for backward compatibility
+ * @param env - Environment containing CRAWLER_PROVIDER
+ * @returns CrawlerProviderType to use
+ */
+export function getCrawlerProvider(env: { CRAWLER_PROVIDER?: string }): CrawlerProviderType {
+  const provider = env.CRAWLER_PROVIDER?.toLowerCase();
+  switch (provider) {
+    case CrawlerProviderType.JINA:
+      return CrawlerProviderType.JINA;
+    case CrawlerProviderType.CRAWLER:
+    case undefined:
+      return CrawlerProviderType.CRAWLER;
+    default:
+      console.warn(`Invalid CRAWLER_PROVIDER "${provider}", falling back to "crawler"`);
+      return CrawlerProviderType.CRAWLER;
+  }
+}
+
+/**
  * DeepSeek AI API configuration
  */
 export const DEEPSEEK_API = {
@@ -210,8 +238,20 @@ export const ARTICLE_FETCHER = {
  * All article content is fetched via Crawler API for richer, more complete data
  */
 export const CRAWLER_API = {
-  /** Request timeout in milliseconds (10 seconds) */
+  /** Request timeout in milliseconds (30 seconds) */
   REQUEST_TIMEOUT: TIMEOUT_CONFIG.CRAWLER_API,
+} as const;
+
+/**
+ * Jina AI Reader API configuration for article content extraction
+ * Provides zero-setup alternative to self-hosted crawler
+ * https://r.jina.ai/https://URL
+ */
+export const JINA_API = {
+  /** Base URL for Jina AI Reader API */
+  BASE_URL: 'https://r.jina.ai',
+  /** Request timeout in milliseconds (10 seconds) */
+  REQUEST_TIMEOUT: 10000,
 } as const;
 
 /**

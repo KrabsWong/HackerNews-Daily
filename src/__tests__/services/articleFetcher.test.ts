@@ -14,6 +14,7 @@ import { fetchArticleMetadata } from '../../services/articleFetcher/metadata';
 import { fetchArticlesBatch } from '../../services/articleFetcher';
 import { createMockCrawlerResponse, createMockCrawlerError, MOCK_ARTICLE_HTML } from '../helpers/fixtures';
 import { createMockEnv } from '../helpers/workerEnvironment';
+import { CrawlerProviderType } from '../../config/constants';
 
 // Helper to create a mock response with proper headers
 function createMockResponse(data: any) {
@@ -68,7 +69,7 @@ describe('Article Fetcher Service', () => {
         markdown: content,
       }));
 
-      const result = await fetchArticleMetadata(url);
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.CRAWLER, CrawlerProviderType.CRAWLER);
 
       expect(result).toBeDefined();
       // When crawler API is available, content should be populated
@@ -91,7 +92,7 @@ describe('Article Fetcher Service', () => {
         markdown: content,
       }));
 
-      const result = await fetchArticleMetadata(url);
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.CRAWLER, CrawlerProviderType.CRAWLER);
 
       // When crawler API is enabled, should extract first paragraph as description
       // When not available, description will be null
@@ -108,7 +109,7 @@ describe('Article Fetcher Service', () => {
         markdown: '',
       }));
 
-      const result = await fetchArticleMetadata(url);
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.CRAWLER, CrawlerProviderType.CRAWLER);
 
       expect(result.description).toBeNull();
     });
@@ -122,7 +123,7 @@ describe('Article Fetcher Service', () => {
         markdown: longDescription,
       }));
 
-      const result = await fetchArticleMetadata(url);
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.CRAWLER, CrawlerProviderType.CRAWLER);
 
       expect(result.description).toBeDefined();
       // Should be truncated
@@ -140,7 +141,7 @@ describe('Article Fetcher Service', () => {
         markdown: longContent,
       }));
 
-      const result = await fetchArticleMetadata(url);
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.CRAWLER, CrawlerProviderType.CRAWLER);
 
       // Content should be truncated (implementation dependent on MAX_CONTENT_LENGTH)
       expect(result.fullContent).toBeDefined();
@@ -157,7 +158,7 @@ describe('Article Fetcher Service', () => {
         error: 'Failed to fetch URL',
       }));
 
-      const result = await fetchArticleMetadata(url);
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.CRAWLER, CrawlerProviderType.CRAWLER);
 
       expect(result.fullContent).toBeNull();
       expect(result.description).toBeNull();
@@ -177,7 +178,7 @@ describe('Article Fetcher Service', () => {
         text: async () => JSON.stringify({ error: 'Server error' }),
       });
 
-      const result = await fetchArticleMetadata(url);
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.CRAWLER, CrawlerProviderType.CRAWLER);
 
       expect(result.fullContent).toBeNull();
       expect(result.description).toBeNull();
@@ -188,7 +189,7 @@ describe('Article Fetcher Service', () => {
 
       mockFetch.mockRejectedValueOnce(new Error('Network timeout'));
 
-      const result = await fetchArticleMetadata(url);
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.CRAWLER, CrawlerProviderType.CRAWLER);
 
       expect(result.fullContent).toBeNull();
       expect(result.description).toBeNull();
@@ -199,7 +200,7 @@ describe('Article Fetcher Service', () => {
 
       mockFetch.mockResolvedValueOnce(createMockResponse({}));
 
-      const result = await fetchArticleMetadata(url);
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.CRAWLER, CrawlerProviderType.CRAWLER);
 
       expect(result.fullContent).toBeNull();
       expect(result.description).toBeNull();
@@ -221,7 +222,7 @@ describe('Article Fetcher Service', () => {
         text: async () => '<html></html>',
       });
 
-      const result = await fetchArticleMetadata(url);
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.CRAWLER, CrawlerProviderType.CRAWLER);
 
       expect(result.fullContent).toBeNull();
       expect(result.description).toBeNull();
@@ -236,7 +237,7 @@ describe('Article Fetcher Service', () => {
         markdown: content,
       }));
 
-      const result = await fetchArticleMetadata(url);
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.CRAWLER, CrawlerProviderType.CRAWLER);
 
       // When MAX_CONTENT_LENGTH is 0 (default), content should not be truncated
       // Note: content is trimmed, so we need to compare with trimmed version
@@ -261,7 +262,7 @@ describe('Article Fetcher Service', () => {
         }));
       });
 
-      const results = await fetchArticlesBatch(urls);
+      const results = await fetchArticlesBatch(urls, CrawlerProviderType.CRAWLER);
 
       expect(results).toHaveLength(urls.length);
       // When crawler API is available, content should be populated
@@ -302,7 +303,7 @@ describe('Article Fetcher Service', () => {
         markdown: 'Content 3',
       }));
 
-      const results = await fetchArticlesBatch(urls);
+      const results = await fetchArticlesBatch(urls, CrawlerProviderType.CRAWLER);
 
       expect(results).toHaveLength(3);
       // When crawler API is available:
@@ -320,7 +321,7 @@ describe('Article Fetcher Service', () => {
     });
 
     it('should handle empty URL array', async () => {
-      const results = await fetchArticlesBatch([]);
+      const results = await fetchArticlesBatch([], CrawlerProviderType.CRAWLER);
 
       expect(results).toEqual([]);
       expect(mockFetch).not.toHaveBeenCalled();
@@ -334,7 +335,7 @@ describe('Article Fetcher Service', () => {
         markdown: 'Content',
       }));
 
-      const results = await fetchArticlesBatch(urls);
+      const results = await fetchArticlesBatch(urls, CrawlerProviderType.CRAWLER);
 
       expect(results).toHaveLength(1);
       // When crawler API is available, content should be populated
@@ -355,7 +356,7 @@ describe('Article Fetcher Service', () => {
       });
 
       const startTime = Date.now();
-      const results = await fetchArticlesBatch(urls);
+      const results = await fetchArticlesBatch(urls, CrawlerProviderType.CRAWLER);
       const duration = Date.now() - startTime;
 
       expect(results).toHaveLength(5);
@@ -382,7 +383,7 @@ describe('Article Fetcher Service', () => {
         markdown: '',
       }));
 
-      const result = await fetchArticleMetadata(url);
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.CRAWLER, CrawlerProviderType.CRAWLER);
 
       expect(result.description).toBeNull();
     });
@@ -396,7 +397,7 @@ describe('Article Fetcher Service', () => {
         markdown: content,
       }));
 
-      const result = await fetchArticleMetadata(url);
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.CRAWLER, CrawlerProviderType.CRAWLER);
 
       if (result.description) {
         expect(result.description).toContain('中文');
@@ -411,7 +412,7 @@ describe('Article Fetcher Service', () => {
         markdown: 'Hi',
       }));
 
-      const result = await fetchArticleMetadata(url);
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.CRAWLER, CrawlerProviderType.CRAWLER);
 
       // When crawler API is available, should handle short content
       // When not available, both will be null
@@ -434,7 +435,7 @@ describe('Article Fetcher Service', () => {
         metadata: { extracted_at: '2025-12-20' },
       }));
 
-      const result = await fetchArticleMetadata(url);
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.CRAWLER, CrawlerProviderType.CRAWLER);
 
       // When crawler API is available, should extract content and ignore extra fields
       // When not available, content will be null
@@ -461,7 +462,7 @@ describe('Article Fetcher Service', () => {
         });
       });
 
-      await fetchArticleMetadata(url, crawlerApiUrl, crawlerApiToken);
+      await fetchArticleMetadata(url, CrawlerProviderType.CRAWLER, crawlerApiUrl, crawlerApiToken);
 
       // Verify Authorization header was included
       expect(capturedHeaders).toBeDefined();
@@ -484,7 +485,7 @@ describe('Article Fetcher Service', () => {
         });
       });
 
-      await fetchArticleMetadata(url, crawlerApiUrl); // No token provided
+      await fetchArticleMetadata(url, CrawlerProviderType.CRAWLER, crawlerApiUrl); // No token provided
 
       // Verify Authorization header was NOT included
       expect(capturedHeaders).toBeDefined();
@@ -503,9 +504,93 @@ describe('Article Fetcher Service', () => {
         })
       );
 
-      const result = await fetchArticleMetadata(url, crawlerApiUrl, crawlerApiToken);
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.CRAWLER, crawlerApiUrl, crawlerApiToken);
 
       // Should return null content on auth failure (graceful degradation)
+      expect(result.fullContent).toBeNull();
+      expect(result.description).toBeNull();
+    });
+  });
+
+  describe('Jina.ai Provider Tests', () => {
+    it('should fetch content via jina.ai successfully', async () => {
+      const url = 'https://example.com/article';
+      const markdownContent = 'This is the first paragraph of the article.\n\nThis is more content.';
+
+      mockFetch.mockImplementation(async (fetchUrl: string) => {
+        // Verify jina.ai URL format
+        expect(fetchUrl).toBe(`https://r.jina.ai/${encodeURIComponent(url)}`);
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          text: async () => markdownContent,
+        };
+      });
+
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.JINA);
+
+      expect(result.fullContent).toBe(markdownContent);
+      expect(result.description).toBe('This is the first paragraph of the article.');
+      expect(result.url).toBe(url);
+    });
+
+    it('should handle jina.ai rate limiting (429)', async () => {
+      const url = 'https://example.com/article';
+
+      mockFetch.mockRejectedValueOnce(
+        Object.assign(new Error('Rate limit exceeded: 429'), {
+          status: 429,
+        })
+      );
+
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.JINA);
+
+      // Should return null content on rate limit
+      expect(result.fullContent).toBeNull();
+      expect(result.description).toBeNull();
+    });
+
+    it('should handle jina.ai timeout', async () => {
+      const url = 'https://example.com/article';
+
+      mockFetch.mockRejectedValueOnce(new Error('timeout'));
+
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.JINA);
+
+      // Should return null content on timeout
+      expect(result.fullContent).toBeNull();
+      expect(result.description).toBeNull();
+    });
+
+    it('should extract description from first paragraph for jina.ai', async () => {
+      const url = 'https://example.com/article';
+      const markdownContent = 'First paragraph here.\n\nSecond paragraph here.\n\nThird paragraph.';
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        text: async () => markdownContent,
+      });
+
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.JINA);
+
+      expect(result.description).toBe('First paragraph here.');
+    });
+
+    it('should handle jina.ai error responses', async () => {
+      const url = 'https://example.com/article';
+
+      // jina.ai returns error messages as text starting with "[Error:"
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => '[Error: Failed to fetch the page]',
+      });
+
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.JINA);
+
       expect(result.fullContent).toBeNull();
       expect(result.description).toBeNull();
     });
