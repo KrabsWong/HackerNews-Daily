@@ -171,6 +171,7 @@ export function createMockEnv(options?: MockEnvOptions): Env & Record<string, an
     TELEGRAM_CHANNEL_ID: '@test_channel',
 
     // Crawler Configuration (Optional)
+    CRAWLER_PROVIDER: 'crawler',
     CRAWLER_API_URL: 'https://yiiiiiha-tiny-crawl.hf.space',
     CRAWLER_API_TOKEN: 'test-hf-token-12345',
 
