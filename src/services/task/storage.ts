@@ -312,6 +312,8 @@ export class TaskStorage {
         if (update.errorMessage !== undefined) {
           sets.push('error_message = ?');
           binds.push(update.errorMessage);
+        } else if (update.status === ArticleStatus.COMPLETED) {
+          sets.push('error_message = NULL');
         }
         if (update.retryCount !== undefined) {
           sets.push('retry_count = ?');
@@ -461,7 +463,7 @@ export class TaskStorage {
 
     const stmt = this.db.prepare(
       `UPDATE articles 
-       SET status = '${ArticleStatus.PENDING}', updated_at = ?
+       SET status = '${ArticleStatus.PENDING}', error_message = NULL, updated_at = ?
        WHERE task_date = ? AND status = '${ArticleStatus.FAILED}' AND retry_count < ?`
     );
 
