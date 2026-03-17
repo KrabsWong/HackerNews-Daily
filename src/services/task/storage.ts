@@ -468,7 +468,13 @@ export class TaskStorage {
     const result = await stmt.bind(now, taskDate, maxRetries).run();
     const resetCount = result.meta.changes ?? 0;
 
-    console.log(`[Retry] Reset ${resetCount} articles to pending state`);
+    if (resetCount > 0) {
+      await this.incrementTaskCounters(taskDate, 0, -resetCount);
+      console.log(`[Retry] Reset ${resetCount} articles to pending state, updated task counters`);
+    } else {
+      console.log(`[Retry] No articles to reset`);
+    }
+
     return resetCount;
   }
 
