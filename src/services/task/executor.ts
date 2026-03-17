@@ -222,17 +222,29 @@ export class TaskExecutor {
         const commentSummary = commentSummaries[index];
         const metadata = articleMetadata[index];
 
+        // Check if content was successfully fetched
+        const hasContent = metadata.fullContent && metadata.fullContent.trim().length > 0;
+
         // Determine final description
         let descriptionZh = contentSummary;
-        if (!descriptionZh && metadata.description) {
-          // Fallback to translated description
-          descriptionZh = ''; // Will be handled in aggregation
+        let fallbackNote = '';
+
+        if (!descriptionZh) {
+          if (hasContent) {
+            // Content was fetched but summarization failed
+            fallbackNote = '（内容摘要生成失败）';
+          } else {
+            // Content fetch failed - this is acceptable, use placeholder
+            fallbackNote = '（内容抓取失败，仅保留标题翻译）';
+          }
         }
 
         // Determine final comment summary
         const finalCommentSummary = commentSummary || '暂无评论';
 
-        const isSuccess = titleZh && descriptionZh;
+        // Success criteria: must have title translation
+        // Content summary is optional - if fetch fails, we still consider it success
+        const isSuccess = !!titleZh;
 
         if (isSuccess) {
           processedCount++;
@@ -240,13 +252,18 @@ export class TaskExecutor {
           failedCount++;
         }
 
+        // Build final description with fallback note if needed
+        const finalDescription = descriptionZh
+          ? descriptionZh + fallbackNote
+          : fallbackNote || '暂无摘要';
+
         return {
           id: article.id,
           status: isSuccess ? ArticleStatus.COMPLETED : ArticleStatus.FAILED,
           titleZh: titleZh || '',
-          contentSummaryZh: descriptionZh || '',
+          contentSummaryZh: finalDescription,
           commentSummaryZh: finalCommentSummary,
-          errorMessage: isSuccess ? undefined : 'Translation failed: missing title or description',
+          errorMessage: isSuccess ? undefined : 'Translation failed: missing title',
         };
       });
 

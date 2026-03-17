@@ -48,8 +48,23 @@ export async function fetchWithJinaAPI(
     let trimmedContent = content.trim();
 
     // Check if content looks like an error message from jina.ai
-    if (trimmedContent.startsWith('[') && trimmedContent.includes('Error:')) {
-      console.warn(`  ⚠️  jina.ai returned error: ${trimmedContent.substring(0, 100)}`);
+    // Pattern 1: Traditional error format starting with '[' and containing 'Error:'
+    const isTraditionalError = trimmedContent.startsWith('[') && trimmedContent.includes('Error:');
+    // Pattern 2: robots.txt restriction or autonomous fetching blocked
+    const isRobotsBlocked =
+      trimmedContent.includes('robots.txt') &&
+      (trimmedContent.includes('autonomous fetching') || trimmedContent.includes('Disallow'));
+    // Pattern 3: Site access denied or blocked
+    const isAccessDenied =
+      trimmedContent.toLowerCase().includes('access denied') ||
+      trimmedContent.toLowerCase().includes('not allowed');
+
+    if (isTraditionalError || isRobotsBlocked || isAccessDenied) {
+      if (isRobotsBlocked) {
+        console.warn(`  ⚠️  jina.ai blocked by robots.txt: ${url.substring(0, 60)}...`);
+      } else {
+        console.warn(`  ⚠️  jina.ai returned error: ${trimmedContent.substring(0, 100)}`);
+      }
       return { content: null, description: null };
     }
 

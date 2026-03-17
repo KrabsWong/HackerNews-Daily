@@ -594,6 +594,39 @@ describe('Article Fetcher Service', () => {
       expect(result.fullContent).toBeNull();
       expect(result.description).toBeNull();
     });
+
+    it('should handle jina.ai robots.txt blocking', async () => {
+      const url = 'https://example.com/article';
+
+      // jina.ai returns robots.txt restriction message
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () =>
+          'The sites robots.txt (https://r.jina.ai/robots.txt), specifies that autonomous fetching of this page is not allowed',
+      });
+
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.JINA);
+
+      expect(result.fullContent).toBeNull();
+      expect(result.description).toBeNull();
+    });
+
+    it('should handle jina.ai access denied errors', async () => {
+      const url = 'https://example.com/article';
+
+      // jina.ai returns access denied message
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => 'Access Denied: This page is not allowed',
+      });
+
+      const result = await fetchArticleMetadata(url, CrawlerProviderType.JINA);
+
+      expect(result.fullContent).toBeNull();
+      expect(result.description).toBeNull();
+    });
   });
 });
 
