@@ -211,18 +211,21 @@ export function createRouter(): Router {
 
       const executor = createTaskExecutor(env);
       const storage = executor['storage'];
-      const taskDate = formatDateForDisplay(new Date());
 
       // Parse optional parameters from request body
       let maxRetries = 3;
       let syncCounters = false;
+      let taskDate = formatDateForDisplay(new Date());
       try {
-        const body = await req.json() as { maxRetries?: number; sync?: boolean };
+        const body = await req.json() as { maxRetries?: number; sync?: boolean; date?: string };
         if (body.maxRetries && typeof body.maxRetries === 'number') {
           maxRetries = Math.min(Math.max(1, body.maxRetries), 5);
         }
         if (body.sync === true) {
           syncCounters = true;
+        }
+        if (body.date && /^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
+          taskDate = body.date;
         }
       } catch {
         // No body or invalid body, use defaults
