@@ -141,6 +141,8 @@ function buildCrawlerConfig(env: Env): AppConfig['crawler'] {
     provider,
     apiUrl: env.CRAWLER_API_URL,
     apiToken: env.CRAWLER_API_TOKEN,
+    jinaApiKey: env.JINA_API_KEY,
+    jinaUseKeyRotation: env.JINA_USE_KEY_ROTATION === 'true',
     enabled: provider === CrawlerProviderType.JINA ? true : !!env.CRAWLER_API_URL,
   };
 }

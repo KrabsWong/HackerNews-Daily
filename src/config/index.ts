@@ -7,6 +7,7 @@ import type { Env } from '../types/worker';
 import type { AppConfig } from './schema';
 import { validateConfig } from './validation';
 import { buildConfig } from './builder';
+import { setJinaConfig } from '../services/articleFetcher/jina';
 
 /**
  * Configuration cache
@@ -42,6 +43,12 @@ export function getConfig(env: Env, forceRefresh = false): AppConfig {
 
   // Build configuration from environment
   const config = buildConfig(env);
+
+  // Initialize jina.ai configuration for API key rotation
+  setJinaConfig({
+    apiKey: config.crawler.jinaApiKey,
+    useKeyRotation: config.crawler.jinaUseKeyRotation,
+  });
 
   // Validate configuration
   const validation = validateConfig(config);

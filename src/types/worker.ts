@@ -45,6 +45,10 @@ export interface Env {
   CRAWLER_API_TOKEN?: string;     // Bearer token for private crawler API authentication
   LOCAL_TEST_MODE?: string;       // "true" to output to terminal instead of publishing
 
+  // Jina AI Reader API configuration
+  JINA_API_KEY?: string;          // Jina AI API key (optional, increases rate limit from 20 RPM to 500 RPM)
+  JINA_USE_KEY_ROTATION?: string; // "true" to alternate between API key and free tier for maximum utilization
+
   // Telegram publisher configuration (optional)
   TELEGRAM_ENABLED?: string;      // "true" to enable Telegram publishing
   TELEGRAM_BOT_TOKEN?: string;    // Bot token from @BotFather

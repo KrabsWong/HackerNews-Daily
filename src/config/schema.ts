@@ -139,6 +139,10 @@ export interface CrawlerConfig {
   apiUrl?: string;
   /** Crawler API authentication token (used when provider='crawler') */
   apiToken?: string;
+  /** Jina AI API key (optional, increases rate limit from 20 RPM to 500 RPM) */
+  jinaApiKey?: string;
+  /** Whether to alternate between API key and free tier for maximum utilization */
+  jinaUseKeyRotation: boolean;
   /** Whether crawler is enabled */
   enabled: boolean;
 }

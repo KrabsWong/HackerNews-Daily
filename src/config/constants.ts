@@ -252,6 +252,18 @@ export const JINA_API = {
   BASE_URL: 'https://r.jina.ai',
   /** Request timeout in milliseconds (10 seconds) */
   REQUEST_TIMEOUT: 10000,
+  /**
+   * Rate limits for different access tiers
+   * - Without API key: 20 RPM (IP-based)
+   * - With Free API key: 500 RPM (key-based)
+   * By alternating between the two, we can theoretically achieve 520 RPM combined
+   */
+  RATE_LIMITS: {
+    /** Requests per minute without API key (IP-based) */
+    NO_KEY_RPM: 20,
+    /** Requests per minute with API key */
+    WITH_KEY_RPM: 500,
+  },
 } as const;
 
 /**

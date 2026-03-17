@@ -1,10 +1,73 @@
-import { JINA_API, CONTENT_CONFIG } from '../../config/constants';
+import { JINA_API } from '../../config/constants';
+import { CONTENT_CONFIG } from '../../config/constants';
 import { truncateContent } from './truncation';
+
+/**
+ * Counter for key rotation strategy
+ * Used to alternate between API key and free tier requests
+ */
+let requestCounter = 0;
+
+/**
+ * Configuration for jina.ai API calls
+ */
+interface JinaConfig {
+  /** Jina AI API key (optional) */
+  apiKey?: string;
+  /** Whether to alternate between API key and free tier */
+  useKeyRotation: boolean;
+}
+
+/**
+ * Get the configuration for jina.ai API calls
+ * This function can be overridden to provide dynamic configuration
+ */
+let globalJinaConfig: JinaConfig = { useKeyRotation: false };
+
+/**
+ * Set the global jina.ai configuration
+ * Called during application initialization
+ */
+export function setJinaConfig(config: JinaConfig): void {
+  globalJinaConfig = config;
+}
+
+/**
+ * Determine whether to use API key for the current request
+ * Implements rotation logic when useKeyRotation is enabled
+ */
+function shouldUseApiKey(): boolean {
+  const { apiKey, useKeyRotation } = globalJinaConfig;
+
+  // No API key configured, always use free tier
+  if (!apiKey) {
+    return false;
+  }
+
+  // Key rotation disabled, always use API key if available
+  if (!useKeyRotation) {
+    return true;
+  }
+
+  // Rotation enabled: alternate between key and no-key
+  // Even numbers (0, 2, 4...) -> use key
+  // Odd numbers (1, 3, 5...) -> no key (free tier)
+  const useKey = requestCounter % 2 === 0;
+  requestCounter++;
+
+  return useKey;
+}
 
 /**
  * Fetch article content using jina.ai Reader API
  * jina.ai provides zero-setup content extraction as an alternative to self-hosted crawler
  * Returns markdown content or null if extraction fails
+ *
+ * Supports API key rotation to maximize rate limit utilization:
+ * - Without API key: 20 RPM (IP-based)
+ * - With Free API key: 500 RPM (key-based)
+ * - With rotation: can theoretically use both quotas
+ *
  * @param url - Article URL to fetch
  * @returns Object containing content (markdown) and description (first paragraph)
  */
@@ -14,17 +77,36 @@ export async function fetchWithJinaAPI(
   // Build jina.ai URL: https://r.jina.ai/https://example.com
   const jinaUrl = `${JINA_API.BASE_URL}/${url}`;
 
-  console.log(`  📤 Request: GET ${jinaUrl.substring(0, 60)}...`);
+  // Determine whether to use API key for this request
+  const useApiKey = shouldUseApiKey();
+  const { apiKey } = globalJinaConfig;
+
+  if (apiKey) {
+    if (globalJinaConfig.useKeyRotation) {
+      console.log(`  📤 Request: GET ${jinaUrl.substring(0, 60)}... (rotation: ${useApiKey ? 'key' : 'free'})`);
+    } else {
+      console.log(`  📤 Request: GET ${jinaUrl.substring(0, 60)}... (using API key)`);
+    }
+  } else {
+    console.log(`  📤 Request: GET ${jinaUrl.substring(0, 60)}... (no API key)`);
+  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), JINA_API.REQUEST_TIMEOUT);
 
   try {
+    const headers: Record<string, string> = {
+      'Accept': 'text/plain',
+    };
+
+    // Add Authorization header if using API key
+    if (useApiKey && apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
     const response = await fetch(jinaUrl, {
       signal: controller.signal,
-      headers: {
-        'Accept': 'text/plain',
-      },
+      headers,
     });
 
     clearTimeout(timeoutId);
