@@ -210,28 +210,71 @@ export function createRouter(): Router {
       }
 
       const executor = createTaskExecutor(env);
+      const storage = executor['storage'];
       const taskDate = formatDateForDisplay(new Date());
 
-      // Parse optional maxRetries from request body
+      // Parse optional parameters from request body
       let maxRetries = 3;
+      let syncCounters = false;
       try {
-        const body = await req.json() as { maxRetries?: number };
+        const body = await req.json() as { maxRetries?: number; sync?: boolean };
         if (body.maxRetries && typeof body.maxRetries === 'number') {
           maxRetries = Math.min(Math.max(1, body.maxRetries), 5);
         }
+        if (body.sync === true) {
+          syncCounters = true;
+        }
       } catch {
-        // No body or invalid body, use default
+        // No body or invalid body, use defaults
+      }
+
+      let syncResult = null;
+
+      // If sync flag is set, recalculate and fix counters
+      if (syncCounters) {
+        const { ArticleStatus } = await import('../../types/database');
+
+        const actualPending = await env.DB.prepare(
+          `SELECT COUNT(*) as count FROM articles WHERE task_date = ? AND status = '${ArticleStatus.PENDING}'`
+        ).bind(taskDate).first<{ count: number }>();
+
+        const actualFailed = await env.DB.prepare(
+          `SELECT COUNT(*) as count FROM articles WHERE task_date = ? AND status = '${ArticleStatus.FAILED}'`
+        ).bind(taskDate).first<{ count: number }>();
+
+        const actualCompleted = await env.DB.prepare(
+          `SELECT COUNT(*) as count FROM articles WHERE task_date = ? AND status = '${ArticleStatus.COMPLETED}'`
+        ).bind(taskDate).first<{ count: number }>();
+
+        const pendingCount = actualPending?.count ?? 0;
+        const failedCount = actualFailed?.count ?? 0;
+        const completedCount = actualCompleted?.count ?? 0;
+
+        await env.DB.prepare(
+          `UPDATE daily_tasks SET completed_articles = ?, failed_articles = ?, updated_at = ? WHERE task_date = ?`
+        ).bind(completedCount, failedCount, Date.now(), taskDate).run();
+
+        syncResult = { pendingCount, failedCount, completedCount };
       }
 
       const resetCount = await executor.retryFailedArticles(taskDate, maxRetries);
+
+      const messageParts: string[] = [];
+      if (syncResult) {
+        messageParts.push(`Synced counters: ${syncResult.completedCount} completed, ${syncResult.failedCount} failed, ${syncResult.pendingCount} pending`);
+      }
+      if (resetCount > 0) {
+        messageParts.push(`Reset ${resetCount} failed articles to pending`);
+      } else if (!syncResult) {
+        messageParts.push('No failed articles to retry');
+      }
 
       return Response.json({
         success: true,
         taskDate,
         resetCount,
-        message: resetCount > 0
-          ? `Reset ${resetCount} failed articles to pending state (max ${maxRetries} retries)`
-          : 'No failed articles to retry',
+        synced: !!syncResult,
+        message: messageParts.join('; '),
       });
     } catch (error) {
       return Response.json({
