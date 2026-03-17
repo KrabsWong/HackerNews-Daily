@@ -257,6 +257,9 @@ export class TaskExecutor {
           ? descriptionZh + fallbackNote
           : fallbackNote || '暂无摘要';
 
+        // Increment retry count for failed articles
+        const retryCount = isSuccess ? article.retry_count : (article.retry_count || 0) + 1;
+
         return {
           id: article.id,
           status: isSuccess ? ArticleStatus.COMPLETED : ArticleStatus.FAILED,
@@ -264,6 +267,7 @@ export class TaskExecutor {
           contentSummaryZh: finalDescription,
           commentSummaryZh: finalCommentSummary,
           errorMessage: isSuccess ? undefined : 'Translation failed: missing title',
+          retryCount,
         };
       });
 
@@ -279,12 +283,13 @@ export class TaskExecutor {
     } catch (error) {
       logError('Batch processing failed', { error: error instanceof Error ? error.message : String(error) });
 
-      // Mark all articles as failed
+      // Mark all articles as failed and increment retry count
       await this.storage.updateArticlesBatch(
         pendingArticles.map((article) => ({
           id: article.id,
           status: ArticleStatus.FAILED,
           errorMessage: error instanceof Error ? error.message : String(error),
+          retryCount: (article.retry_count || 0) + 1,
         }))
       );
 

@@ -440,6 +440,25 @@ export class TaskStorage {
     maxRetries: number
   ): Promise<number> {
     const now = Date.now();
+
+    // First, count how many failed articles exist
+    const countStmt = this.db.prepare(
+      `SELECT COUNT(*) as count FROM articles 
+       WHERE task_date = ? AND status = '${ArticleStatus.FAILED}'`
+    );
+    const countResult = await countStmt.bind(taskDate).first<{ count: number }>();
+    const totalFailed = countResult?.count || 0;
+
+    // Count how many are eligible for retry (retry_count < maxRetries)
+    const eligibleStmt = this.db.prepare(
+      `SELECT COUNT(*) as count FROM articles 
+       WHERE task_date = ? AND status = '${ArticleStatus.FAILED}' AND retry_count < ?`
+    );
+    const eligibleResult = await eligibleStmt.bind(taskDate, maxRetries).first<{ count: number }>();
+    const eligibleCount = eligibleResult?.count || 0;
+
+    console.log(`[Retry] Task ${taskDate}: ${totalFailed} failed articles, ${eligibleCount} eligible for retry (max ${maxRetries})`);
+
     const stmt = this.db.prepare(
       `UPDATE articles 
        SET status = '${ArticleStatus.PENDING}', updated_at = ?
@@ -447,7 +466,10 @@ export class TaskStorage {
     );
 
     const result = await stmt.bind(now, taskDate, maxRetries).run();
-    return result.meta.changes;
+    const resetCount = result.meta.changes ?? 0;
+
+    console.log(`[Retry] Reset ${resetCount} articles to pending state`);
+    return resetCount;
   }
 
   /**
