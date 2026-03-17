@@ -78,9 +78,8 @@ LLM_BATCH_SIZE = "15"
 # Rate limits:
 #   - Without API key: 20 RPM (IP-based)
 #   - With Free API key: 500 RPM (key-based)
-# To maximize utilization, set JINA_USE_KEY_ROTATION="true" to alternate between key and free tier
 # JINA_API_KEY should be set as a secret: wrangler secret put JINA_API_KEY
-# JINA_USE_KEY_ROTATION = "false"
+JINA_USE_KEY_ROTATION = "false"  # Set to "true" to alternate between key and free tier
 
 # =============================================================================
 # REQUIRED: You MUST set these variables before deploying
@@ -138,7 +137,6 @@ TARGET_BRANCH = "main"
 #   wrangler secret put CRAWLER_API_URL      # Required when CRAWLER_PROVIDER=crawler
 #   wrangler secret put CRAWLER_API_TOKEN    # Required for private HF Spaces crawler
 #   wrangler secret put JINA_API_KEY         # Increases rate limit from 20 RPM to 500 RPM
-#   wrangler secret put JINA_USE_KEY_ROTATION # "true" to alternate between key and free tier
 #
 # =============================================================================
 
