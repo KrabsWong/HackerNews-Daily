@@ -232,10 +232,11 @@ export function createRouter(): Router {
       }
 
       let syncResult = null;
+      let statusReset = false;
 
       // If sync flag is set, recalculate and fix counters
       if (syncCounters) {
-        const { ArticleStatus } = await import('../../types/database');
+        const { ArticleStatus, DailyTaskStatus } = await import('../../types/database');
 
         const actualPending = await env.DB.prepare(
           `SELECT COUNT(*) as count FROM articles WHERE task_date = ? AND status = '${ArticleStatus.PENDING}'`
@@ -257,6 +258,20 @@ export function createRouter(): Router {
           `UPDATE daily_tasks SET completed_articles = ?, failed_articles = ?, updated_at = ? WHERE task_date = ?`
         ).bind(completedCount, failedCount, Date.now(), taskDate).run();
 
+        // If there are pending articles but task is in aggregating state, reset to processing
+        if (pendingCount > 0) {
+          const task = await env.DB.prepare(
+            `SELECT status FROM daily_tasks WHERE task_date = ?`
+          ).bind(taskDate).first<{ status: string }>();
+
+          if (task?.status === DailyTaskStatus.AGGREGATING || task?.status === DailyTaskStatus.PUBLISHED) {
+            await env.DB.prepare(
+              `UPDATE daily_tasks SET status = '${DailyTaskStatus.PROCESSING}', updated_at = ? WHERE task_date = ?`
+            ).bind(Date.now(), taskDate).run();
+            statusReset = true;
+          }
+        }
+
         syncResult = { pendingCount, failedCount, completedCount };
       }
 
@@ -265,6 +280,9 @@ export function createRouter(): Router {
       const messageParts: string[] = [];
       if (syncResult) {
         messageParts.push(`Synced counters: ${syncResult.completedCount} completed, ${syncResult.failedCount} failed, ${syncResult.pendingCount} pending`);
+      }
+      if (statusReset) {
+        messageParts.push('Reset task status from aggregating to processing');
       }
       if (resetCount > 0) {
         messageParts.push(`Reset ${resetCount} failed articles to pending`);
@@ -277,6 +295,7 @@ export function createRouter(): Router {
         taskDate,
         resetCount,
         synced: !!syncResult,
+        statusReset,
         message: messageParts.join('; '),
       });
     } catch (error) {
