@@ -199,5 +199,47 @@ export function createRouter(): Router {
     }
   });
 
+  // Retry failed articles endpoint
+  router.post('/retry-failed-tasks', async (req, env) => {
+    const { formatDateForDisplay } = await import('../../utils/date');
+    const { createTaskExecutor } = await import('../../services/task');
+
+    try {
+      if (!env.DB) {
+        throw new Error('D1 database binding (DB) is required');
+      }
+
+      const executor = createTaskExecutor(env);
+      const taskDate = formatDateForDisplay(new Date());
+
+      // Parse optional maxRetries from request body
+      let maxRetries = 3;
+      try {
+        const body = await req.json() as { maxRetries?: number };
+        if (body.maxRetries && typeof body.maxRetries === 'number') {
+          maxRetries = Math.min(Math.max(1, body.maxRetries), 5);
+        }
+      } catch {
+        // No body or invalid body, use default
+      }
+
+      const resetCount = await executor.retryFailedArticles(taskDate, maxRetries);
+
+      return Response.json({
+        success: true,
+        taskDate,
+        resetCount,
+        message: resetCount > 0
+          ? `Reset ${resetCount} failed articles to pending state (max ${maxRetries} retries)`
+          : 'No failed articles to retry',
+      });
+    } catch (error) {
+      return Response.json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }, { status: 500 });
+    }
+  });
+
   return router;
 }
