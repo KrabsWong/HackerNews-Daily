@@ -33,6 +33,28 @@ export class DeepSeekProvider extends BaseLLMProvider {
   getName(): string {
     return 'deepseek';
   }
+
+  /**
+   * Build request configuration with DeepSeek-specific parameters
+   * Disables thinking mode via extra_body to reduce token usage and improve response time
+   */
+  protected buildRequestConfig(request: import('../../types/llm').ChatCompletionRequest): {
+    url: string;
+    body: any;
+    headers: Record<string, string>;
+    timeout: number;
+  } {
+    const baseConfig = super.buildRequestConfig(request);
+    
+    // Add extra_body to disable DeepSeek thinking mode
+    baseConfig.body.extra_body = {
+      thinking: {
+        type: 'disabled'
+      }
+    };
+    
+    return baseConfig;
+  }
 }
 
 // =============================================================================

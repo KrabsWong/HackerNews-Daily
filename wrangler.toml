@@ -1,0 +1,7 @@
+name = "hackernews-daily"
+main = "dist/worker/index.js"
+compatibility_date = "2024-01-01"
+
+# Build configuration for Cloudflare Git integration
+[build]
+command = "npm ci && npm run build:worker"
