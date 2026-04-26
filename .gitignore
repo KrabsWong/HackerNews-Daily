@@ -9,9 +9,10 @@ web/dist/
 .env
 .dev.vars
 
-# Cloudflare Worker configuration (contains personal repo settings)
-# Use wrangler.toml.example as template
-wrangler.toml
+# Cloudflare Worker local config (contains sensitive settings)
+# Use wrangler.toml (committed) for Git integration
+wrangler.local.toml
+.dev.vars
 
 # Cache
 .cache/

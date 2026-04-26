@@ -224,6 +224,36 @@ describe('LLM Providers', () => {
 
       await expect(provider.chatCompletion(request)).rejects.toThrow();
     });
+
+    it('should include extra_body with thinking disabled in request', async () => {
+      const provider = new DeepSeekProvider('test-key');
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => 'application/json' },
+        json: async () => ({
+          choices: [{ message: { content: 'Response' } }],
+        }),
+      });
+
+      const request: ChatCompletionRequest = {
+        messages: [{ role: 'user', content: 'Test' }],
+      };
+
+      try {
+        await provider.chatCompletion(request);
+      } catch {
+        // May throw
+      }
+
+      expect(mockFetch).toHaveBeenCalled();
+      const requestBody = JSON.parse(mockFetch.mock.calls[0][1]?.body);
+      expect(requestBody.extra_body).toEqual({
+        thinking: {
+          type: 'disabled'
+        }
+      });
+    });
   });
 
   // ==========================================================================
