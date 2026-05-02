@@ -51,7 +51,7 @@ CACHE_ENABLED = "false"
 LLM_BATCH_SIZE = "15"
 
 # LLM Provider configuration (default: deepseek)
-# Options: deepseek, openrouter, zhipu
+# Options: deepseek, openrouter
 # LLM_PROVIDER = "deepseek"
 
 # Optional: Override default models (only set if you need a specific model)
@@ -59,11 +59,15 @@ LLM_BATCH_SIZE = "15"
 # LLM_DEEPSEEK_MODEL = "deepseek-v4-flash"
 # OpenRouter default: deepseek/deepseek-v4-flash
 # LLM_OPENROUTER_MODEL = "deepseek/deepseek-v4-flash"
-# Zhipu default: glm-4.5-flash
-# LLM_ZHIPU_MODEL = "glm-4.5-flash"
+
+# Crawler Provider configuration (default: jina)
+# Options: jina, crawler
+# jina: Jina AI Reader API (zero-setup, https://r.jina.ai/https://URL)
+# crawler: Custom crawler service (requires CRAWLER_API_URL and CRAWLER_API_TOKEN)
+CRAWLER_PROVIDER = "jina"
 
 # IMPORTANT: You must set these secrets via Cloudflare Dashboard or wrangler secret put:
 #   - GITHUB_TOKEN (GitHub Personal Access Token with repo scope)
 #   - LLM_DEEPSEEK_API_KEY or LLM_OPENROUTER_API_KEY (depending on your LLM provider)
-#   - CRAWLER_API_URL and CRAWLER_API_TOKEN (if using custom crawler)
 #   - LLM_PROVIDER (optional, defaults to "deepseek")
+#   - JINA_API_KEY (optional, increases rate limit from 20 RPM to 500 RPM)
