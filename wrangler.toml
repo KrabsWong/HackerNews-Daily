@@ -27,3 +27,30 @@ crons = ["*/10 * * * *"]
 binding = "DB"
 database_name = "hackernews-daily-db"
 database_id = "7f5311dc-3fe3-40b9-add0-c20b8b58825d"
+
+# Environment Variables
+[vars]
+# GitHub publishing configuration
+TARGET_REPO = "KrabsWong/Hacker-News-Daily"
+TARGET_BRANCH = "main"
+
+# Number of articles to process per batch (default: 6)
+TASK_BATCH_SIZE = "6"
+
+# Story fetching configuration
+HN_STORY_LIMIT = "30"
+SUMMARY_MAX_LENGTH = "300"
+
+# Content filtering (set to "true" to enable AI content filtering)
+ENABLE_CONTENT_FILTER = "false"
+
+# Cache configuration
+CACHE_ENABLED = "false"
+
+# LLM batch processing
+LLM_BATCH_SIZE = "15"
+
+# IMPORTANT: You must set these secrets via Cloudflare Dashboard or wrangler secret put:
+#   - GITHUB_TOKEN (GitHub Personal Access Token with repo scope)
+#   - LLM_DEEPSEEK_API_KEY or LLM_OPENROUTER_API_KEY (depending on your LLM provider)
+#   - CRAWLER_API_URL and CRAWLER_API_TOKEN (if using custom crawler)
