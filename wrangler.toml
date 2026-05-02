@@ -50,7 +50,20 @@ CACHE_ENABLED = "false"
 # LLM batch processing
 LLM_BATCH_SIZE = "15"
 
+# LLM Provider configuration (default: deepseek)
+# Options: deepseek, openrouter, zhipu
+# LLM_PROVIDER = "deepseek"
+
+# Optional: Override default models (only set if you need a specific model)
+# DeepSeek default: deepseek-chat
+# LLM_DEEPSEEK_MODEL = "deepseek-chat"
+# OpenRouter default: deepseek/deepseek-chat-v3-0324
+# LLM_OPENROUTER_MODEL = "deepseek/deepseek-chat-v3-0324"
+# Zhipu default: glm-4.5-flash
+# LLM_ZHIPU_MODEL = "glm-4.5-flash"
+
 # IMPORTANT: You must set these secrets via Cloudflare Dashboard or wrangler secret put:
 #   - GITHUB_TOKEN (GitHub Personal Access Token with repo scope)
 #   - LLM_DEEPSEEK_API_KEY or LLM_OPENROUTER_API_KEY (depending on your LLM provider)
 #   - CRAWLER_API_URL and CRAWLER_API_TOKEN (if using custom crawler)
+#   - LLM_PROVIDER (optional, defaults to "deepseek")
