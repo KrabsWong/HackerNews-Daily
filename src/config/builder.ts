@@ -10,7 +10,6 @@ import {
   getOpenRouterModel,
   getOpenRouterSiteUrl,
   getOpenRouterSiteName,
-  getZhipuModel,
   getLLMProvider,
   getCrawlerProvider,
   CrawlerProviderType,
@@ -31,10 +30,8 @@ function buildLLMConfig(env: Env): AppConfig['llm'] {
     provider,
     deepSeekApiKey: env.LLM_DEEPSEEK_API_KEY,
     openRouterApiKey: env.LLM_OPENROUTER_API_KEY,
-    zhipuApiKey: env.LLM_ZHIPU_API_KEY,
     deepSeekModel: getDeepSeekModel(env),
     openRouterModel: getOpenRouterModel(env),
-    zhipuModel: getZhipuModel(env),
     openRouterSiteUrl: getOpenRouterSiteUrl(env),
     openRouterSiteName: getOpenRouterSiteName(env),
   };

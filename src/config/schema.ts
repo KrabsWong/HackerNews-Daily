@@ -11,20 +11,16 @@ import { LLMProviderType } from './constants';
  * LLM Provider Configuration
  */
 export interface LLMConfig {
-  /** Provider type (deepseek, openrouter, zhipu) */
+  /** Provider type (deepseek, openrouter) */
   provider: LLMProviderType;
   /** DeepSeek API key */
   deepSeekApiKey?: string;
   /** OpenRouter API key */
   openRouterApiKey?: string;
-  /** Zhipu API key */
-  zhipuApiKey?: string;
   /** DeepSeek model name */
   deepSeekModel?: string;
   /** OpenRouter model name */
   openRouterModel?: string;
-  /** Zhipu model name */
-  zhipuModel?: string;
   /** OpenRouter site URL for leaderboard attribution */
   openRouterSiteUrl?: string;
   /** OpenRouter site name for leaderboard attribution */

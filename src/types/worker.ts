@@ -30,12 +30,10 @@ export interface Env {
   // Provider-specific API keys (one required based on LLM_PROVIDER)
   LLM_DEEPSEEK_API_KEY?: string;
   LLM_OPENROUTER_API_KEY?: string;
-  LLM_ZHIPU_API_KEY?: string;
   
   // Optional LLM configuration
   LLM_DEEPSEEK_MODEL?: string;
   LLM_OPENROUTER_MODEL?: string;
-  LLM_ZHIPU_MODEL?: string;
   LLM_OPENROUTER_SITE_URL?: string;
   LLM_OPENROUTER_SITE_NAME?: string;
   

@@ -29,11 +29,6 @@ function validateLLMConfig(config: AppConfig): string[] {
         errors.push('LLM_OPENROUTER_API_KEY is required when using OpenRouter provider');
       }
       break;
-    case LLMProviderType.ZHIPU:
-      if (!config.llm.zhipuApiKey) {
-        errors.push('LLM_ZHIPU_API_KEY is required when using Zhipu provider');
-      }
-      break;
   }
 
   return errors;

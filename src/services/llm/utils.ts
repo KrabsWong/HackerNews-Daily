@@ -68,13 +68,6 @@ export function getApiKeyForProvider(provider: LLMProviderType, env: ProviderEnv
       }
       return key;
     }
-    case LLMProviderType.ZHIPU: {
-      const key = env.LLM_ZHIPU_API_KEY;
-      if (!key) {
-        throw new Error('LLM_ZHIPU_API_KEY is required when LLM_PROVIDER=zhipu');
-      }
-      return key;
-    }
     default:
       throw new Error(`Unsupported provider: ${provider}`);
   }
@@ -93,8 +86,6 @@ export function getModelForProvider(provider: LLMProviderType, env: ProviderEnv)
       return env.LLM_DEEPSEEK_MODEL;
     case LLMProviderType.OPENROUTER:
       return env.LLM_OPENROUTER_MODEL;
-    case LLMProviderType.ZHIPU:
-      return env.LLM_ZHIPU_MODEL;
     default:
       return undefined;
   }
@@ -176,7 +167,5 @@ export function buildCliProviderOptions(): CreateProviderOptions {
     LLM_OPENROUTER_MODEL: process.env.LLM_OPENROUTER_MODEL,
     LLM_OPENROUTER_SITE_URL: process.env.LLM_OPENROUTER_SITE_URL,
     LLM_OPENROUTER_SITE_NAME: process.env.LLM_OPENROUTER_SITE_NAME,
-    LLM_ZHIPU_API_KEY: process.env.LLM_ZHIPU_API_KEY,
-    LLM_ZHIPU_MODEL: process.env.LLM_ZHIPU_MODEL,
   });
 }
