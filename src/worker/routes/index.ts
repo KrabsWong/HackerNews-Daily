@@ -306,5 +306,49 @@ export function createRouter(): Router {
     }
   });
 
+  // Reset task state endpoint (for debugging stuck tasks)
+  router.post('/reset-task', async (req, env) => {
+    const { formatDateForDisplay } = await import('../../utils/date');
+    
+    try {
+      if (!env.DB) {
+        throw new Error('D1 database binding (DB) is required');
+      }
+
+      let taskDate = formatDateForDisplay(new Date());
+      try {
+        const body = await req.json() as { date?: string };
+        if (body.date && /^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
+          taskDate = body.date;
+        }
+      } catch {
+        // No body or invalid body, use today's date
+      }
+
+      const { DailyTaskStatus } = await import('../../types/database');
+      
+      // Reset task status to LIST_FETCHED so it will reprocess
+      await env.DB.prepare(
+        `UPDATE daily_tasks SET status = ?, completed_articles = 0, failed_articles = 0, updated_at = ? WHERE task_date = ?`
+      ).bind(DailyTaskStatus.LIST_FETCHED, Date.now(), taskDate).run();
+
+      // Reset all articles to PENDING
+      await env.DB.prepare(
+        `UPDATE articles SET status = ?, retry_count = 0, error_message = NULL, updated_at = ? WHERE task_date = ?`
+      ).bind('pending', Date.now(), taskDate).run();
+
+      return Response.json({
+        success: true,
+        taskDate,
+        message: 'Task reset to LIST_FETCHED state, all articles reset to PENDING',
+      });
+    } catch (error) {
+      return Response.json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }, { status: 500 });
+    }
+  });
+
   return router;
 }

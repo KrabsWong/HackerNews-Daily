@@ -5,15 +5,13 @@
  * Eliminates duplicate switch statements across the codebase.
  * 
  * All LLM-related environment variables use the LLM_ prefix:
- * - LLM_PROVIDER: Provider type (deepseek | openrouter | zhipu)
+ * - LLM_PROVIDER: Provider type (deepseek | openrouter)
  * - LLM_DEEPSEEK_API_KEY: DeepSeek API key
  * - LLM_DEEPSEEK_MODEL: DeepSeek model override
  * - LLM_OPENROUTER_API_KEY: OpenRouter API key
  * - LLM_OPENROUTER_MODEL: OpenRouter model override
  * - LLM_OPENROUTER_SITE_URL: OpenRouter site URL for attribution
  * - LLM_OPENROUTER_SITE_NAME: OpenRouter site name for attribution
- * - LLM_ZHIPU_API_KEY: Zhipu AI API key
- * - LLM_ZHIPU_MODEL: Zhipu model override (default: glm-4.5-flash)
  */
 
 import { LLMProviderType } from '../../config/constants';
@@ -31,7 +29,7 @@ export type { ProviderEnv, ResolvedProviderConfig, CreateProviderOptions };
  */
 export function parseProvider(providerString: string | undefined): LLMProviderType {
   if (!providerString) {
-    throw new Error('LLM_PROVIDER is required (set to "deepseek", "openrouter", or "zhipu")');
+    throw new Error('LLM_PROVIDER is required (set to "deepseek" or "openrouter")');
   }
   
   const normalized = providerString.toLowerCase();
@@ -41,10 +39,8 @@ export function parseProvider(providerString: string | undefined): LLMProviderTy
       return LLMProviderType.DEEPSEEK;
     case LLMProviderType.OPENROUTER:
       return LLMProviderType.OPENROUTER;
-    case LLMProviderType.ZHIPU:
-      return LLMProviderType.ZHIPU;
     default:
-      throw new Error(`Invalid LLM_PROVIDER "${providerString}". Must be "deepseek", "openrouter", or "zhipu"`);
+      throw new Error(`Invalid LLM_PROVIDER "${providerString}". Must be "deepseek" or "openrouter"`);
   }
 }
 

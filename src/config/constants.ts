@@ -52,7 +52,6 @@ export const HN_API = {
 export enum LLMProviderType {
   DEEPSEEK = 'deepseek',
   OPENROUTER = 'openrouter',
-  ZHIPU = 'zhipu',
 }
 
 /**
@@ -150,31 +149,6 @@ export function getOpenRouterSiteName(env: { LLM_OPENROUTER_SITE_NAME?: string }
 }
 
 /**
- * Zhipu AI API configuration
- * Zhipu AI provides GLM series models with OpenAI-compatible API
- * Note: glm-4.5-flash has a concurrency limit of 2
- */
-export const ZHIPU_API = {
-  /** Base URL for Zhipu AI API */
-  BASE_URL: 'https://open.bigmodel.cn/api/paas/v4',
-  /** Default model for Zhipu (high cost-performance fast model) */
-  DEFAULT_MODEL: 'glm-4.5-flash',
-  /** Request timeout in milliseconds (30 seconds for translation/summarization) */
-  REQUEST_TIMEOUT: TIMEOUT_CONFIG.LLM_API,
-  /** Delay before retry on rate limit (2 seconds - longer due to concurrency limit of 2) */
-  RETRY_DELAY: 2000,
-} as const;
-
-/**
- * Get the configured Zhipu model from environment or use default
- * @param env - Environment containing LLM_ZHIPU_MODEL
- * @returns Model name to use
- */
-export function getZhipuModel(env: { LLM_ZHIPU_MODEL?: string }): string {
-  return env.LLM_ZHIPU_MODEL || ZHIPU_API.DEFAULT_MODEL;
-}
-
-/**
  * Get the configured LLM provider from environment
  * Defaults to DEEPSEEK for backward compatibility
  * @param env - Environment containing LLM_PROVIDER
@@ -185,8 +159,6 @@ export function getLLMProvider(env: { LLM_PROVIDER?: string }): LLMProviderType 
   switch (provider) {
     case LLMProviderType.OPENROUTER:
       return LLMProviderType.OPENROUTER;
-    case LLMProviderType.ZHIPU:
-      return LLMProviderType.ZHIPU;
     case LLMProviderType.DEEPSEEK:
     case undefined:
       return LLMProviderType.DEEPSEEK;

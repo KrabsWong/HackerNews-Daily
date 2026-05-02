@@ -4,7 +4,7 @@
  * Concrete implementations of LLMProvider interface for different providers
  */
 
-import { DEEPSEEK_API, OPENROUTER_API, ZHIPU_API } from '../../config/constants';
+import { DEEPSEEK_API, OPENROUTER_API } from '../../config/constants';
 import { BaseLLMProvider } from './base';
 import type {
   ChatCompletionRequest,
@@ -108,27 +108,4 @@ export class OpenRouterProvider extends BaseLLMProvider {
   }
 }
 
-// =============================================================================
-// Zhipu AI Provider
-// =============================================================================
 
-/**
- * Zhipu AI LLM Provider
- * GLM series models with OpenAI-compatible API
- * Note: glm-4.5-flash has a concurrency limit of 2
- */
-export class ZhipuProvider extends BaseLLMProvider {
-  constructor(apiKey: string, model: string = ZHIPU_API.DEFAULT_MODEL) {
-    super(
-      apiKey,
-      model,
-      ZHIPU_API.BASE_URL,
-      ZHIPU_API.REQUEST_TIMEOUT,
-      ZHIPU_API.RETRY_DELAY
-    );
-  }
-
-  getName(): string {
-    return 'zhipu';
-  }
-}

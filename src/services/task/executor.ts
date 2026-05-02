@@ -281,14 +281,21 @@ export class TaskExecutor {
         subrequests: subrequestCount,
       });
     } catch (error) {
-      logError('Batch processing failed', { error: error instanceof Error ? error.message : String(error) });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logError('Batch processing failed', { 
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+        taskDate,
+        batchSize: actualBatchSize,
+        pendingCount: pendingArticles.length
+      });
 
       // Mark all articles as failed and increment retry count
       await this.storage.updateArticlesBatch(
         pendingArticles.map((article) => ({
           id: article.id,
           status: ArticleStatus.FAILED,
-          errorMessage: error instanceof Error ? error.message : String(error),
+          errorMessage: errorMessage,
           retryCount: (article.retry_count || 0) + 1,
         }))
       );

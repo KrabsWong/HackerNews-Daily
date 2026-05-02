@@ -5,9 +5,9 @@
  * This is the main entry point for all LLM-related functionality.
  */
 
-import { DEEPSEEK_API, OPENROUTER_API, ZHIPU_API, LLMProviderType } from '../../config/constants';
+import { DEEPSEEK_API, OPENROUTER_API, LLMProviderType } from '../../config/constants';
 import { FetchError } from '../../utils/fetch';
-import { DeepSeekProvider, OpenRouterProvider, ZhipuProvider } from './providers';
+import { DeepSeekProvider, OpenRouterProvider } from './providers';
 import { resolveProviderConfig } from './utils';
 import type {
   LLMProvider,
@@ -56,11 +56,7 @@ export function createLLMProvider(options: CreateProviderOptions): LLMProvider {
         config.siteName
       );
       
-    case LLMProviderType.ZHIPU:
-      return new ZhipuProvider(
-        config.apiKey,
-        config.model ?? ZHIPU_API.DEFAULT_MODEL
-      );
+
       
     case LLMProviderType.DEEPSEEK:
       return new DeepSeekProvider(
@@ -117,7 +113,7 @@ export {
 } from './utils';
 
 // Re-export provider classes for advanced usage
-export { DeepSeekProvider, OpenRouterProvider, ZhipuProvider } from './providers';
+export { DeepSeekProvider, OpenRouterProvider } from './providers';
 
 // Re-export types from centralized location
 export type {
