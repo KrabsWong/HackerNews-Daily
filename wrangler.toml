@@ -55,10 +55,10 @@ LLM_BATCH_SIZE = "15"
 # LLM_PROVIDER = "deepseek"
 
 # Optional: Override default models (only set if you need a specific model)
-# DeepSeek default: deepseek-chat
-# LLM_DEEPSEEK_MODEL = "deepseek-chat"
-# OpenRouter default: deepseek/deepseek-chat-v3-0324
-# LLM_OPENROUTER_MODEL = "deepseek/deepseek-chat-v3-0324"
+# DeepSeek default: deepseek-v4-flash
+# LLM_DEEPSEEK_MODEL = "deepseek-v4-flash"
+# OpenRouter default: deepseek/deepseek-v4-flash
+# LLM_OPENROUTER_MODEL = "deepseek/deepseek-v4-flash"
 # Zhipu default: glm-4.5-flash
 # LLM_ZHIPU_MODEL = "glm-4.5-flash"
 

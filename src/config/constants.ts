@@ -90,7 +90,7 @@ export const DEEPSEEK_API = {
   /** Base URL for DeepSeek API */
   BASE_URL: 'https://api.deepseek.com/v1',
   /** Default model for DeepSeek */
-  DEFAULT_MODEL: 'deepseek-chat',
+  DEFAULT_MODEL: 'deepseek-v4-flash',
   /** Request timeout in milliseconds (30 seconds for translation/summarization) */
   REQUEST_TIMEOUT: TIMEOUT_CONFIG.LLM_API,
   /** Delay before retry on rate limit (1 second) */
@@ -113,8 +113,8 @@ export function getDeepSeekModel(env: { LLM_DEEPSEEK_MODEL?: string }): string {
 export const OPENROUTER_API = {
   /** Base URL for OpenRouter API */
   BASE_URL: 'https://openrouter.ai/api/v1',
-  /** Default model for OpenRouter (DeepSeek V3 via OpenRouter) */
-  DEFAULT_MODEL: 'deepseek/deepseek-chat-v3-0324',
+  /** Default model for OpenRouter (DeepSeek V4 Flash via OpenRouter) */
+  DEFAULT_MODEL: 'deepseek/deepseek-v4-flash',
   /** Request timeout in milliseconds (30 seconds for translation/summarization) */
   REQUEST_TIMEOUT: TIMEOUT_CONFIG.LLM_API,
   /** Delay before retry on rate limit (1 second) */
