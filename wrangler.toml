@@ -1,8 +1,29 @@
 # wrangler.toml
 name = "hackernews-daily-export"
 main = "dist/worker/index.js"
-compatibility_date = "2024-01-01"
+compatibility_date = "2024-12-11"
+compatibility_flags = ["nodejs_compat"]
+
+# Enable observability features
+observability = { enabled = true }
 
 # Build configuration for Cloudflare Git integration
 [build]
 command = "npm ci && npm run build:worker"
+
+# Scheduled triggers (cron format)
+# Every 10 minutes for incremental processing
+# The system will process one batch (6 articles) per trigger
+# Total time to process 30 articles: ~50 minutes (5 batches)
+[triggers]
+crons = ["*/10 * * * *"]
+
+# D1 Database Configuration (REQUIRED)
+# You need to create a D1 database and run the migration first:
+#   1. wrangler d1 create hackernews-daily-db
+#   2. wrangler d1 execute hackernews-daily-db --file=./migrations/0001_create_tables.sql
+#   3. Copy the database_id from step 1 and replace <your-database-id> below
+[[d1_databases]]
+binding = "DB"
+database_name = "hackernews-daily-db"
+database_id = "7f5311dc-3fe3-40b9-add0-c20b8b58825d"
