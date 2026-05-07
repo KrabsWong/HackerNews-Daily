@@ -206,6 +206,17 @@ export class GitHubClient {
         logWarn('GitHub API rate limit low', { remaining });
       }
 
+      // Check if response data exists
+      if (!response.data) {
+        logWarn('GitHub API returned null response data', { 
+          repo, 
+          path, 
+          branch,
+          status: response.status 
+        });
+        throw new Error(`GitHub API returned empty response for ${path}. Status: ${response.status}`);
+      }
+
       logInfo('File successfully pushed to GitHub', { 
         repo,
         path,

@@ -31,7 +31,7 @@ database_id = "7f5311dc-3fe3-40b9-add0-c20b8b58825d"
 # Environment Variables
 [vars]
 # GitHub publishing configuration
-TARGET_REPO = "KrabsWong/Hacker-News-Daily"
+TARGET_REPO = "KrabsWong/tldr-hackernews-24"
 TARGET_BRANCH = "main"
 
 # Number of articles to process per batch (default: 6)
