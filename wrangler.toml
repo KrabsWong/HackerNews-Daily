@@ -52,7 +52,7 @@ LLM_BATCH_SIZE = "15"
 
 # LLM Provider configuration (default: deepseek)
 # Options: deepseek, openrouter
-# LLM_PROVIDER = "deepseek"
+LLM_PROVIDER = "deepseek"
 
 # Optional: Override default models (only set if you need a specific model)
 # DeepSeek default: deepseek-v4-flash
