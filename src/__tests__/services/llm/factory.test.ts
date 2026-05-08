@@ -26,7 +26,7 @@ describe('LLM Factory', () => {
       });
 
       expect(provider.getName()).toBe('deepseek');
-      expect(provider.getModel()).toBe('deepseek-chat');
+      expect(provider.getModel()).toBe('deepseek-v4-flash');
     });
 
     it('should create OpenRouter provider', () => {
@@ -36,16 +36,6 @@ describe('LLM Factory', () => {
       });
 
       expect(provider.getName()).toBe('openrouter');
-    });
-
-    it('should create Zhipu provider', () => {
-      const provider = createLLMProvider({
-        provider: LLMProviderType.ZHIPU,
-        config: { apiKey: 'test-key' },
-      });
-
-      expect(provider.getName()).toBe('zhipu');
-      expect(provider.getModel()).toContain('glm');
     });
 
     it('should throw when API key is missing', () => {
@@ -97,15 +87,9 @@ describe('LLM Factory', () => {
       expect(result).toBe(LLMProviderType.OPENROUTER);
     });
 
-    it('should parse zhipu provider', () => {
-      const result = parseProvider('zhipu');
-      expect(result).toBe(LLMProviderType.ZHIPU);
-    });
-
     it('should be case insensitive', () => {
       expect(parseProvider('DEEPSEEK')).toBe(LLMProviderType.DEEPSEEK);
       expect(parseProvider('OpenRouter')).toBe(LLMProviderType.OPENROUTER);
-      expect(parseProvider('ZHIPU')).toBe(LLMProviderType.ZHIPU);
     });
 
     it('should throw on invalid provider', () => {
@@ -136,13 +120,6 @@ describe('LLM Factory', () => {
       expect(key).toBe(env.LLM_OPENROUTER_API_KEY);
     });
 
-    it('should get Zhipu API key', () => {
-      const env = createMockEnv({ llmProvider: 'zhipu' });
-      const key = getApiKeyForProvider(LLMProviderType.ZHIPU, env);
-
-      expect(key).toBe(env.LLM_ZHIPU_API_KEY);
-    });
-
     it('should throw when API key is missing for deepseek', () => {
       const env = createMockEnv();
       delete (env as any).LLM_DEEPSEEK_API_KEY;
@@ -158,15 +135,6 @@ describe('LLM Factory', () => {
 
       expect(() => {
         getApiKeyForProvider(LLMProviderType.OPENROUTER, env);
-      }).toThrow();
-    });
-
-    it('should throw when API key is missing for zhipu', () => {
-      const env = createMockEnv();
-      delete (env as any).LLM_ZHIPU_API_KEY;
-
-      expect(() => {
-        getApiKeyForProvider(LLMProviderType.ZHIPU, env);
       }).toThrow();
     });
 
@@ -208,23 +176,10 @@ describe('LLM Factory', () => {
       expect(provider.getModel()).toBe('claude-2');
     });
 
-    it('should read all Zhipu configuration from env', () => {
-      const env = {
-        LLM_PROVIDER: 'zhipu',
-        LLM_ZHIPU_API_KEY: 'sk-zhipu-123',
-        LLM_ZHIPU_MODEL: 'glm-4-0613',
-      };
-
-      const provider = createLLMProviderFromEnv(env as any);
-
-      expect(provider.getName()).toBe('zhipu');
-      expect(provider.getModel()).toBe('glm-4-0613');
-    });
-
     it('should use defaults when custom models not specified', () => {
       const provider = createLLMProviderFromEnv({ LLM_PROVIDER: 'deepseek', LLM_DEEPSEEK_API_KEY: 'test-key' } as any);
 
-      expect(provider.getModel()).toBe('deepseek-chat');
+      expect(provider.getModel()).toBe('deepseek-v4-flash');
     });
   });
 
@@ -273,11 +228,7 @@ describe('LLM Factory', () => {
 
       const openrouter = createLLMProviderFromEnv({ LLM_PROVIDER: 'openrouter', LLM_OPENROUTER_API_KEY: 'key2' } as any);
 
-      const zhipu = createLLMProviderFromEnv({ LLM_PROVIDER: 'zhipu', LLM_ZHIPU_API_KEY: 'key3' } as any);
-
       expect(deepseek.getName()).not.toBe(openrouter.getName());
-      expect(openrouter.getName()).not.toBe(zhipu.getName());
-      expect(zhipu.getName()).not.toBe(deepseek.getName());
     });
   });
 

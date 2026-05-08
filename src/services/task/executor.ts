@@ -17,10 +17,8 @@ import { getConfig } from '../../config';
 import type { Env } from '../../types/worker';
 import type { ProcessedStory } from '../../types/shared';
 import { ArticleStatus, BatchStatus, DailyTaskStatus, DailyTask, Article, TaskProgress, BatchProcessingResult } from '../../types/database';
-import { GitHubPublisher } from '../../worker/publishers/github';
-import { TelegramPublisher } from '../../worker/publishers/telegram';
-import { TerminalPublisher } from '../../worker/publishers/terminal';
-import { PublisherType } from '../../types/publisher';
+import { getPublisher } from '../../worker/publishers';
+import { PublisherType, type PublisherConfig } from '../../types/publisher';
 
 /**
  * Task executor class that manages distributed article processing
@@ -35,6 +33,10 @@ export class TaskExecutor {
       throw new Error('D1 database binding (DB) is required for distributed task processing');
     }
     this.storage = createTaskStorage(env.DB);
+  }
+
+  getStorage(): TaskStorage {
+    return this.storage;
   }
 
   /**
@@ -191,7 +193,7 @@ export class TaskExecutor {
 
       // Step 4: Summarize content (pseudo-batch)
       logInfo('Summarizing content', { count: pendingArticles.length });
-      const summaryMaxLength = parseInt(this.env.SUMMARY_MAX_LENGTH || '300', 10);
+      const summaryMaxLength = config.summary.maxLength;
       const contentWithMetadata = articleMetadata.map((meta) => meta.fullContent);
       const contentSummaries = await translator.summarizeContentBatch(
         contentWithMetadata,
@@ -419,8 +421,8 @@ export class TaskExecutor {
   private async publishToTerminal(publishContent: any): Promise<boolean> {
     try {
       logInfo('Local test mode: Outputting to terminal');
-      const terminalPublisher = new TerminalPublisher();
-      await terminalPublisher.publish(publishContent, { type: PublisherType.TERMINAL });
+      const publisher = getPublisher(PublisherType.TERMINAL);
+      await publisher.publish(publishContent, { type: PublisherType.TERMINAL });
       logInfo('Terminal output completed');
       return true;
     } catch (error) {
@@ -447,8 +449,8 @@ export class TaskExecutor {
 
     try {
       logInfo('Publishing to GitHub');
-      const githubPublisher = new GitHubPublisher();
-      await githubPublisher.publish(publishContent, {
+      const publisher = getPublisher(PublisherType.GITHUB);
+      await publisher.publish(publishContent, {
         type: PublisherType.GITHUB,
         GITHUB_TOKEN: this.env.GITHUB_TOKEN,
         TARGET_REPO: this.env.TARGET_REPO,
@@ -479,8 +481,8 @@ export class TaskExecutor {
 
     try {
       logInfo('Publishing to Telegram');
-      const telegramPublisher = new TelegramPublisher();
-      await telegramPublisher.publish(publishContent, {
+      const publisher = getPublisher(PublisherType.TELEGRAM);
+      await publisher.publish(publishContent, {
         type: PublisherType.TELEGRAM,
         TELEGRAM_BOT_TOKEN: this.env.TELEGRAM_BOT_TOKEN,
         TELEGRAM_CHANNEL_ID: this.env.TELEGRAM_CHANNEL_ID,
@@ -504,7 +506,7 @@ export class TaskExecutor {
     }
   }
 
-  private mapArticlesToStories(completedArticles: any[]): ProcessedStory[] {
+  private mapArticlesToStories(completedArticles: Article[]): ProcessedStory[] {
     return completedArticles.map((article) => ({
       rank: article.rank,
       storyId: article.story_id,

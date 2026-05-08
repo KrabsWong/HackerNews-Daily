@@ -1,8 +1,11 @@
-const esbuild = require('esbuild');
-const fs = require('fs');
-const path = require('path');
+import esbuild from 'esbuild';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Ensure output directory exists
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const outDir = path.dirname('dist/worker/index.js');
 if (!fs.existsSync(outDir)) {
   fs.mkdirSync(outDir, { recursive: true });
@@ -24,7 +27,6 @@ esbuild.build({
   },
   metafile: true,
 }).then(result => {
-  // Output bundle size
   const size = fs.statSync('dist/worker/index.js').size;
   const sizeKB = (size / 1024).toFixed(2);
   console.log(`✅ Bundle created: ${sizeKB} KB`);
@@ -34,7 +36,6 @@ esbuild.build({
     process.exit(1);
   }
   
-  // Write bundle metadata
   fs.writeFileSync('dist/worker/meta.json', JSON.stringify(result.metafile, null, 2));
   console.log(`📊 Bundle metadata saved to dist/worker/meta.json`);
 }).catch((error) => {

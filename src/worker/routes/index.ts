@@ -169,13 +169,12 @@ export function createRouter(): Router {
       }
 
       const executor = createTaskExecutor(env);
-      const storage = executor['storage'];
 
       // Get today's task date
       const taskDate = formatDateForDisplay(new Date());
 
       // Get task progress
-      const progress = await storage.getTaskProgress(taskDate);
+      const progress = await executor.storage.getTaskProgress(taskDate);
 
       if (!progress) {
         return Response.json({
@@ -210,7 +209,6 @@ export function createRouter(): Router {
       }
 
       const executor = createTaskExecutor(env);
-      const storage = executor['storage'];
 
       // Parse optional parameters from request body
       let maxRetries = 3;

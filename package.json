@@ -4,8 +4,8 @@
   "description": "Fetch and translate HackerNews top stories to Chinese",
   "main": "dist/index.js",
   "scripts": {
-    "build:worker": "node esbuild.worker.config.js",
-    "build:worker:watch": "node esbuild.worker.config.js --watch",
+    "build:worker": "node esbuild.worker.config.mjs",
+    "build:worker:watch": "node esbuild.worker.config.mjs --watch",
     "clean:worker": "rm -rf dist/worker",
     "dev:worker": "wrangler dev --local --persist-to .wrangler/state --env dev",
     "deploy:worker": "npm run build:worker && wrangler deploy",

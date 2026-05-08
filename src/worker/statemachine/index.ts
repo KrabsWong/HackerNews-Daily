@@ -30,7 +30,6 @@ interface StateMachineContext {
   env: Env;
   taskDate: string;
   executor: ReturnType<typeof createTaskExecutor>;
-  storage: any;
 }
 
 /**
@@ -59,7 +58,9 @@ async function handleListFetchedState(context: StateMachineContext): Promise<voi
 async function handleProcessingState(context: StateMachineContext): Promise<void> {
   logInfo(`State: processing -> Processing next batch`);
 
-  const batchSize = parseInt(context.env.TASK_BATCH_SIZE || '6', 10);
+  const { getConfig } = await import('../../config');
+  const config = getConfig(context.env);
+  const batchSize = config.task.batchSize;
   const result = await context.executor.processNextBatch(context.taskDate, batchSize);
 
   logInfo('Batch processed', result);
@@ -67,7 +68,7 @@ async function handleProcessingState(context: StateMachineContext): Promise<void
   // Check if all articles are processed (no pending or processing articles)
   if (result.pending === 0 && result.processing === 0) {
     logInfo('All articles processed, transitioning to aggregating');
-    await context.storage.updateTaskStatus(context.taskDate, DailyTaskStatus.AGGREGATING);
+    await context.executor.storage.updateTaskStatus(context.taskDate, DailyTaskStatus.AGGREGATING);
   }
 }
 
@@ -143,9 +144,8 @@ export async function executeStateMachine(env: Env): Promise<void> {
     // Initialize task executor
     const executor = createTaskExecutor(env);
 
-    // Get or create task
-    const storage = executor['storage']; // Access private field for task status check
-    const task = await storage.getOrCreateTask(taskDate);
+    // Get or create task using public getter
+    const task = await executor.storage.getOrCreateTask(taskDate);
 
     logInfo('Current task status', {
       taskDate: task.task_date,
@@ -160,7 +160,6 @@ export async function executeStateMachine(env: Env): Promise<void> {
       env,
       taskDate,
       executor,
-      storage,
     };
 
     // Create state handlers

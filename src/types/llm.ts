@@ -1,9 +1,4 @@
-/**
- * LLM-related type definitions
- * 
- * Centralized types for LLM providers, configurations, and responses
- */
-
+import type { Env } from './worker';
 import { LLMProviderType } from '../config/constants';
 
 // =============================================================================
@@ -47,15 +42,15 @@ export interface ChatCompletionResponse {
  * Used for both Worker and CLI environments
  * All LLM-related environment variables use the LLM_ prefix
  */
-export interface ProviderEnv {
-  LLM_PROVIDER?: string;
-  LLM_DEEPSEEK_API_KEY?: string;
-  LLM_DEEPSEEK_MODEL?: string;
-  LLM_OPENROUTER_API_KEY?: string;
-  LLM_OPENROUTER_MODEL?: string;
-  LLM_OPENROUTER_SITE_URL?: string;
-  LLM_OPENROUTER_SITE_NAME?: string;
-}
+export type ProviderEnv = Partial<Pick<Env,
+  | 'LLM_PROVIDER'
+  | 'LLM_DEEPSEEK_API_KEY'
+  | 'LLM_DEEPSEEK_MODEL'
+  | 'LLM_OPENROUTER_API_KEY'
+  | 'LLM_OPENROUTER_MODEL'
+  | 'LLM_OPENROUTER_SITE_URL'
+  | 'LLM_OPENROUTER_SITE_NAME'
+>>;
 
 /**
  * Resolved provider configuration after validation

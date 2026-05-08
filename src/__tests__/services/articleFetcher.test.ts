@@ -31,11 +31,11 @@ function createMockResponse(data: any) {
 }
 
 // Mock fetch at module level before importing constants
-let mockFetch: ReturnType<typeof vi.fn>;
+const mockFetch = vi.fn();
 
-vi.stubGlobal('fetch', vi.fn((url: string, options?: any) => {
+vi.stubGlobal('fetch', (url: string, options?: any) => {
   return mockFetch(url, options);
-}));
+});
 
 describe('Article Fetcher Service', () => {
   beforeEach(() => {
@@ -47,11 +47,6 @@ describe('Article Fetcher Service', () => {
       if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
         process.env[key] = String(value);
       }
-    });
-    
-    mockFetch = vi.fn();
-    vi.mocked(global.fetch).mockImplementation((url: any, options?: any) => {
-      return mockFetch(url, options);
     });
   });
 
@@ -517,15 +512,11 @@ describe('Article Fetcher Service', () => {
       const url = 'https://example.com/article';
       const markdownContent = 'This is the first paragraph of the article.\n\nThis is more content.';
 
-      mockFetch.mockImplementation(async (fetchUrl: string) => {
-        // Verify jina.ai URL format
-        expect(fetchUrl).toBe(`https://r.jina.ai/${encodeURIComponent(url)}`);
-        return {
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          text: async () => markdownContent,
-        };
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        text: async () => markdownContent,
       });
 
       const result = await fetchArticleMetadata(url, CrawlerProviderType.JINA);

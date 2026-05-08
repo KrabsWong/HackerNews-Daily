@@ -234,14 +234,6 @@ describe('Worker Configuration Validation', () => {
       expect(() => validateWorkerConfig(env)).not.toThrow();
     });
 
-    it('should pass with Zhipu provider', () => {
-      const env = createMockEnv({
-        llmProvider: 'zhipu',
-        githubEnabled: true,
-      });
-      expect(() => validateWorkerConfig(env)).not.toThrow();
-    });
-
     it('should throw on invalid LLM provider', () => {
       const env = createMockEnv() as any;
       env.LLM_PROVIDER = 'invalid-provider';

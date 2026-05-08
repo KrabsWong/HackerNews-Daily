@@ -71,13 +71,6 @@ export type {
   ProcessedStory,
 } from './shared';
 
-// Source types
-export type {
-  SourceConfig,
-  SourceContent,
-  ContentSource,
-} from './source';
-
 // Task types
 export {
   TaskExecutionStatus,

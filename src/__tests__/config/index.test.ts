@@ -150,16 +150,6 @@ describe('Config Module', () => {
       expect(config.llm.provider).toBe(LLMProviderType.OPENROUTER);
       expect(config.llm.openRouterApiKey).toBe('test-openrouter-key');
     });
-
-    it('should configure Zhipu provider', () => {
-      mockEnv.LLM_PROVIDER = 'zhipu';
-      mockEnv.LLM_ZHIPU_API_KEY = 'test-zhipu-key';
-
-      const config = getConfig(mockEnv);
-
-      expect(config.llm.provider).toBe(LLMProviderType.ZHIPU);
-      expect(config.llm.zhipuApiKey).toBe('test-zhipu-key');
-    });
   });
 
   describe('GitHub Configuration', () => {
