@@ -34,6 +34,9 @@ database_id = "7f5311dc-3fe3-40b9-add0-c20b8b58825d"
 TARGET_REPO = "KrabsWong/tldr-hackernews-24"
 TARGET_BRANCH = "main"
 
+# Telegram publishing configuration
+TELEGRAM_ENABLED = "true"
+
 # Number of articles to process per batch (default: 6)
 TASK_BATCH_SIZE = "6"
 
