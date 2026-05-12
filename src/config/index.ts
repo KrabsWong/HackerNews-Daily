@@ -7,7 +7,7 @@ import type { Env } from '../types/worker';
 import type { AppConfig } from './schema';
 import { validateConfig } from './validation';
 import { buildConfig } from './builder';
-import { setJinaConfig } from '../services/articleFetcher/jina';
+import { setJinaConfig } from '../services/articleFetcher/metadata';
 
 /**
  * Configuration cache

@@ -64,7 +64,3 @@ export interface Env {
   JINA_USE_KEY_ROTATION?: string; // "true" to alternate between API key and free tier for maximum utilization
 }
 
-/**
- * @deprecated Use Env instead. WorkerEnv is kept for backward compatibility.
- */
-export type WorkerEnv = Env;

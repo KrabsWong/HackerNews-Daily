@@ -9,6 +9,17 @@
  * This file is kept for backward compatibility but new code should not use it.
  */
 
-// All types are exported from their respective files
-// See: api.ts, content.ts, database.ts, errors.ts, llm.ts, logger.ts, 
-//      publisher.ts, shared.ts, task.ts, utils.ts, worker.ts
+// Error types (simplified)
+export {
+  AppError,
+  APIError,
+  ServiceError,
+  LLMError,
+  NetworkError,
+  isAppError,
+  isAPIError,
+  isServiceError,
+  isNetworkError,
+  isRetryableError,
+  toAppError,
+} from './errors';

@@ -3,11 +3,7 @@ import {
   AppError,
   APIError,
   ServiceError,
-  ValidationError,
-  DatabaseError,
   LLMError,
-  ContentError,
-  PublisherError,
   NetworkError,
   isAppError,
   isAPIError,
@@ -16,7 +12,6 @@ import {
   isRetryableError,
   toAppError,
 } from '../../types/errors';
-import { PublisherType } from '../../types/publisher';
 
 describe('Error Types', () => {
   describe('AppError', () => {
@@ -54,13 +49,7 @@ describe('Error Types', () => {
     });
 
     it('should include request ID if provided', () => {
-      const error = new APIError(
-        'API failed',
-        429,
-        'OpenAI',
-        {},
-        'req_123'
-      );
+      const error = new APIError('API failed', 429, 'OpenAI', {}, 'req_123');
 
       expect(error.requestId).toBe('req_123');
     });
@@ -108,11 +97,7 @@ describe('Error Types', () => {
 
   describe('ServiceError', () => {
     it('should create service error with service and operation', () => {
-      const error = new ServiceError(
-        'Service failed',
-        'llm',
-        'chatCompletion'
-      );
+      const error = new ServiceError('Service failed', 'llm', 'chatCompletion');
 
       expect(error.message).toBe('Service failed');
       expect(error.service).toBe('llm');
@@ -121,51 +106,9 @@ describe('Error Types', () => {
     });
   });
 
-  describe('ValidationError', () => {
-    it('should create validation error with field and value', () => {
-      const error = new ValidationError(
-        'Invalid value',
-        'email',
-        'not-an-email'
-      );
-
-      expect(error.message).toBe('Invalid value');
-      expect(error.field).toBe('email');
-      expect(error.value).toBe('not-an-email');
-      expect(error.code).toBe('VALIDATION_ERROR');
-    });
-
-    it('should work without field and value', () => {
-      const error = new ValidationError('Invalid config');
-
-      expect(error.field).toBeUndefined();
-      expect(error.value).toBeUndefined();
-    });
-  });
-
-  describe('DatabaseError', () => {
-    it('should create database error with operation and query', () => {
-      const error = new DatabaseError(
-        'Query failed',
-        'select',
-        'SELECT * FROM tasks'
-      );
-
-      expect(error.message).toBe('Query failed');
-      expect(error.operation).toBe('select');
-      expect(error.query).toBe('SELECT * FROM tasks');
-      expect(error.code).toBe('DATABASE_ERROR_SELECT');
-    });
-  });
-
   describe('LLMError', () => {
     it('should create LLM error with provider and model', () => {
-      const error = new LLMError(
-        'LLM failed',
-        'chatCompletion',
-        'openai',
-        'gpt-4'
-      );
+      const error = new LLMError('LLM failed', 'chatCompletion', 'openai', 'gpt-4');
 
       expect(error.message).toBe('LLM failed');
       expect(error.operation).toBe('chatCompletion');
@@ -175,57 +118,9 @@ describe('Error Types', () => {
     });
   });
 
-  describe('ContentError', () => {
-    it('should create content error with URL and content type', () => {
-      const error = new ContentError(
-        'Failed to fetch',
-        'fetch',
-        'https://example.com',
-        'text/html'
-      );
-
-      expect(error.message).toBe('Failed to fetch');
-      expect(error.operation).toBe('fetch');
-      expect(error.url).toBe('https://example.com');
-      expect(error.contentType).toBe('text/html');
-      expect(error.service).toBe('content');
-    });
-  });
-
-  describe('PublisherError', () => {
-    it('should create publisher error with recoverable flag', () => {
-      const error = new PublisherError(
-        'Publish failed',
-        PublisherType.GITHUB,
-        'publish',
-        true
-      );
-
-      expect(error.message).toBe('Publish failed');
-      expect(error.publisher).toBe(PublisherType.GITHUB);
-      expect(error.operation).toBe('publish');
-      expect(error.recoverable).toBe(true);
-      expect(error.service).toBe('publisher');
-    });
-
-    it('should default to recoverable=true', () => {
-      const error = new PublisherError(
-        'Publish failed',
-        PublisherType.TELEGRAM,
-        'sendMessage'
-      );
-
-      expect(error.recoverable).toBe(true);
-    });
-  });
-
   describe('NetworkError', () => {
     it('should create network error with URL and timeout', () => {
-      const error = new NetworkError(
-        'Request timeout',
-        'https://example.com',
-        5000
-      );
+      const error = new NetworkError('Request timeout', 'https://example.com', 5000);
 
       expect(error.message).toBe('Request timeout');
       expect(error.url).toBe('https://example.com');
@@ -234,11 +129,7 @@ describe('Error Types', () => {
     });
 
     it('should identify timeout errors', () => {
-      const timeoutError = new NetworkError(
-        'Timeout',
-        'https://example.com',
-        5000
-      );
+      const timeoutError = new NetworkError('Timeout', 'https://example.com', 5000);
       const connectionError = new NetworkError('Connection failed');
 
       expect(timeoutError.isTimeout()).toBe(true);
@@ -253,7 +144,7 @@ describe('Error Types', () => {
       const stdError = new Error('Test');
 
       expect(isAppError(appError)).toBe(true);
-      expect(isAppError(serviceError)).toBe(true); // ServiceError extends AppError
+      expect(isAppError(serviceError)).toBe(true);
       expect(isAppError(stdError)).toBe(false);
       expect(isAppError('string')).toBe(false);
     });
@@ -272,7 +163,7 @@ describe('Error Types', () => {
       const appError = new AppError('Test', 'TEST');
 
       expect(isServiceError(serviceError)).toBe(true);
-      expect(isServiceError(llmError)).toBe(true); // LLMError extends ServiceError
+      expect(isServiceError(llmError)).toBe(true);
       expect(isServiceError(appError)).toBe(false);
     });
 
