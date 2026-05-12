@@ -186,24 +186,7 @@ export const ALGOLIA_HN_API = {
   RETRY_DELAY: 1000,
 } as const;
 
-/**
- * Article fetcher configuration
- */
-export const ARTICLE_FETCHER = {
-  /** Request timeout in milliseconds (10 seconds - balanced for both speed and reliability) */
-  REQUEST_TIMEOUT: TIMEOUT_CONFIG.ARTICLE_FETCH,
-  /** User agent string for HTTP requests */
-  USER_AGENT: 'Mozilla/5.0 (compatible; HackerNewsDaily/1.0)',
-  /** 
-   * Batch size for concurrent article fetching
-   * Limits the number of articles fetched in parallel to avoid:
-   * - Server rate limiting or connection issues
-   * - Excessive memory usage from parallel JSDOM parsing
-   * - Sudden traffic spikes to target servers
-   * Recommended: 3-5 for balanced performance and politeness
-   */
-  BATCH_SIZE: 5,
-} as const;
+
 
 /**
  * Crawler API configuration for article content extraction
@@ -238,59 +221,9 @@ export const JINA_API = {
   },
 } as const;
 
-/**
- * Get the full crawler API endpoint URL from environment
- * Returns undefined if not configured - content fetching will be disabled
- * @param env - Environment containing CRAWLER_API_URL
- * @returns Full endpoint URL (including path) or undefined
- * @example getCrawlerApiUrl(env) => "https://your-crawl-url"
- */
-export function getCrawlerApiUrl(env: { CRAWLER_API_URL?: string }): string | undefined {
-  return env.CRAWLER_API_URL;
-}
 
-/**
- * Check if crawler API is enabled (i.e., endpoint URL is configured)
- * @param env - Environment containing CRAWLER_API_URL
- * @returns true if crawler API is configured
- */
-export function isCrawlerApiEnabled(env: { CRAWLER_API_URL?: string }): boolean {
-  return !!env.CRAWLER_API_URL;
-}
 
-// =============================================================================
-// Story Limits
-// =============================================================================
 
-/**
- * Story count limits and thresholds
- */
-export const STORY_LIMITS = {
-  /** Maximum number of stories to process (prevents performance issues) */
-  MAX_STORY_LIMIT: 30,
-  /** Threshold at which to warn users their limit will be capped */
-  WARN_THRESHOLD: 50,
-  /** Absolute maximum stories to fetch from API */
-  MAX_FETCH_LIMIT: 100,
-  /** Default number of comments to fetch per story */
-  DEFAULT_COMMENT_LIMIT: 10,
-} as const;
-
-// =============================================================================
-// Summary Configuration
-// =============================================================================
-
-/**
- * Summary length constraints
- */
-export const SUMMARY_CONFIG = {
-  /** Default summary length in characters */
-  DEFAULT_LENGTH: 300,
-  /** Minimum allowed summary length */
-  MIN_LENGTH: 100,
-  /** Maximum allowed summary length */
-  MAX_LENGTH: 500,
-} as const;
 
 // =============================================================================
 // Content Configuration
@@ -364,21 +297,7 @@ export const LLM_BATCH_CONFIG = {
   DEFAULT_CONCURRENCY: 5,
 } as const;
 
-// =============================================================================
-// Cache Configuration
-// =============================================================================
 
-/**
- * Local cache settings
- */
-export const CACHE_CONFIG = {
-  /** Default cache TTL in minutes */
-  DEFAULT_TTL_MINUTES: 30,
-  /** Cache directory name (relative to project root) */
-  CACHE_DIR: '.cache',
-  /** Cache file name */
-  CACHE_FILE: 'stories.json',
-} as const;
 
 // =============================================================================
 // Content Filter Configuration
@@ -399,27 +318,7 @@ export const CONTENT_FILTER_CONSTANTS = {
   FALLBACK_ON_ERROR: true,
 } as const;
 
-/**
- * Get content filter configuration from environment
- * @param env - Environment containing ENABLE_CONTENT_FILTER and CONTENT_FILTER_SENSITIVITY
- * @returns Content filter configuration object
- */
-export function getContentFilterConfig(env: {
-  ENABLE_CONTENT_FILTER?: string;
-  CONTENT_FILTER_SENSITIVITY?: string;
-}): {
-  enabled: boolean;
-  sensitivity: SensitivityLevel;
-  timeout: number;
-  fallbackOnError: boolean;
-} {
-  return {
-    enabled: env.ENABLE_CONTENT_FILTER === 'true',
-    sensitivity: (env.CONTENT_FILTER_SENSITIVITY || 'medium') as SensitivityLevel,
-    timeout: CONTENT_FILTER_CONSTANTS.TIMEOUT,
-    fallbackOnError: CONTENT_FILTER_CONSTANTS.FALLBACK_ON_ERROR,
-  };
-}
+
 
 // =============================================================================
 // Telegram Publisher Configuration
@@ -454,49 +353,7 @@ export const TELEGRAM_BATCH_CONFIG = {
   MESSAGE_DELAY: 500,
 } as const;
 
-// =============================================================================
-// Translation Progress Logging Configuration
-// =============================================================================
 
-/**
- * Progress logging settings for translation operations
- */
-export const TRANSLATION_PROGRESS_CONFIG = {
-  /**
-   * Log progress every N items
-   */
-  LOG_INTERVAL: 5,
-  
-  /**
-   * Time-based logging interval in seconds (log at least every N seconds)
-   */
-  TIME_INTERVAL_SECONDS: 30,
-  
-  /**
-   * Enable detailed logging (includes ETA and elapsed time)
-   */
-  ENABLE_DETAILED_LOGGING: false,
-} as const;
-
-/**
- * Comment translation reliability configuration
- */
-export const COMMENT_TRANSLATION_CONFIG = {
-  /**
-   * Maximum number of retry attempts for comment translation
-   */
-  MAX_RETRIES: 3,
-  
-  /**
-   * Base delay for exponential backoff in milliseconds
-   */
-  RETRY_BASE_DELAY: 1000,
-  
-  /**
-   * Minimum Chinese character ratio to consider translation valid (0.2 = 20%)
-   */
-  MIN_CHINESE_RATIO: 0.2,
-} as const;
 
 // =============================================================================
 // Default Environment Values

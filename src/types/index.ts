@@ -1,113 +1,14 @@
 /**
- * Centralized Type Exports
+ * Centralized Type Exports (DEPRECATED)
  * 
- * This file provides a single entry point for importing commonly used types.
- * All exportable types and interfaces MUST be defined in the src/types/ directory.
+ * NOTE: This barrel file is deprecated. Import types directly from their source files:
+ * 
+ * Instead of: import { HNStory } from '@/types';
+ * Use: import { HNStory } from '@/types/api';
+ * 
+ * This file is kept for backward compatibility but new code should not use it.
  */
 
-// API types
-export type {
-  HNStory,
-  AlgoliaStory,
-  AlgoliaComment,
-  AlgoliaSearchResponse,
-  HNComment,
-} from './api';
-
-// Content types
-export {
-  ContentClassification,
-} from './content';
-export type {
-  FilterClassification,
-  ContentFilter,
-  ArticleMetadata,
-} from './content';
-
-// Database types (D1)
-export type {
-  DailyTask,
-  DailyTaskStatus,
-  Article,
-  ArticleStatus,
-  TaskBatch,
-  BatchStatus,
-  TaskProgress,
-  BatchProcessingResult,
-} from './database';
-
-// LLM types
-export type {
-  ChatMessage,
-  ChatCompletionRequest,
-  ChatCompletionResponse,
-  ProviderEnv,
-  ResolvedProviderConfig,
-  ProviderConfig,
-  CreateProviderOptions,
-  LLMProvider,
-  OpenAIStyleResponse,
-} from './llm';
-
-// Logger types
-export type {
-  LogContext,
-  ExportMetrics,
-} from './logger';
-
-// Publisher types
-export type {
-  PublisherConfig,
-  PublishContent,
-  Publisher,
-  GitHubPublisherConfig,
-  GitHubFileResponse,
-  GitHubCreateFileRequest,
-  PushConfig,
-} from './publisher';
-
-// Shared types
-export type {
-  ProcessedStory,
-} from './shared';
-
-// Task types
-export {
-  TaskExecutionStatus,
-} from './task';
-export type {
-  BatchTask,
-  BatchResult,
-  TaskMetadata,
-} from './task';
-
-// Utility types
-export type {
-  FetchOptions,
-  DayBoundaries,
-} from './utils';
-
-// Worker types
-export type {
-  Env,
-  WorkerEnv,
-} from './worker';
-
-// Error types
-export {
-  AppError,
-  APIError,
-  ServiceError,
-  ValidationError,
-  DatabaseError,
-  LLMError,
-  ContentError,
-  PublisherError,
-  NetworkError,
-  isAppError,
-  isAPIError,
-  isServiceError,
-  isNetworkError,
-  isRetryableError,
-  toAppError,
-} from './errors';
+// All types are exported from their respective files
+// See: api.ts, content.ts, database.ts, errors.ts, llm.ts, logger.ts, 
+//      publisher.ts, shared.ts, task.ts, utils.ts, worker.ts

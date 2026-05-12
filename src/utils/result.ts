@@ -22,19 +22,7 @@ export type ErrorResult<E = Error> = { ok: false; error: E };
  */
 export type Result<T, E = Error> = Success<T> | ErrorResult<E>;
 
-/**
- * Type guard to check if result is a success
- */
-export function isSuccess<T, E>(result: Result<T, E>): result is Success<T> {
-  return result.ok;
-}
 
-/**
- * Type guard to check if result is an error
- */
-export function isError<T, E>(result: Result<T, E>): result is ErrorResult<E> {
-  return !result.ok;
-}
 
 /**
  * 创建成功结果
@@ -65,52 +53,4 @@ export async function fromPromise<T>(
   }
 }
 
-/**
- * 批量执行并收集结果（不会因单个失败而中断）
- * 适用于批量操作需要知道哪些成功哪些失败的场景
- */
-export async function collectResults<T>(
-  promises: Promise<Result<T>>[]
-): Promise<{ successes: T[]; failures: Error[] }> {
-  const results = await Promise.all(promises);
-  const successes: T[] = [];
-  const failures: Error[] = [];
 
-  for (const result of results) {
-    if (result.ok) {
-      successes.push(result.value);
-    } else {
-      failures.push(result.error);
-    }
-  }
-
-  return { successes, failures };
-}
-
-/**
- * 将 Result 数组展平为单个值数组（忽略错误）
- * 适用于只关心成功结果的场景
- */
-export function unwrapResults<T>(results: Result<T>[]): T[] {
-  return results.filter((r): r is { ok: true; value: T } => r.ok).map((r) => r.value);
-}
-
-/**
- * 检查是否所有结果都成功
- */
-export function allOk<T>(results: Result<T>[]): results is { ok: true; value: T }[] {
-  return results.every((r) => r.ok);
-}
-
-/**
- * 将 Result 映射为新的值（如果成功）
- */
-export function mapResult<T, U, E>(
-  result: Result<T, E>,
-  fn: (value: T) => U
-): Result<U, E> {
-  if (result.ok) {
-    return Ok(fn(result.value));
-  }
-  return result;
-}
