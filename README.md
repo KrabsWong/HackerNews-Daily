@@ -1,283 +1,105 @@
-# HackerNews Daily - Chinese Translation
+# HackerNews Daily
 
-A Cloudflare Worker that fetches top-rated stories from HackerNews's curated "best" list, processes them incrementally using D1 database for state management, extracts full article content via Crawler API, generates AI-powered summaries, fetches and summarizes top comments, and translates everything to Chinese using configurable LLM providers. Supports publishing to GitHub and Telegram.
+每日自动获取 HackerNews 热门文章，使用 AI 翻译和摘要，发布到 GitHub 和 Telegram。
 
-## Key Features
+## 技术栈
 
-- **Distributed Processing**: Uses Cloudflare D1 database to manage task state across multiple cron triggers
-- **Incremental Execution**: Processes articles in batches (default 6 per trigger) to stay within free tier subrequest limits (50/execution)
-- **State Machine Architecture**: Tracks task status through transitions: init → list_fetched → processing → aggregating → published
-- **Resilient**: Idempotent operations support safe retries and recovery from failures
+- **爬虫**: [Jina.ai Reader API](https://jina.ai/reader/) (500 RPM)
+- **LLM**: [DeepSeek](https://deepseek.com/) (翻译和摘要)
+- **发布**: GitHub + Telegram
 
-## System Architecture
+## 快速开始
 
-```mermaid
-flowchart TB
-    subgraph Triggers["Triggers"]
-        Cron["Cron Trigger<br/>(Every 10 min)"]
-        HTTP["HTTP Endpoints<br/>/trigger-export<br/>/task-status"]
-    end
+### 1. 安装依赖
 
-    subgraph Worker["Cloudflare Worker"]
-        Index["Worker Entry<br/>src/worker/index.ts"]
-        
-        subgraph TaskSystem["Distributed Task System"]
-            Executor["Task Executor<br/>State Machine"]
-            Storage["Task Storage<br/>D1 Operations"]
-        end
-        
-        subgraph Services["Core Services"]
-            Translator["Translator Service<br/>Title & Summary"]
-            ArticleFetcher["Article Fetcher<br/>Content Extraction"]
-            ContentFilter["Content Filter<br/>AI-powered"]
-            MarkdownExporter["Markdown Exporter"]
-        end
-        
-        subgraph LLM["LLM Providers"]
-            DeepSeek["DeepSeek"]
-            OpenRouter["OpenRouter"]
-            Zhipu["Zhipu AI"]
-        end
-        
-        subgraph Publishers["Publishers"]
-            GitHub["GitHub Publisher"]
-            Telegram["Telegram Publisher"]
-        end
-    end
-
-    subgraph ExternalAPIs["External APIs"]
-        HNAlgolia["HackerNews<br/>Algolia API"]
-        HNFirebase["HackerNews<br/>Firebase API"]
-        CrawlerAPI["Crawler API<br/>Content Extraction"]
-    end
-
-    subgraph Storage["Cloudflare D1"]
-        D1[("D1 Database<br/>daily_tasks<br/>articles<br/>task_batches")]
-    end
-
-    subgraph Outputs["Output Channels"]
-        GitHubRepo["GitHub Repository"]
-        TelegramChannel["Telegram Channel"]
-    end
-
-    %% Trigger connections
-    Cron --> Index
-    HTTP --> Index
-    
-    %% Worker internal flow
-    Index --> Executor
-    Executor --> Storage
-    Storage <--> D1
-    
-    Executor --> ArticleFetcher
-    Executor --> Translator
-    Executor --> ContentFilter
-    Executor --> MarkdownExporter
-    
-    %% Service dependencies
-    Translator --> DeepSeek
-    Translator --> OpenRouter
-    Translator --> Zhipu
-    ContentFilter --> DeepSeek
-    ContentFilter --> OpenRouter
-    ContentFilter --> Zhipu
-    
-    %% External API connections
-    Executor --> HNAlgolia
-    Executor --> HNFirebase
-    ArticleFetcher --> CrawlerAPI
-    
-    %% Publishing flow
-    Executor --> GitHub
-    Executor --> Telegram
-    GitHub --> GitHubRepo
-    Telegram --> TelegramChannel
+```bash
+npm install
 ```
 
-### State Machine Flow
+### 2. 配置环境变量
 
-```mermaid
-stateDiagram-v2
-    [*] --> init: Cron Trigger
-    
-    init --> list_fetched: Fetch article list<br/>Store in D1
-    
-    list_fetched --> processing: Process first batch<br/>(6 articles)
-    
-    processing --> processing: Process next batch<br/>Until all done
-    processing --> aggregating: All articles<br/>processed
-    
-    aggregating --> published: Generate Markdown<br/>Publish to GitHub/Telegram
-    
-    published --> [*]: Task Complete
-    
-    note right of processing
-        Each batch:
-        1. Fetch article content
-        2. Fetch comments
-        3. Translate titles
-        4. Summarize content
-        5. Summarize comments
-    end note
+创建 `.env` 文件：
+
+```bash
+# Jina.ai API Key（必填）
+JINA_API_KEY=your-jina-api-key
+
+# DeepSeek API Key（必填）
+LLM_DEEPSEEK_API_KEY=your-deepseek-api-key
+
+# GitHub 配置（必填）
+GITHUB_TOKEN=your-github-token
+TARGET_REPO=your-username/your-repo
+TARGET_BRANCH=main
+
+# Telegram 配置（可选）
+TELEGRAM_ENABLED=false
+TELEGRAM_BOT_TOKEN=your-bot-token
+TELEGRAM_CHANNEL_ID=@your-channel
+
+# 可选配置
+HN_STORY_LIMIT=30
+SUMMARY_MAX_LENGTH=300
 ```
 
-### Data Flow
+### 3. 本地运行
 
-```mermaid
-flowchart LR
-    subgraph Input
-        HN["HackerNews API"]
-    end
-    
-    subgraph Processing
-        Fetch["Fetch Stories"] --> Filter["Content Filter"]
-        Filter --> Extract["Extract Content"]
-        Extract --> Translate["Translate & Summarize"]
-        Translate --> Aggregate["Aggregate Results"]
-    end
-    
-    subgraph Output
-        MD["Markdown"]
-        GH["GitHub"]
-        TG["Telegram"]
-    end
-    
-    HN --> Fetch
-    Aggregate --> MD
-    MD --> GH
-    MD --> TG
+```bash
+npm run dev
 ```
 
-## Documentation
+### 4. 编译
 
-Comprehensive documentation is available in the `docs/` directory:
+```bash
+npm run build
+npm start
+```
 
-### Quick Start
-- **[Quick Start Guide](docs/quick-start.md)** - Get up and running in 5 minutes
+## 部署到腾讯云
 
-### Configuration
-- **[Configuration Guide](docs/configuration.md)** - Complete configuration reference
-  - D1 database settings
-  - Task processing options
-  - LLM provider setup
-  - Story fetching and content processing
-  - GitHub/Telegram publishing configuration
-  - Cron scheduling and performance tuning
+详见 [deploy/README.md](deploy/README.md)
 
-### API Reference
-- **[API Endpoints](docs/api-endpoints.md)** - HTTP API documentation
-  - Health check (`GET /`)
-  - Trigger export (async) and (sync)
-  - Task status (`GET /task-status`)
-  - Retry failed tasks (`POST /retry-failed-tasks`)
-  - Force publish (`POST /force-publish`)
-  - Error handling and rate limiting
+### 快速部署
 
-### Deployment
-- **[Cloudflare Worker Deployment](docs/cloudflare-worker-deployment.md)** - Production deployment
-  - Wrangler CLI setup
-  - Environment variable configuration
-  - Secret management
+```bash
+# 构建 Docker 镜像
+docker build -f deploy/Dockerfile -t hackernews-daily .
 
-### Database Management
-- **[D1 Database Management](docs/d1-database-management.md)** - Database operations
-  - Two-database strategy (production/dev)
-  - Schema reference
-  - Common queries
-  - Performance monitoring
-  - Backup and maintenance
+# 运行
+docker run --rm \
+  -e JINA_API_KEY=xxx \
+  -e LLM_DEEPSEEK_API_KEY=xxx \
+  -e GITHUB_TOKEN=xxx \
+  -e TARGET_REPO=xxx \
+  hackernews-daily
+```
 
-### Development
-- **[Local Development Guide](docs/local-development.md)** - Local testing and debugging
-  - Development environment setup
-  - Database isolation for safe testing
-  - Testing HTTP endpoints
-  - Debugging techniques and tools
-
-### Monitoring & Logging
-- **[Logging Guide](docs/logging.md)** - Observability
-  - Real-time log streaming
-  - Cloudflare dashboard monitoring
-  - Error tracking and debugging
-  - Performance metrics
-
-### Testing
-- **[Testing Guide](docs/TESTING.md)** - Testing standards
-  - Test coverage requirements
-  - Mock infrastructure
-  - Test organization
-  - Writing new tests
-
-## Quick Navigation
-
-| What you want to do | Read this |
-|---------------------|-----------|
-| Set up and deploy for first time | [Quick Start Guide](docs/quick-start.md) |
-| Change configuration | [Configuration Guide](docs/configuration.md) |
-| Learn about API endpoints | [API Endpoints](docs/api-endpoints.md) |
-| Deploy to production | [Cloudflare Worker Deployment](docs/cloudflare-worker-deployment.md) |
-| Manage D1 database | [D1 Database Management](docs/d1-database-management.md) |
-| Test locally | [Local Development Guide](docs/local-development.md) |
-| View logs and metrics | [Logging Guide](docs/logging.md) |
-| Write tests | [Testing Guide](docs/TESTING.md) |
-
-## Prerequisites
-
-- Node.js 20+
-- Cloudflare account (free tier works fine - just need to enable D1 databases)
-- LLM provider API key (DeepSeek, OpenRouter, or Zhipu AI)
-- GitHub personal access token (if using GitHub publisher)
-
-## Project Structure
+## 项目结构
 
 ```
 src/
-├── api/                      # External API integrations
-│   └── hackernews/           # HackerNews APIs (Firebase + Algolia)
-├── config/                   # Configuration management
-│   ├── constants.ts          # API constants & enums
-│   ├── schema.ts            # Configuration schema & types
-│   ├── builder.ts           # Configuration builder
-│   ├── validation.ts        # Configuration validation
-│   └── index.ts             # Configuration exports
+├── api/
+│   └── hackernews/     # Algolia HN API
 ├── services/
-│   ├── llm/                  # LLM provider abstraction
-│   │   ├── base.ts          # Base LLM provider class
-│   │   ├── providers.ts      # DeepSeek, OpenRouter, Zhipu implementations
-│   │   ├── utils.ts          # Provider utilities
-│   │   └── index.ts          # Factory & exports
-│   ├── translator/           # Translation & summarization
-│   ├── articleFetcher/       # Article content extraction
-│   │   ├── crawler.ts       # Crawler API integration
-│   │   ├── direct.ts        # Direct HTML parsing
-│   │   └── index.ts         # Fetcher exports
-│   ├── contentFilter/        # AI content filtering
-│   ├── task/                 # Distributed task processing
-│   │   ├── executor.ts      # Task orchestration & state machine
-│   │   ├── storage.ts       # D1 database operations
-│   │   └── index.ts         # Task service exports
-│   └── markdownExporter.ts   # Markdown generation
-├── types/                    # TypeScript type definitions
-│   ├── database.ts           # D1 database types (with enums)
-│   ├── publisher.ts          # Publisher types
-│   └── ...                   # Other type definitions
-├── utils/                    # Utility functions
-│   ├── array.ts             # Array utilities
-│   ├── date.ts              # Date utilities
-│   ├── fetch.ts             # HTTP client wrapper
-│   └── ...                   # Other utilities
-└── worker/                   # Cloudflare Worker
-    ├── routes/               # HTTP route handlers
-    ├── statemachine/         # State machine logic
-    ├── sources/              # Content source abstraction
-    ├── publishers/           # Publishing abstraction
-    └── logger.ts            # Logging utilities
+│   ├── articleFetcher/ # Jina.ai 爬虫
+│   ├── llm/           # DeepSeek LLM
+│   ├── translator/    # 翻译服务
+│   └── markdownExporter.ts
+├── scripts/
+│   └── daily-export-simple.ts  # 主脚本
+├── utils/
+│   ├── date.ts
+│   └── fetch.ts
+└── types/
+    └── index.ts
 ```
+
+## 获取 API Key
+
+- **Jina.ai**: https://jina.ai/reader/ (免费 500 RPM)
+- **DeepSeek**: https://platform.deepseek.com/ (新用户送额度)
+- **GitHub Token**: https://github.com/settings/tokens (需要 repo 权限)
 
 ## License
 
 MIT
-
-## Contributing
-
-Contributions are welcome! Please read [Testing Guide](docs/TESTING.md) for guidelines on writing tests.

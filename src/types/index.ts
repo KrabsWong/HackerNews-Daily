@@ -1,25 +1,71 @@
 /**
- * Centralized Type Exports (DEPRECATED)
- * 
- * NOTE: This barrel file is deprecated. Import types directly from their source files:
- * 
- * Instead of: import { HNStory } from '@/types';
- * Use: import { HNStory } from '@/types/api';
- * 
- * This file is kept for backward compatibility but new code should not use it.
+ * 类型定义
  */
 
-// Error types (simplified)
-export {
-  AppError,
-  APIError,
-  ServiceError,
-  LLMError,
-  NetworkError,
-  isAppError,
-  isAPIError,
-  isServiceError,
-  isNetworkError,
-  isRetryableError,
-  toAppError,
-} from './errors';
+// 文章元数据
+export interface ArticleMetadata {
+  url: string;
+  description: string | null;
+  fullContent: string | null;
+}
+
+// LLM 相关类型
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatCompletionResponse {
+  content: string;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+export interface LLMProvider {
+  getName(): string;
+  getModel(): string;
+  chatCompletion(messages: ChatMessage[], temperature?: number): Promise<ChatCompletionResponse>;
+}
+
+// 错误类型
+export class LLMError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'LLMError';
+  }
+}
+
+export class FetchError extends Error {
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = 'FetchError';
+  }
+}
+
+// API 类型
+export interface Story {
+  id: number;
+  title: string;
+  url?: string;
+  score: number;
+  time: number;
+  by: string;
+  descendants?: number;
+}
+
+// 处理后的文章
+export interface ProcessedStory {
+  rank: number;
+  storyId: number;
+  titleEnglish: string;
+  titleChinese: string;
+  url: string;
+  score: number;
+  time: string;
+  timestamp: number;
+  description: string;
+  commentSummary: string | null;
+}

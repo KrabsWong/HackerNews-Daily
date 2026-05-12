@@ -1,48 +1,28 @@
 {
-  "name": "hacknews-daily",
-  "version": "4.0.0",
-  "description": "Fetch and translate HackerNews top stories to Chinese",
-  "main": "dist/index.js",
+  "name": "hackernews-daily",
+  "version": "5.0.0",
+  "description": "HackerNews daily export with Jina.ai crawler and DeepSeek LLM",
+  "main": "dist/scripts/daily-export-simple.js",
   "scripts": {
-    "build:worker": "node esbuild.worker.config.mjs",
-    "build:worker:watch": "node esbuild.worker.config.mjs --watch",
-    "clean:worker": "rm -rf dist/worker",
-    "dev:worker": "wrangler dev --local --persist-to .wrangler/state --env dev",
-    "deploy:worker": "npm run build:worker && wrangler deploy",
-    "deploy:worker:staging": "npm run build:worker && wrangler deploy --env staging",
-    "logs:worker": "wrangler tail",
-    "validate:worker": "wrangler validate",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage --config vitest.coverage.config.ts"
+    "build": "tsc",
+    "start": "node dist/scripts/daily-export-simple.js",
+    "dev": "tsx src/scripts/daily-export-simple.ts",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "hackernews",
-    "cloudflare-workers",
-    "translation",
-    "chinese"
+    "jina-ai",
+    "deepseek",
+    "translation"
   ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@mozilla/readability": "^0.6.0",
-    "cheerio": "^1.1.2",
-    "dotenv": "^16.3.1",
-    "linkedom": "^0.16.0"
+    "dotenv": "^16.3.1"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.11.1",
-    "@cloudflare/workers-types": "^4.0.0",
-    "@types/jsdom": "^27.0.0",
     "@types/node": "^20.10.5",
-    "@vitest/coverage-v8": "^3.2.4",
-    "@vitest/ui": "^3.2.4",
-    "esbuild": "^0.19.0",
-    "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
-    "typescript": "^5.3.3",
-    "vitest": "^3.2.4",
-    "wrangler": "^4.53.0"
+    "typescript": "^5.3.3"
   }
 }

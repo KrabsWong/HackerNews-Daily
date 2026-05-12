@@ -1,42 +1,26 @@
 # Dependencies
 node_modules/
 
-# Build output
+# Build
 dist/
-web/dist/
 
-# Environment variables
+# Environment
 .env
 .dev.vars
 
-# Cloudflare Worker local config (contains sensitive settings)
-# Use wrangler.toml (committed) for Git integration
-wrangler.local.toml
-.dev.vars
-
-# Cache
-.cache/
-.wrangler/
-
-# Test coverage
-coverage/
-
-# Exported markdown files
-hacknews-export/
-
-# DB Migrations
-migrations/
-
-# Logs
-logs/
-*.log
-npm-debug.log*
-
-# OS files
-.DS_Store
-
 # IDE
-.vscode/
 .idea/
+.vscode/
 *.swp
 *.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test
+coverage/

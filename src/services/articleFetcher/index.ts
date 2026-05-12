@@ -1,7 +1,5 @@
 /**
- * Article Fetcher Service
- * Fetches article content using configured crawler provider (Crawler API or jina.ai)
+ * Article Fetcher - Jina.ai Reader
  */
 
-export { fetchArticlesBatch, fetchArticleMetadata, setJinaConfig } from './metadata';
-export type { ArticleMetadata } from '../../types/content';
+export { fetchWithJinaAPI, fetchArticlesWithJina } from './jina';

@@ -1,204 +1,136 @@
 /**
- * Translation Service
- *
- * Main entry point for translation and summarization operations.
- * Delegates to specialized modules for actual implementation.
+ * Translator Service
  */
 
-import { HNComment } from '../../types/api';
-import {
-  LLMProvider,
-  createLLMProvider,
-  CreateProviderOptions,
-} from '../llm';
-import * as title from './title';
-import * as summary from './summary';
+import { DeepSeekProvider } from '../llm';
+import type { ChatMessage } from '../../types';
 
-/**
- * TranslationService class
- * Provides a unified interface for all translation and summarization operations.
- * Uses singleton pattern - access via exported `translator` instance.
- */
-class TranslationService {
-  private provider: LLMProvider | null = null;
-  private initialized = false;
+export interface TranslatorConfig {
+  apiKey: string;
+  model?: string;
+}
 
-  /**
-   * Initialize the translation service with LLM provider
-   * @param options - Provider options
-   */
-  init(options: CreateProviderOptions): void {
-    if (this.initialized) {
-      return;
-    }
+export class Translator {
+  private provider: DeepSeekProvider | null = null;
 
-    this.provider = createLLMProvider(options);
-    this.initialized = true;
-
-    console.log(
-      `Translation service initialized with ${this.provider.getName()} provider (model: ${this.provider.getModel()})`
-    );
+  init(config: TranslatorConfig): void {
+    this.provider = new DeepSeekProvider(config.apiKey, config.model);
   }
 
   /**
-   * Get the current provider (for testing or advanced usage)
+   * 批量翻译标题
    */
-  getProvider(): LLMProvider | null {
-    return this.provider;
-  }
-
-  /**
-   * Ensure provider is initialized
-   */
-  private ensureProvider(): LLMProvider {
+  async translateTitles(titles: string[]): Promise<string[]> {
     if (!this.provider) {
-      throw new Error('Translation service not initialized');
+      throw new Error('Translator not initialized');
     }
-    return this.provider;
-  }
 
-  // ============================================
-  // Title Translation Methods
-  // ============================================
+    const results: string[] = [];
 
-  /**
-   * Translate a single title to Chinese
-   */
-  async translateTitle(titleText: string): Promise<string> {
-    return title.translateTitle(this.ensureProvider(), titleText);
-  }
+    for (let i = 0; i < titles.length; i++) {
+      const title = titles[i];
+      console.log(`  [${i + 1}/${titles.length}] 翻译标题...`);
 
-  /**
-   * Translate multiple titles sequentially
-   */
-  async translateBatch(titles: string[]): Promise<string[]> {
-    return title.translateBatchSequential(this.ensureProvider(), titles);
-  }
+      try {
+        const response = await this.provider.chatCompletion([
+          {
+            role: 'system',
+            content: '你是一个专业的技术翻译。请将用户提供的英文标题翻译成简洁的中文。只返回翻译结果。',
+          },
+          { role: 'user', content: title },
+        ], 0.3);
 
-  /**
-   * Batch translate multiple titles in a single API call (optimized)
-   */
-  async translateTitlesBatch(
-    titles: string[],
-    batchSize: number = 10
-  ): Promise<string[]> {
-    return title.translateTitlesBatch(this.ensureProvider(), titles, batchSize);
-  }
+        results.push(response.content.trim());
+      } catch (error) {
+        console.warn(`  ⚠️  翻译失败: ${error}`);
+        results.push(title);
+      }
+    }
 
-  // ============================================
-  // Description Translation Methods
-  // ============================================
-
-  /**
-   * Translate a single description to Chinese
-   */
-  async translateDescription(description: string | null): Promise<string> {
-    return title.translateDescription(this.ensureProvider(), description);
+    return results;
   }
 
   /**
-   * Translate multiple descriptions sequentially
+   * 批量摘要内容
    */
-  async translateDescriptionsBatch(
-    descriptions: (string | null)[]
-  ): Promise<string[]> {
-    return title.translateDescriptionsBatch(this.ensureProvider(), descriptions);
-  }
-
-  // ============================================
-  // Content Summarization Methods
-  // ============================================
-
-  /**
-   * Summarize article content in Chinese
-   */
-  async summarizeContent(
-    content: string,
-    maxLength: number
-  ): Promise<string | null> {
-    return summary.summarizeContent(this.ensureProvider(), content, maxLength);
-  }
-
-  /**
-   * Summarize multiple contents sequentially with fallback
-   */
-  async summarizeBatch(
+  async summarizeContents(
     contents: (string | null)[],
-    fallbackDescriptions: (string | null)[],
-    maxLength: number
+    maxLength: number = 300
   ): Promise<string[]> {
-    return summary.summarizeBatchSequential(
-      this.ensureProvider(),
-      contents,
-      fallbackDescriptions,
-      maxLength
-    );
+    if (!this.provider) {
+      throw new Error('Translator not initialized');
+    }
+
+    const results: string[] = [];
+
+    for (let i = 0; i < contents.length; i++) {
+      const content = contents[i];
+      console.log(`  [${i + 1}/${contents.length}] 生成内容摘要...`);
+
+      if (!content) {
+        results.push('暂无摘要');
+        continue;
+      }
+
+      try {
+        const response = await this.provider.chatCompletion([
+          {
+            role: 'system',
+            content: `你是内容摘要助手。请用中文总结文章内容，控制在${maxLength}字以内。只返回摘要内容。`,
+          },
+          { role: 'user', content: content.substring(0, 5000) },
+        ], 0.3);
+
+        results.push(response.content.trim());
+      } catch (error) {
+        console.warn(`  ⚠️  摘要失败: ${error}`);
+        results.push('暂无摘要');
+      }
+    }
+
+    return results;
   }
 
   /**
-   * Summarize multiple contents using concurrent single-item processing
-   * Returns array with empty strings for null/missing content (preserves indices)
-   * Index-to-content alignment is guaranteed by code (not dependent on LLM response order)
-   * @param concurrency - Number of concurrent LLM requests (default 10)
+   * 批量摘要评论
    */
-  async summarizeContentBatch(
-    contents: (string | null)[],
-    maxLength: number,
-    concurrency: number = 10
-  ): Promise<string[]> {
-    return summary.summarizeContentBatch(
-      this.ensureProvider(),
-      contents,
-      maxLength,
-      concurrency
-    );
-  }
+  async summarizeComments(
+    commentsBatch: string[],
+    maxLength: number = 300
+  ): Promise<(string | null)[]> {
+    if (!this.provider) {
+      throw new Error('Translator not initialized');
+    }
 
-  // ============================================
-  // Comment Summarization Methods
-  // ============================================
+    const results: (string | null)[] = [];
 
-  /**
-   * Summarize comments for a single story
-   */
-  async summarizeComments(comments: HNComment[]): Promise<string | null> {
-    return summary.summarizeComments(this.ensureProvider(), comments);
-  }
+    for (let i = 0; i < commentsBatch.length; i++) {
+      const comments = commentsBatch[i];
+      console.log(`  [${i + 1}/${commentsBatch.length}] 生成评论摘要...`);
 
-  /**
-   * Summarize comments with retry logic for reliability
-   */
-  async summarizeCommentsWithRetry(
-    comments: HNComment[],
-    maxRetries?: number
-  ): Promise<string | null> {
-    return summary.summarizeCommentsWithRetry(
-      this.ensureProvider(),
-      comments,
-      maxRetries
-    );
-  }
+      if (!comments || comments.trim().length === 0) {
+        results.push(null);
+        continue;
+      }
 
-  /**
-   * Summarize comments for multiple stories using concurrent single-item processing
-   * Returns array with empty strings for insufficient comments (preserves indices)
-   * Index-to-content alignment is guaranteed by code (not dependent on LLM response order)
-   * @param concurrency - Number of concurrent LLM requests (default 10)
-   */
-  async summarizeCommentsBatch(
-    commentArrays: HNComment[][],
-    concurrency: number = 10
-  ): Promise<string[]> {
-    return summary.summarizeCommentsBatch(
-      this.ensureProvider(),
-      commentArrays,
-      concurrency
-    );
+      try {
+        const response = await this.provider.chatCompletion([
+          {
+            role: 'system',
+            content: `你是评论摘要助手。请用中文总结评论核心观点，控制在${maxLength}字以内。只返回摘要内容。`,
+          },
+          { role: 'user', content: comments.substring(0, 3000) },
+        ], 0.3);
+
+        results.push(response.content.trim());
+      } catch (error) {
+        console.warn(`  ⚠️  评论摘要失败: ${error}`);
+        results.push(null);
+      }
+    }
+
+    return results;
   }
 }
 
-// Export singleton instance
-export const translator = new TranslationService();
-
-// Re-export types for convenience
-export type { CreateProviderOptions } from '../llm';
+export const translator = new Translator();
