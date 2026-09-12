@@ -24,6 +24,9 @@ npm install
 # DeepSeek API Key（必填）
 LLM_DEEPSEEK_API_KEY=your-deepseek-api-key
 
+# Tinyfish 补偿（可选，留空禁用）
+TINYFISH_API_KEY=
+
 # GitHub 配置（必填）
 GITHUB_TOKEN=your-github-token
 TARGET_REPO=your-username/your-repo
@@ -126,6 +129,10 @@ src/
 ## 外链读取与备选来源
 
 外链内容优先通过 DeepSeek Responses API 的 Web Search 读取原始 URL。原始网页无法访问时，DeepSeek 可以根据已成功打开的相关公开报道生成备选摘要；生成结果会保留备选来源链接，并在日报页面中标注“原文不可用”，来源可按需展开查看。
+
+配置 `TINYFISH_API_KEY` 后，如果现有 DeepSeek 流程返回空结果、无可用摘要或抛错，会继续尝试 Tinyfish Fetch 原文；正文不足时按文章标题搜索，过滤首页和重复链接，最多 Fetch 3 个备选页面，再由 DeepSeek 根据正文核实相关性并生成摘要。只保留实际采用的来源链接，重定向后的不同地址也按备选来源标注。未配置 Key 时不会请求 Tinyfish。
+
+Fetch 每次请求超时 60 秒，不自动重试；每篇正文最多传入前 20,000 字符，因此长文可能丢失后半部分。搜索片段不会传给摘要模型，正文是否对应同一事件仍依赖模型判断。HTTP 200 中的逐页错误会被过滤，原文 Fetch 超时、5xx 等异常时继续搜索备选；认证失败或限流时直接保留不可用状态。接口格式参见 [Tinyfish Fetch 文档](https://docs.tinyfish.ai/fetch-api)，部署和历史重跑见 [部署指南](deploy/README.md#tinyfish-补偿配置与历史重跑)。
 
 帖子没有外链、原始与备选网页都没有可读正文，或 API 请求失败时，任务不会中断；对应文章会保留完整标题和链接，并在描述中显示无法获取内容的原因。搜索片段、未成功打开的网页以及没有来源标记的模型文本不会作为摘要发布。
 

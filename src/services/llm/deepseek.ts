@@ -37,7 +37,7 @@ export interface UrlSummaryResult {
   sourceUrls: string[];
 }
 
-function sanitizeSourceUrl(rawUrl: string): string | null {
+export function sanitizeSourceUrl(rawUrl: string): string | null {
   try {
     const parsed = new URL(rawUrl);
     if (!['http:', 'https:'].includes(parsed.protocol)) {
@@ -63,7 +63,7 @@ function sanitizeSourceUrl(rawUrl: string): string | null {
   }
 }
 
-function normalizeSourceUrl(rawUrl: string): string | null {
+export function normalizeSourceUrl(rawUrl: string): string | null {
   const sanitizedUrl = sanitizeSourceUrl(rawUrl);
   if (!sanitizedUrl) {
     return null;

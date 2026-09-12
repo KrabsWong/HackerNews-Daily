@@ -26,6 +26,7 @@ npm run typecheck # 类型检查
 | 变量 | 必填 | 说明 |
 |------|------|------|
 | `LLM_DEEPSEEK_API_KEY` | ✅ | DeepSeek API Key（外链读取、翻译和摘要） |
+| `TINYFISH_API_KEY` | ❌ | Tinyfish Search / Fetch 共用 Key；非空自动启用失败补偿，留空禁用 |
 | `GITHUB_TOKEN` | ✅ | GitHub Token (repo 权限) |
 | `TARGET_REPO` | ✅ | 目标仓库 (owner/repo) |
 | `HN_TARGET_DATE` | ❌ | 指定补跑日期 (YYYY-MM-DD) |

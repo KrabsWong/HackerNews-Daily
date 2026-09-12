@@ -128,6 +128,7 @@ tail -f /opt/hackernews-daily/logs/hackernews-daily.log
 | 变量 | 必填 | 说明 |
 |------|------|------|
 | `LLM_DEEPSEEK_API_KEY` | ✅ | DeepSeek API Key（外链读取、翻译和摘要） |
+| `TINYFISH_API_KEY` | ❌ | Tinyfish Search / Fetch 共用 Key；非空自动启用失败补偿，留空禁用 |
 | `GITHUB_TOKEN` | ✅ | GitHub Personal Access Token |
 | `TARGET_REPO` | ✅ | 目标仓库 (owner/repo) |
 | `TARGET_BRANCH` | ❌ | 分支 (默认 main) |
@@ -179,3 +180,72 @@ npm run build
 docker build -f deploy/Dockerfile -t hackernews-daily:latest .
 docker run --rm --env-file .env hackernews-daily:latest
 ```
+
+## Tinyfish 补偿配置与历史重跑
+
+### 配置位置
+
+在**运行任务的服务器项目根目录** `/opt/hackernews-daily/.env` 添加一行（本地运行则修改本地项目根目录 `.env`）：
+
+```dotenv
+TINYFISH_API_KEY=你的实际TinyfishKey
+```
+
+Key 在 [Tinyfish 控制台](https://agent.tinyfish.ai/api-keys) 创建，Search 与 Fetch 共用。之前调研脚本目录里的 `.env` 不会被本项目读取，需要把 Key 填入上述文件。已有 `.env` 时只添加这一项，不要用示例文件覆盖现有配置。也可以通过进程环境变量注入，优先于 `.env`；禁用时清空该变量，并检查进程环境中没有旧值。
+
+`LLM_DEEPSEEK_API_KEY` 仍为必填：Tinyfish 获取正文后依然交给 DeepSeek 生成摘要。GitHub、Telegram 的配置位置保持为同一份 `.env`。无需额外 npm 依赖、端口或后台服务，也无需修改 cron；服务器需能通过 HTTPS 访问 `api.fetch.tinyfish.ai`、`api.search.tinyfish.ai` 和原有 API。Docker 的 `--env-file .env` 和 Compose 的 `env_file: ../.env` 已自动传入新配置，无需在 Dockerfile 写 Key。
+
+链路：DeepSeek 现有流程 → 失败时 Fetch 原文 → 正文不足时 Search 标题、Fetch 最多 3 个备选页面 → DeepSeek 判断相关性并摘要 → 仍失败则 `unavailable`。原文 Fetch 超时、5xx 或响应解析失败时继续搜索备选；401/403/429、后续搜索或摘要异常会结束该篇补偿，不阻断其他文章。未配置 Key 时保持原有行为。补偿会增加请求耗时以及 Search / LLM 用量；Fetch 的逐页成功与错误按 [官方接口格式](https://docs.tinyfish.ai/fetch-api) 分别处理。
+
+### 更新部署
+
+将本次代码同步到服务器并填写 Key 后，原生 Node.js 执行：
+
+```bash
+cd /opt/hackernews-daily
+npm ci
+npm run build
+```
+
+Docker 还需要重建镜像（只修改 `.env` 无法让旧镜像获得新代码）：
+
+```bash
+docker build -f deploy/Dockerfile -t hackernews-daily:latest .
+```
+
+如果通过 Compose 运行，则执行 `docker compose -f deploy/docker-compose.yml build hackernews-daily`。任务每次启动都会读取配置，无需重启常驻服务。
+
+### 重跑 2026-09-11
+
+日期范围为 **UTC 2026-09-11 00:00:00 至 2026-09-12 00:00:00（不含）**。命令会重新获取当天热门文章并生成完整日报，不是只修补失败条目；当前分数和评论可能与首次执行时不同。
+
+可先预览，验证输出而不调用 GitHub / Telegram：
+
+```bash
+HN_TARGET_DATE=2026-09-11 npm run preview
+```
+
+原生 Node.js 正式重跑（在已编译的项目根目录执行）：
+
+```bash
+HN_TARGET_DATE=2026-09-11 TELEGRAM_ENABLED=false npm start
+```
+
+Docker：
+
+```bash
+docker run --rm --env-file .env \
+  -e HN_TARGET_DATE=2026-09-11 -e TELEGRAM_ENABLED=false \
+  hackernews-daily:latest
+```
+
+Docker Compose：
+
+```bash
+docker compose -f deploy/docker-compose.yml run --rm \
+  -e HN_TARGET_DATE=2026-09-11 -e TELEGRAM_ENABLED=false hackernews-daily
+```
+
+正式重跑会更新 `TARGET_REPO` / `TARGET_BRANCH` 下该日期的 Markdown 文件。上述命令临时关闭 Telegram，避免重复推送；如需同时重新推送频道，将 `TELEGRAM_ENABLED=false` 改为 `TELEGRAM_ENABLED=true`，这会发送新消息，不会编辑旧消息。不要把 `HN_TARGET_DATE` 长期写入 `.env` 或 cron。
+
+日志出现 `Tinyfish 补偿` 表示进入补偿，出现 `补偿成功：original/alternative` 表示恢复成功；已有 DeepSeek 摘要时不会触发 Tinyfish，未出现补偿日志不代表配置错误。

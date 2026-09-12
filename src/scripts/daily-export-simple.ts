@@ -56,7 +56,7 @@ export async function generateDailyExport(
 
   // 3. DeepSeek 读取外链、翻译和摘要
   console.log('\n[3/3] 🤖 DeepSeek 读取外链、翻译和摘要...');
-  translator.init({ apiKey: deepseekApiKey });
+  translator.init({ apiKey: deepseekApiKey, tinyfishApiKey: process.env.TINYFISH_API_KEY });
 
   console.log('  翻译标题...');
   const titlesZh = await translator.translateTitles(stories.map(s => s.title));
